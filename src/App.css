@@ -81,10 +81,195 @@
   border-radius: 12px;
   padding: 14px 16px 16px;
   transition: border-color 120ms ease;
+  cursor: pointer;
+  outline: none;
 }
 
 .card:hover {
   border-color: var(--border-strong);
+}
+
+.card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+.card.expanded {
+  grid-column: 1 / -1;
+}
+
+.card.flipped {
+  border-color: var(--accent);
+}
+
+.flip-row {
+  margin-top: 10px;
+}
+
+.flip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.flip-bull {
+  background: var(--bull-bg);
+  color: var(--bull);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.flip-bear {
+  background: var(--bear-bg);
+  color: var(--bear);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.flip-neutral {
+  background: var(--neutral-bg);
+  color: var(--neutral);
+  border: 1px solid rgba(156, 163, 175, 0.4);
+}
+
+.posbar-section {
+  margin-top: 14px;
+}
+
+.posbar {
+  position: relative;
+  height: 6px;
+  margin-bottom: 6px;
+}
+
+.posbar-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--neutral-bg) 0%,
+    var(--neutral-bg) 100%
+  );
+  border: 1px solid var(--border);
+}
+
+.posbar.near-buy .posbar-track {
+  background: linear-gradient(
+    to right,
+    var(--bull-bg) 0%,
+    var(--bull-bg) 20%,
+    var(--neutral-bg) 20%,
+    var(--neutral-bg) 100%
+  );
+}
+
+.posbar.near-sell .posbar-track {
+  background: linear-gradient(
+    to right,
+    var(--neutral-bg) 0%,
+    var(--neutral-bg) 80%,
+    var(--bear-bg) 80%,
+    var(--bear-bg) 100%
+  );
+}
+
+.posbar.disabled .posbar-track {
+  opacity: 0.4;
+}
+
+.posbar-marker {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-strong);
+  border: 2px solid var(--bg-elev);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.posbar.near-buy .posbar-marker {
+  background: var(--bull);
+}
+
+.posbar.near-sell .posbar-marker {
+  background: var(--bear);
+}
+
+.posbar-labels {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.posbar-end {
+  font-variant-numeric: tabular-nums;
+}
+
+.posbar-end.buy {
+  color: var(--bull);
+}
+
+.posbar-end.sell {
+  color: var(--bear);
+  text-align: right;
+}
+
+.zone-tag {
+  justify-self: center;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.zone-tag.zone-buy {
+  background: var(--bull-bg);
+  color: var(--bull);
+}
+
+.zone-tag.zone-sell {
+  background: var(--bear-bg);
+  color: var(--bear);
+}
+
+.chart-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  cursor: default;
+}
+
+.chart-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chart-state {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.chart-state.error {
+  color: var(--bear);
 }
 
 .card-head {
