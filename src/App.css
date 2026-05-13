@@ -8,9 +8,9 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 16px;
+  padding-bottom: 14px;
 }
 
 .topbar h1 {
@@ -24,11 +24,53 @@
   font-size: 13px;
 }
 
+.view-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: -1px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.view-tab:hover {
+  color: var(--text-strong);
+}
+
+.view-tab.active {
+  color: var(--text-strong);
+  border-bottom-color: var(--accent);
+}
+
+.view-tab-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .chip {
@@ -72,14 +114,14 @@
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 14px 16px 16px;
+  padding: 11px 12px 12px;
   transition: border-color 120ms ease;
   cursor: pointer;
   outline: none;
@@ -102,11 +144,23 @@
   border-color: var(--accent);
 }
 
-.flip-row {
-  margin-top: 10px;
+.card.has-setup.setup-long {
+  border-color: rgba(34, 197, 94, 0.6);
 }
 
-.flip {
+.card.has-setup.setup-short {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.flip,
+.setup {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -136,25 +190,33 @@
   border: 1px solid rgba(156, 163, 175, 0.4);
 }
 
+.setup.setup-long {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--bull);
+  border: 1px solid rgba(34, 197, 94, 0.55);
+}
+
+.setup.setup-short {
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--bear);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+}
+
 .posbar-section {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .posbar {
   position: relative;
-  height: 6px;
-  margin-bottom: 6px;
+  height: 8px;
+  margin-bottom: 8px;
 }
 
 .posbar-track {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    var(--neutral-bg) 0%,
-    var(--neutral-bg) 100%
-  );
+  background: var(--neutral-bg);
   border: 1px solid var(--border);
 }
 
@@ -185,13 +247,13 @@
 .posbar-marker {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--text-strong);
-  border: 2px solid var(--bg-elev);
+  border: 2px solid #ffffff;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 .posbar.near-buy .posbar-marker {
@@ -214,6 +276,8 @@
 
 .posbar-end {
   font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .posbar-end.buy {
@@ -247,16 +311,22 @@
 }
 
 .chart-panel {
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
   cursor: default;
+}
+
+.chart-wrap {
+  background: #111318;
+  border-radius: 8px;
+  padding: 12px;
 }
 
 .chart-meta {
   font-size: 11px;
   color: var(--text-dim);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -272,9 +342,40 @@
   color: var(--bear);
 }
 
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 6px 2px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.legend-label {
+  font-family: var(--mono);
+  letter-spacing: 0.3px;
+}
+
 .card-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
@@ -303,6 +404,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .trend.bullish {
@@ -321,21 +423,21 @@
 }
 
 .grid {
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
+  gap: 6px 14px;
 }
 
 .grid > div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
 .grid dt {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-dim);
@@ -344,12 +446,14 @@
 .grid dd {
   margin: 0;
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.15;
 }
 
 .grid dd.buy {
@@ -361,7 +465,25 @@
 }
 
 .grid dd.range-state {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.width-pct {
+  font-family: var(--mono);
   font-size: 13px;
+  font-weight: 600;
+  margin-left: 8px;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.width-pct.widening {
+  color: rgba(239, 68, 68, 0.85);
+}
+
+.width-pct.narrowing {
+  color: rgba(34, 197, 94, 0.85);
 }
 
 .state {
@@ -377,11 +499,20 @@
   border-color: var(--bear);
 }
 
+.state.state-center {
+  padding: 64px 32px;
+  font-size: 15px;
+  color: var(--text);
+}
+
 @media (max-width: 640px) {
   .topbar h1 {
     font-size: 22px;
   }
   .cards {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+  .grid dd {
+    font-size: 18px;
   }
 }

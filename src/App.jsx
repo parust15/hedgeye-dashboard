@@ -14,6 +14,8 @@ import './App.css'
 
 const NEAR_BUY = 0.20
 const NEAR_SELL = 0.80
+const LONG_SETUP_PCT = 0.25
+const SHORT_SETUP_PCT = 0.75
 
 const CATEGORY_LABELS = {
   us_sectors: 'Sectors',
@@ -26,15 +28,12 @@ function labelFor(category) {
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-const RANGE_FILL = {
-  'HH/HL': 'rgba(34, 197, 94, 0.25)',
-  'LH/LL': 'rgba(239, 68, 68, 0.25)',
-  'HH/LL': 'rgba(251, 146, 60, 0.25)',
-  'LH/HL': 'rgba(96, 165, 250, 0.25)',
-  unchanged: 'rgba(156, 163, 175, 0.15)',
-}
-function fillFor(state) {
-  return RANGE_FILL[state] ?? RANGE_FILL.unchanged
+const NEUTRAL_BAND_FILL = 'rgba(156, 163, 175, 0.1)'
+function widthFill(widthDelta) {
+  const wd = Number(widthDelta)
+  if (!Number.isFinite(wd) || wd === 0) return NEUTRAL_BAND_FILL
+  if (wd > 0) return 'url(#rr-widen)'
+  return 'url(#rr-narrow)'
 }
 
 function trendClass(trend) {
@@ -58,6 +57,14 @@ function rangePct(row) {
   const span = sell - buy
   if (span === 0) return null
   return (close - buy) / span
+}
+
+function getSetup(row) {
+  const pct = rangePct(row)
+  if (pct === null) return null
+  if (row.trend === 'BULLISH' && pct < LONG_SETUP_PCT) return 'LONG'
+  if (row.trend === 'BEARISH' && pct > SHORT_SETUP_PCT) return 'SHORT'
+  return null
 }
 
 function PositionBar({ pct }) {
@@ -89,6 +96,39 @@ function TrendChangeBadge({ change }) {
   return <span className="flip flip-neutral">◆ {to}</span>
 }
 
+function SetupBadge({ setup }) {
+  if (setup === 'LONG') return <span className="setup setup-long">⚡ LONG SETUP</span>
+  if (setup === 'SHORT') return <span className="setup setup-short">🔻 SHORT SETUP</span>
+  return null
+}
+
+function LegendSwatch({ stroke }) {
+  return (
+    <svg className="legend-swatch" width="14" height="14" aria-hidden="true">
+      <path
+        d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2 M0,14 l14,-14"
+        stroke={stroke}
+        strokeWidth="1.5"
+      />
+    </svg>
+  )
+}
+
+function ChartLegend() {
+  return (
+    <div className="chart-legend">
+      <span className="legend-item">
+        <LegendSwatch stroke="rgba(239,68,68,0.85)" />
+        <span className="legend-label">↔ Widening (red lines)</span>
+      </span>
+      <span className="legend-item">
+        <LegendSwatch stroke="rgba(34,197,94,0.85)" />
+        <span className="legend-label">↔ Narrowing (green lines)</span>
+      </span>
+    </div>
+  )
+}
+
 function ExpandedChart({ ticker }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -101,7 +141,7 @@ function ExpandedChart({ ticker }) {
       // works as the user said either is acceptable.
       const { data, error } = await supabase
         .from('hedgeye_signals_v')
-        .select('signal_date,buy_trade,sell_trade,prev_close,range_state')
+        .select('signal_date,buy_trade,sell_trade,prev_close,range_state,width_delta')
         .eq('ticker', ticker)
         .order('signal_date', { ascending: false })
         .limit(10)
@@ -116,6 +156,7 @@ function ExpandedChart({ ticker }) {
         sell: Number(r.sell_trade),
         close: Number(r.prev_close),
         state: r.range_state,
+        widthDelta: r.width_delta,
       }))
       setData(ordered)
     }
@@ -131,9 +172,17 @@ function ExpandedChart({ ticker }) {
 
   return (
     <div className="chart-wrap">
-      <div className="chart-meta">Last {data.length} sessions · per-day range_state fill</div>
+      <div className="chart-meta">Last {data.length} sessions · per-day width direction</div>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+          <defs>
+            <pattern id="rr-widen" patternUnits="userSpaceOnUse" width="8" height="8">
+              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(239,68,68,0.45)" strokeWidth="1.5" />
+            </pattern>
+            <pattern id="rr-narrow" patternUnits="userSpaceOnUse" width="8" height="8">
+              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(34,197,94,0.45)" strokeWidth="1.5" />
+            </pattern>
+          </defs>
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
           <XAxis
             dataKey="date"
@@ -166,7 +215,7 @@ function ExpandedChart({ ticker }) {
               key={`band-${d.date}`}
               x1={d.date}
               x2={data[i + 1].date}
-              fill={fillFor(d.state)}
+              fill={widthFill(data[i + 1].widthDelta)}
               fillOpacity={1}
               stroke="none"
             />
@@ -201,11 +250,29 @@ function ExpandedChart({ ticker }) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      <ChartLegend />
     </div>
   )
 }
 
-function SignalCard({ row, change, expanded, onToggle }) {
+function WidthDeltaPct({ row }) {
+  if (row.prev_trr === null || row.prev_trr === undefined) return null
+  if (row.prev_lrr === null || row.prev_lrr === undefined) return null
+  const wd = Number(row.width_delta)
+  const prevTrr = Number(row.prev_trr)
+  const prevLrr = Number(row.prev_lrr)
+  if (!Number.isFinite(wd) || !Number.isFinite(prevTrr) || !Number.isFinite(prevLrr)) return null
+  const prevWidth = prevTrr - prevLrr
+  if (prevWidth === 0) return null
+  const pct = (wd / prevWidth) * 100
+  const rounded = Math.abs(pct).toFixed(1)
+  if (rounded === '0.0') return null
+  const sign = pct > 0 ? '+' : '−'
+  const cls = pct > 0 ? 'width-pct widening' : 'width-pct narrowing'
+  return <span className={cls}>{sign}{rounded}%</span>
+}
+
+function SignalCard({ row, change, setup, expanded, onToggle }) {
   const pct = rangePct(row)
   let zoneLabel = null
   if (pct !== null) {
@@ -213,9 +280,18 @@ function SignalCard({ row, change, expanded, onToggle }) {
     else if (pct > NEAR_SELL) zoneLabel = 'Near sell'
   }
 
+  const cardClasses = [
+    'card',
+    expanded ? 'expanded' : '',
+    change ? 'flipped' : '',
+    setup ? `has-setup setup-${setup.toLowerCase()}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <article
-      className={`card${expanded ? ' expanded' : ''}${change ? ' flipped' : ''}`}
+      className={cardClasses}
       onClick={() => onToggle(row.ticker)}
       role="button"
       tabIndex={0}
@@ -236,8 +312,9 @@ function SignalCard({ row, change, expanded, onToggle }) {
         <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
       </header>
 
-      {change && (
-        <div className="flip-row">
+      {(setup || change) && (
+        <div className="badge-row">
+          <SetupBadge setup={setup} />
           <TrendChangeBadge change={change} />
         </div>
       )}
@@ -257,7 +334,10 @@ function SignalCard({ row, change, expanded, onToggle }) {
         </div>
         <div>
           <dt>Range</dt>
-          <dd className="range-state">{row.range_state ?? '—'}</dd>
+          <dd className="range-state">
+            {row.range_state ?? '—'}
+            <WidthDeltaPct row={row} />
+          </dd>
         </div>
       </dl>
 
@@ -283,6 +363,7 @@ export default function App() {
   const [rows, setRows] = useState([])
   const [changes, setChanges] = useState({})
   const [signalDate, setSignalDate] = useState(null)
+  const [view, setView] = useState('all') // 'all' | 'setups'
   const [active, setActive] = useState('All')
   const [expanded, setExpanded] = useState(null)
   const [status, setStatus] = useState('loading')
@@ -320,7 +401,7 @@ export default function App() {
         supabase
           .from('hedgeye_signals_v')
           .select(
-            'ticker,name,display_name,trend,buy_trade,sell_trade,prev_close,range_state,category,signal_date'
+            'ticker,name,display_name,trend,buy_trade,sell_trade,prev_close,range_state,category,signal_date,width_delta,prev_trr,prev_lrr'
           )
           .eq('signal_date', date),
         supabase
@@ -374,7 +455,42 @@ export default function App() {
     return c
   }, [filters, rows])
 
-  const filtered = useMemo(() => {
+  // Hide zero-count chips, but always keep "All".
+  const visibleFilters = useMemo(
+    () => filters.filter((f) => f.value === null || (counts[f.label] ?? 0) > 0),
+    [filters, counts]
+  )
+
+  // If the active chip becomes hidden (e.g., data shifts), fall back to All.
+  useEffect(() => {
+    if (!visibleFilters.find((f) => f.label === active)) setActive('All')
+  }, [visibleFilters, active])
+
+  const setupCount = useMemo(
+    () => rows.reduce((n, r) => (getSetup(r) ? n + 1 : n), 0),
+    [rows]
+  )
+
+  const visibleCards = useMemo(() => {
+    if (view === 'setups') {
+      const setups = rows
+        .map((r) => ({ row: r, setup: getSetup(r), pct: rangePct(r) }))
+        .filter((x) => x.setup !== null)
+
+      setups.sort((a, b) => {
+        const fa = changes[a.row.ticker] ? 0 : 1
+        const fb = changes[b.row.ticker] ? 0 : 1
+        if (fa !== fb) return fa - fb
+        // Longs: pct ascending (closest to buy first)
+        // Shorts: pct descending (closest to sell first)
+        if (a.setup === 'LONG' && b.setup === 'LONG') return (a.pct ?? 0) - (b.pct ?? 0)
+        if (a.setup === 'SHORT' && b.setup === 'SHORT') return (b.pct ?? 0) - (a.pct ?? 0)
+        // Mix: LONG before SHORT
+        return a.setup === 'LONG' ? -1 : 1
+      })
+      return setups.map((x) => x.row)
+    }
+
     const f = filters.find((x) => x.label === active)
     let list
     if (!f || f.value === null) list = rows
@@ -394,7 +510,7 @@ export default function App() {
       if (ta !== tb) return ta - tb
       return a.ticker.localeCompare(b.ticker)
     })
-  }, [filters, rows, active, changes])
+  }, [view, filters, rows, active, changes])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
@@ -413,34 +529,61 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="chips" role="tablist" aria-label="Category filters">
-        {filters.map((f) => (
-          <button
-            key={f.label}
-            role="tab"
-            aria-selected={active === f.label}
-            className={`chip${active === f.label ? ' active' : ''}`}
-            onClick={() => setActive(f.label)}
-          >
-            {f.label}
-            <span className="chip-count">{counts[f.label] ?? 0}</span>
-          </button>
-        ))}
+      <nav className="view-tabs" role="tablist" aria-label="Dashboard view">
+        <button
+          role="tab"
+          aria-selected={view === 'all'}
+          className={`view-tab${view === 'all' ? ' active' : ''}`}
+          onClick={() => setView('all')}
+        >
+          All Signals
+          <span className="view-tab-count">{rows.length}</span>
+        </button>
+        <button
+          role="tab"
+          aria-selected={view === 'setups'}
+          className={`view-tab${view === 'setups' ? ' active' : ''}`}
+          onClick={() => setView('setups')}
+        >
+          ⚡ Actionable Setups
+          <span className="view-tab-count">{setupCount}</span>
+        </button>
       </nav>
+
+      {view === 'all' && (
+        <nav className="chips" role="tablist" aria-label="Category filters">
+          {visibleFilters.map((f) => (
+            <button
+              key={f.label}
+              role="tab"
+              aria-selected={active === f.label}
+              className={`chip${active === f.label ? ' active' : ''}`}
+              onClick={() => setActive(f.label)}
+            >
+              {f.label}
+              <span className="chip-count">{counts[f.label] ?? 0}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {status === 'loading' && <div className="state">Loading…</div>}
       {status === 'error' && <div className="state error">Error: {error}</div>}
-      {status === 'ready' && filtered.length === 0 && (
+      {status === 'ready' && view === 'setups' && visibleCards.length === 0 && (
+        <div className="state state-center">No active setups today.</div>
+      )}
+      {status === 'ready' && view === 'all' && visibleCards.length === 0 && (
         <div className="state">No signals in this category for {signalDate}.</div>
       )}
 
-      {status === 'ready' && filtered.length > 0 && (
+      {status === 'ready' && visibleCards.length > 0 && (
         <section className="cards">
-          {filtered.map((r) => (
+          {visibleCards.map((r) => (
             <SignalCard
               key={r.ticker}
               row={r}
               change={changes[r.ticker]}
+              setup={getSetup(r)}
               expanded={expanded === r.ticker}
               onToggle={toggleExpand}
             />
