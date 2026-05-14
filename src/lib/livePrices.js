@@ -19,8 +19,9 @@ export function useLivePrices(isMarketOpen) {
         .select('ticker,current_price,change_amount,change_pct,prev_close,quoted_at,source')
       if (cancelled) return
       if (error) {
-        // Soft-fail: leave the existing map untouched so cards keep their
-        // current state rather than flashing to "none".
+        // Soft-fail for UX (cards keep their current state rather than
+        // flashing to "none"), but log so the failure is debuggable.
+        console.warn('useLivePrices: fetch failed:', error)
         return
       }
       const next = new Map()

@@ -145,10 +145,21 @@ export function formatNextChange(state: MarketState, now: Date = new Date()): st
   return sameDay ? `Opens ${timeStr} ET` : `Opens ${timeStr} ET ${p.weekday}`
 }
 
+function sameMarketState(a: MarketState, b: MarketState): boolean {
+  return a.isOpen === b.isOpen && a.nextChange.getTime() === b.nextChange.getTime()
+}
+
 export function useMarketState(): MarketState {
   const [state, setState] = useState<MarketState>(() => getMarketState())
   useEffect(() => {
-    const id = setInterval(() => setState(getMarketState()), 30_000)
+    const id = setInterval(() => {
+      // Only swap state identity when something materially changed, so the
+      // 30s tick doesn't cascade re-renders across the app.
+      setState((prev) => {
+        const next = getMarketState()
+        return sameMarketState(prev, next) ? prev : next
+      })
+    }, 30_000)
     return () => clearInterval(id)
   }, [])
   return state

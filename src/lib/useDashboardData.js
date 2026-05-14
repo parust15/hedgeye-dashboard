@@ -31,8 +31,9 @@ export function useDashboardData() {
         .limit(1)
 
       if (latest.error) {
+        console.error('useDashboardData: latest signal_date query failed:', latest.error)
         if (!cancelled) {
-          setError(latest.error.message)
+          setError(true)
           setStatus('error')
         }
         return
@@ -70,7 +71,8 @@ export function useDashboardData() {
 
       if (cancelled) return
       if (signalsRes.error) {
-        setError(signalsRes.error.message)
+        console.error('useDashboardData: signals query failed:', signalsRes.error)
+        setError(true)
         setStatus('error')
         return
       }
