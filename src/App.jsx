@@ -13,6 +13,7 @@ import { supabase } from './lib/supabase'
 import { useMarketState, formatNextChange } from './lib/marketState'
 import { useLivePrices } from './lib/livePrices'
 import { getPriceDisplay } from './lib/priceDisplay'
+import { useDashboardData } from './lib/useDashboardData'
 import './App.css'
 
 const NEAR_BUY = 0.20
@@ -48,6 +49,19 @@ function labelFor(category) {
 
 const TICKER_STORAGE_KEY = 'dashboard.selectedTickers'
 
+// Shared palette for the 10-day chart. One source of truth keeps line
+// colors, axis chrome, and tooltip styling consistent.
+const CHART_COLORS = {
+  axis: '#262b38',
+  axisTick: '#8b93a6',
+  grid: 'rgba(255,255,255,0.06)',
+  tooltipBg: '#14171f',
+  tooltipBorder: '#364056',
+  textStrong: '#f3f5fa',
+  sell: '#ef4444',
+  buy: '#22c55e',
+}
+
 const RANGE_FILL = {
   'HH/HL': 'rgba(34, 197, 94, 0.28)',
   'LH/LL': 'rgba(239, 68, 68, 0.28)',
@@ -66,7 +80,7 @@ function trendClass(trend) {
   return 'trend neutral'
 }
 
-function fmt(n) {
+function formatNumber(n) {
   if (n === null || n === undefined) return '—'
   const num = Number(n)
   if (!Number.isFinite(num)) return '—'
@@ -274,7 +288,7 @@ function ExpandedChart({ ticker, display }) {
     const { cx, cy, index, key } = props
     if (!Number.isFinite(cx) || !Number.isFinite(cy)) return <g key={key} />
     if (index !== lastIdx) {
-      return <circle key={key} cx={cx} cy={cy} r={2} fill="#f3f5fa" />
+      return <circle key={key} cx={cx} cy={cy} r={2} fill={CHART_COLORS.textStrong} />
     }
     if (liveState === 'live') {
       return (
@@ -283,7 +297,7 @@ function ExpandedChart({ ticker, display }) {
           cx={cx}
           cy={cy}
           r={8}
-          fill="#22c55e"
+          fill={CHART_COLORS.buy}
           className="pulse-dot-svg"
         />
       )
@@ -291,7 +305,7 @@ function ExpandedChart({ ticker, display }) {
     if (liveState === 'closed') {
       return <circle key={key} cx={cx} cy={cy} r={6} fill="#ffffff" />
     }
-    return <circle key={key} cx={cx} cy={cy} r={2} fill="#f3f5fa" />
+    return <circle key={key} cx={cx} cy={cy} r={2} fill={CHART_COLORS.textStrong} />
   }
 
   return (
@@ -315,31 +329,31 @@ function ExpandedChart({ ticker, display }) {
               />
             </pattern>
           </defs>
-          <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+          <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fill: '#8b93a6', fontSize: 11 }}
+            tick={{ fill: CHART_COLORS.axisTick, fontSize: 11 }}
             tickFormatter={(d) => d.slice(5)}
-            stroke="#262b38"
+            stroke={CHART_COLORS.axis}
           />
           <YAxis
             domain={['dataMin', 'dataMax']}
-            tick={{ fill: '#8b93a6', fontSize: 11 }}
-            stroke="#262b38"
+            tick={{ fill: CHART_COLORS.axisTick, fontSize: 11 }}
+            stroke={CHART_COLORS.axis}
             width={48}
-            tickFormatter={(n) => fmt(n)}
+            tickFormatter={(n) => formatNumber(n)}
           />
           <Tooltip
             contentStyle={{
-              background: '#14171f',
-              border: '1px solid #364056',
+              background: CHART_COLORS.tooltipBg,
+              border: `1px solid ${CHART_COLORS.tooltipBorder}`,
               borderRadius: 8,
-              color: '#f3f5fa',
+              color: CHART_COLORS.textStrong,
               fontSize: 12,
             }}
             formatter={(value, name) => {
               const label = name === 'buy' ? 'LRR (buy)' : name === 'sell' ? 'TRR (sell)' : 'Prev close'
-              return [fmt(value), label]
+              return [formatNumber(value), label]
             }}
           />
           {data.slice(0, -1).map((d, i) => (
@@ -356,7 +370,7 @@ function ExpandedChart({ ticker, display }) {
             type="monotone"
             dataKey="sell"
             name="sell"
-            stroke="#ef4444"
+            stroke={CHART_COLORS.sell}
             strokeWidth={2}
             dot={false}
             isAnimationActive={false}
@@ -365,7 +379,7 @@ function ExpandedChart({ ticker, display }) {
             type="monotone"
             dataKey="buy"
             name="buy"
-            stroke="#22c55e"
+            stroke={CHART_COLORS.buy}
             strokeWidth={2}
             dot={false}
             isAnimationActive={false}
@@ -374,7 +388,7 @@ function ExpandedChart({ ticker, display }) {
             type="monotone"
             dataKey="close"
             name="close"
-            stroke="#f3f5fa"
+            stroke={CHART_COLORS.textStrong}
             strokeWidth={1.5}
             strokeDasharray="4 3"
             dot={renderCloseDot}
@@ -475,15 +489,15 @@ function SignalCard({ row, change, setup, display, expanded, onToggle }) {
       <dl className="grid">
         <div>
           <dt>Buy</dt>
-          <dd className="buy">{fmt(row.buy_trade)}</dd>
+          <dd className="buy">{formatNumber(row.buy_trade)}</dd>
         </div>
         <div>
           <dt>Sell</dt>
-          <dd className="sell">{fmt(row.sell_trade)}</dd>
+          <dd className="sell">{formatNumber(row.sell_trade)}</dd>
         </div>
         <div>
           <dt>Prev Close</dt>
-          <dd>{fmt(row.prev_close)}</dd>
+          <dd>{formatNumber(row.prev_close)}</dd>
         </div>
         <div>
           <dt>Range</dt>
@@ -497,7 +511,7 @@ function SignalCard({ row, change, setup, display, expanded, onToggle }) {
       <div className="posbar-section">
         <PositionBar markerPct={markerPct} ghostPct={ghostPct} zone={zone} />
         <div className="posbar-labels">
-          <span className="posbar-end buy">{fmt(row.buy_trade)}</span>
+          <span className="posbar-end buy">{formatNumber(row.buy_trade)}</span>
           {zoneLabel ? (
             <span className={`zone-tag zone-${zone === 'near-buy' ? 'buy' : 'sell'}`}>
               {zoneLabel}
@@ -505,7 +519,7 @@ function SignalCard({ row, change, setup, display, expanded, onToggle }) {
           ) : (
             <span />
           )}
-          <span className="posbar-end sell">{fmt(row.sell_trade)}</span>
+          <span className="posbar-end sell">{formatNumber(row.sell_trade)}</span>
         </div>
       </div>
 
@@ -604,9 +618,8 @@ function TickerFilter({ allTickers, selectedTickers, setSelectedTickers }) {
   function clearAll() {
     setSelectedTickers(new Set())
   }
-  function resetToDefault() {
-    setSelectedTickers(new Set(allTickers.map((r) => r.ticker)))
-  }
+  // "Reset to default" semantically means "restore all selected" per spec.
+  const resetToDefault = selectAll
   function toggleGroupCollapse(key) {
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -718,7 +731,7 @@ function TickerFilter({ allTickers, selectedTickers, setSelectedTickers }) {
   )
 }
 
-function fmtTime(iso) {
+function formatTime(iso) {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
@@ -726,10 +739,7 @@ function fmtTime(iso) {
 }
 
 export default function App() {
-  const [rows, setRows] = useState([])
-  const [changes, setChanges] = useState({})
-  const [signalDate, setSignalDate] = useState(null)
-  const [updatedAt, setUpdatedAt] = useState(null)
+  const { rows, changes, signalDate, updatedAt, status, error } = useDashboardData()
   const [view, setView] = useState('all') // 'all' | 'setups'
   // Multi-select chip state: a Set of category labels. Empty set == "All" active.
   const [activeCategories, setActiveCategories] = useState(() => new Set())
@@ -739,83 +749,9 @@ export default function App() {
   const [selectedTickers, setSelectedTickers] = useState(null)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
-  const [status, setStatus] = useState('loading')
-  const [error, setError] = useState(null)
 
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setStatus('loading')
-      setError(null)
-
-      const latest = await supabase
-        .from('hedgeye_signals_v')
-        .select('signal_date')
-        .order('signal_date', { ascending: false })
-        .limit(1)
-
-      if (latest.error) {
-        if (!cancelled) {
-          setError(latest.error.message)
-          setStatus('error')
-        }
-        return
-      }
-      const date = latest.data?.[0]?.signal_date
-      if (!date) {
-        if (!cancelled) {
-          setRows([])
-          setStatus('ready')
-        }
-        return
-      }
-
-      const [signalsRes, changesRes, parsedRes] = await Promise.all([
-        supabase
-          .from('hedgeye_signals_v')
-          .select(
-            'ticker,name,display_name,trend,buy_trade,sell_trade,prev_close,range_state,category,signal_date,width_delta,prev_trr,prev_lrr'
-          )
-          .eq('signal_date', date),
-        supabase
-          .from('hedgeye_trend_changes_v')
-          .select('ticker,from_trend,to_trend')
-          .eq('signal_date', date),
-        // MAX(parsed_at) — raw table is still RLS-blocked from anon, so this
-        // returns []. The "Updated …" header line lights up automatically
-        // once the policy opens.
-        supabase
-          .from('hedgeye_signals')
-          .select('parsed_at')
-          .eq('signal_date', date)
-          .order('parsed_at', { ascending: false })
-          .limit(1),
-      ])
-
-      if (cancelled) return
-      if (signalsRes.error) {
-        setError(signalsRes.error.message)
-        setStatus('error')
-        return
-      }
-      const changeMap = {}
-      for (const c of changesRes.data ?? []) {
-        changeMap[c.ticker] = c
-      }
-      setSignalDate(date)
-      setRows(signalsRes.data ?? [])
-      setChanges(changeMap)
-      setUpdatedAt(parsedRes.data?.[0]?.parsed_at ?? null)
-      setStatus('ready')
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   // Reconcile selectedTickers with the current rows when data arrives or
   // changes. Stored shape: { selected: string[], known: string[] }. We use
@@ -836,7 +772,9 @@ export default function App() {
           }
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('Failed to read selectedTickers from localStorage:', err)
+    }
 
     let next
     if (stored) {
@@ -866,7 +804,9 @@ export default function App() {
         known: rows.map((r) => r.ticker),
       }
       localStorage.setItem(TICKER_STORAGE_KEY, JSON.stringify(payload))
-    } catch {}
+    } catch (err) {
+      console.warn('Failed to persist selectedTickers to localStorage:', err)
+    }
   }, [selectedTickers, rows])
 
   // Map: ticker → priceDisplay. Recomputed when rows, live prices, or market
@@ -948,64 +888,65 @@ export default function App() {
     [rows, displays, selectedTickers]
   )
 
-  const visibleCards = useMemo(() => {
-    // Tickers hidden via the dropdown drop out before any other logic.
-    const visibleRows = selectedTickers
-      ? rows.filter((r) => selectedTickers.has(r.ticker))
-      : rows
+  // Step 1: tickers hidden via the dropdown drop out before any other logic.
+  const visibleRows = useMemo(
+    () => (selectedTickers ? rows.filter((r) => selectedTickers.has(r.ticker)) : rows),
+    [rows, selectedTickers]
+  )
 
-    let baseList
-    if (view === 'setups') {
-      const setups = visibleRows
-        .map((r) => {
-          const d = displays.get(r.ticker)
-          return { row: r, setup: getSetup(r, d), pct: effectivePct(r, d) }
-        })
-        .filter((x) => x.setup !== null)
-
-      // Closest to threshold first: longs by pct asc, shorts by pct desc.
-      setups.sort((a, b) => {
-        if (a.setup === b.setup) {
-          if (a.setup === 'LONG') return (a.pct ?? 0) - (b.pct ?? 0)
-          return (b.pct ?? 0) - (a.pct ?? 0)
-        }
-        return a.setup === 'LONG' ? -1 : 1
+  // Step 2a: Active Setups view — sorted longs/shorts, closest-to-threshold first.
+  const orderedSetups = useMemo(() => {
+    const setups = visibleRows
+      .map((r) => {
+        const d = displays.get(r.ticker)
+        return { row: r, setup: getSetup(r, d), pct: effectivePct(r, d) }
       })
-      baseList = setups.map((x) => x.row)
-    } else {
-      let list
-      if (isAllActive) {
-        list = visibleRows
-      } else {
-        list = visibleRows.filter((r) => {
+      .filter((x) => x.setup !== null)
+    setups.sort((a, b) => {
+      if (a.setup === b.setup) {
+        if (a.setup === 'LONG') return (a.pct ?? 0) - (b.pct ?? 0)
+        return (b.pct ?? 0) - (a.pct ?? 0)
+      }
+      return a.setup === 'LONG' ? -1 : 1
+    })
+    return setups.map((x) => x.row)
+  }, [visibleRows, displays])
+
+  // Step 2b: All Signals view — chip filter + tier sort (flipped → near-buy → near-sell → alpha).
+  const orderedAll = useMemo(() => {
+    const list = isAllActive
+      ? visibleRows
+      : visibleRows.filter((r) => {
           if (!r.category) return activeCategories.has('Uncategorized')
           return activeCategories.has(labelFor(r.category))
         })
-      }
 
-      function tier(r) {
-        if (changes[r.ticker]) return 0
-        const pct = rangePct(r)
-        if (pct !== null && pct < NEAR_BUY) return 1
-        if (pct !== null && pct > NEAR_SELL) return 2
-        return 3
-      }
-      baseList = [...list].sort((a, b) => {
-        const ta = tier(a)
-        const tb = tier(b)
-        if (ta !== tb) return ta - tb
-        return a.ticker.localeCompare(b.ticker)
-      })
+    function tier(r) {
+      if (changes[r.ticker]) return 0
+      const pct = rangePct(r)
+      if (pct !== null && pct < NEAR_BUY) return 1
+      if (pct !== null && pct > NEAR_SELL) return 2
+      return 3
     }
+    return [...list].sort((a, b) => {
+      const ta = tier(a)
+      const tb = tier(b)
+      if (ta !== tb) return ta - tb
+      return a.ticker.localeCompare(b.ticker)
+    })
+  }, [visibleRows, isAllActive, activeCategories, changes])
 
+  // Step 3: apply the free-text search on top of whichever view is active.
+  const visibleCards = useMemo(() => {
+    const base = view === 'setups' ? orderedSetups : orderedAll
     const q = search.trim().toLowerCase()
-    if (!q) return baseList
-    return baseList.filter((r) => {
+    if (!q) return base
+    return base.filter((r) => {
       const ticker = (r.ticker ?? '').toLowerCase()
       const display = (r.display_name ?? '').toLowerCase()
       return ticker.includes(q) || display.includes(q)
     })
-  }, [view, rows, activeCategories, isAllActive, changes, search, displays, selectedTickers])
+  }, [view, orderedSetups, orderedAll, search])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
@@ -1020,7 +961,7 @@ export default function App() {
             {signalDate ? `Signal date: ${signalDate}` : 'Latest signals'} ·{' '}
             {status === 'ready' ? `${rows.length} tickers` : status}
             {status === 'ready' && Object.keys(changes).length > 0 ? ` · ${Object.keys(changes).length} flipped` : ''}
-            {status === 'ready' && updatedAt ? ` · Updated ${fmtTime(updatedAt)}` : ''}
+            {status === 'ready' && updatedAt ? ` · Updated ${formatTime(updatedAt)}` : ''}
           </p>
         </div>
         <MarketStatePill market={market} />

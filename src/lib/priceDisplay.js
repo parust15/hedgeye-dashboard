@@ -1,6 +1,6 @@
 const STALE_MS = 15 * 60 * 1000
 
-function fmtEtHHMM(iso) {
+function formatEtTime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -42,14 +42,14 @@ export function getPriceDisplay(signalRow, livePrice, isMarketOpen) {
         state: 'stale',
         price: Number.isFinite(price) ? price : null,
         livePct,
-        timeLabel: `Last: ${fmtEtHHMM(livePrice.quoted_at)} ET`,
+        timeLabel: `Last: ${formatEtTime(livePrice.quoted_at)} ET`,
       }
     }
     return {
       state: 'live',
       price: Number.isFinite(price) ? price : null,
       livePct,
-      timeLabel: `${fmtEtHHMM(livePrice.quoted_at)} ET`,
+      timeLabel: `${formatEtTime(livePrice.quoted_at)} ET`,
     }
   }
   return {
