@@ -538,42 +538,56 @@
   margin-top: 10px;
 }
 
+/* The wrap is what the tooltip hover handlers attach to — covers a slightly
+   larger hit area than the bar itself, comfortable for mouse targeting. */
+.posbar-wrap {
+  position: relative;
+  padding: 4px 0;
+  cursor: crosshair;
+}
+
 .posbar {
   position: relative;
   height: 8px;
-  margin-bottom: 8px;
 }
 
+/* Static three-zone gradient: long-setup band (0-20%), neutral (20-80%),
+   short-setup band (80-100%). Doesn't depend on live state — even tickers
+   without live data benefit from seeing where the danger zones are. */
 .posbar-track {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: var(--neutral-bg);
+  background: linear-gradient(
+    to right,
+    rgba(34, 197, 94, 0.18) 0%,
+    rgba(34, 197, 94, 0.04) 20%,
+    rgba(255, 255, 255, 0.04) 20%,
+    rgba(255, 255, 255, 0.04) 80%,
+    rgba(239, 68, 68, 0.04) 80%,
+    rgba(239, 68, 68, 0.18) 100%
+  );
   border: 1px solid var(--border);
-}
-
-.posbar.near-buy .posbar-track {
-  background: linear-gradient(
-    to right,
-    var(--bull-bg) 0%,
-    var(--bull-bg) 20%,
-    var(--neutral-bg) 20%,
-    var(--neutral-bg) 100%
-  );
-}
-
-.posbar.near-sell .posbar-track {
-  background: linear-gradient(
-    to right,
-    var(--neutral-bg) 0%,
-    var(--neutral-bg) 80%,
-    var(--bear-bg) 80%,
-    var(--bear-bg) 100%
-  );
 }
 
 .posbar.disabled .posbar-track {
   opacity: 0.4;
+}
+
+/* Connecting line from prev_close to live_price. Color encodes direction
+   of today's move. Sits BELOW the ghost tick and the marker. */
+.posbar-connector {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.posbar-connector.stale {
+  opacity: 0.5;
 }
 
 .posbar-ghost {
@@ -585,7 +599,7 @@
   border-radius: 2px;
   transform: translateX(-50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .posbar-marker {
@@ -598,15 +612,26 @@
   border: 2px solid #ffffff;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 1px var(--border-strong), 0 1px 4px rgba(0, 0, 0, 0.4);
-  z-index: 2;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.posbar.near-buy .posbar-marker {
-  background: var(--bull);
+/* Smart-color dot variants: green when live_pct sits in the long-setup
+   zone (<0.20), red when in short-setup zone (>0.80). White otherwise. */
+.posbar-marker.marker-long {
+  background: rgb(34, 197, 94);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
-.posbar.near-sell .posbar-marker {
-  background: var(--bear);
+.posbar-marker.marker-short {
+  background: rgb(239, 68, 68);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Pulse during live state only. The keyframes are shared with the header
+   price-block pulse-dot — same 2s opacity cycle, same visual rhythm. */
+.posbar-marker.live-pulse {
+  animation: price-pulse 2s ease-in-out infinite;
 }
 
 .posbar-labels {
@@ -931,4 +956,72 @@
   .grid dd {
     font-size: 18px;
   }
+}
+
+/* === Range bar hover tooltip + chart custom tooltip ===
+   Position: fixed (driven by JS cursor coords) so it escapes any card
+   overflow clipping. pointer-events: none keeps the cursor on the bar
+   for continued mousemove. */
+
+.range-tooltip,
+.chart-tooltip-custom {
+  position: fixed;
+  z-index: 1000;
+  background: #14171f;
+  border: 1px solid #364056;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #f3f5fa;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  min-width: 180px;
+}
+
+.range-tooltip-head,
+.chart-tooltip-head {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.range-tooltip-row,
+.chart-tooltip-row {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.range-tooltip-row > :first-child,
+.chart-tooltip-row > :first-child {
+  color: var(--text-dim);
+}
+
+.range-tooltip-row > :last-child,
+.chart-tooltip-row > :last-child {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-strong);
+}
+
+.range-tooltip-row.buy > :last-child {
+  color: var(--bull);
+}
+
+.range-tooltip-row.sell > :last-child {
+  color: var(--bear);
+}
+
+.range-tooltip-row.stale {
+  opacity: 0.5;
 }
