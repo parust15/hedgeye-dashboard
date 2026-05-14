@@ -66,11 +66,61 @@
   color: var(--text);
 }
 
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-wrap {
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 220px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.search-input::placeholder {
+  color: var(--text-dim);
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+/* Remove the native clear button (we use Escape instead) */
+.search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 640px) {
+  .filter-row {
+    flex-direction: column;
+  }
+  .search-input {
+    width: 100%;
+  }
 }
 
 .chip {
@@ -366,6 +416,10 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   overflow: hidden;
+}
+
+.legend-swatch.solid {
+  border: none;
 }
 
 .legend-label {

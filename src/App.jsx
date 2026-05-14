@@ -28,12 +28,16 @@ function labelFor(category) {
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-const NEUTRAL_BAND_FILL = 'rgba(156, 163, 175, 0.1)'
-function widthFill(widthDelta) {
-  const wd = Number(widthDelta)
-  if (!Number.isFinite(wd) || wd === 0) return NEUTRAL_BAND_FILL
-  if (wd > 0) return 'url(#rr-widen)'
-  return 'url(#rr-narrow)'
+const RANGE_FILL = {
+  'HH/HL': 'rgba(34, 197, 94, 0.28)',
+  'LH/LL': 'rgba(239, 68, 68, 0.28)',
+  'LH/HL': 'url(#pattern-lhhl)',
+  'HH/LL': 'url(#pattern-hhll)',
+  unchanged: 'rgba(156, 163, 175, 0.12)',
+}
+function rangeFill(state) {
+  if (state in RANGE_FILL) return RANGE_FILL[state]
+  return RANGE_FILL.unchanged
 }
 
 function trendClass(trend) {
@@ -102,9 +106,14 @@ function SetupBadge({ setup }) {
   return null
 }
 
-function LegendSwatch({ stroke }) {
+function SolidSwatch({ color }) {
+  return <span className="legend-swatch solid" style={{ background: color }} />
+}
+
+function HatchSwatch({ stroke }) {
   return (
     <svg className="legend-swatch" width="14" height="14" aria-hidden="true">
+      <rect width="14" height="14" fill="rgba(255,255,255,0.04)" />
       <path
         d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2 M0,14 l14,-14"
         stroke={stroke}
@@ -118,12 +127,24 @@ function ChartLegend() {
   return (
     <div className="chart-legend">
       <span className="legend-item">
-        <LegendSwatch stroke="rgba(239,68,68,0.85)" />
-        <span className="legend-label">↔ Widening (red lines)</span>
+        <SolidSwatch color="rgba(34,197,94,0.6)" />
+        <span className="legend-label">HH/HL bullish</span>
       </span>
       <span className="legend-item">
-        <LegendSwatch stroke="rgba(34,197,94,0.85)" />
-        <span className="legend-label">↔ Narrowing (green lines)</span>
+        <HatchSwatch stroke="rgba(34,197,94,0.85)" />
+        <span className="legend-label">LH/HL compression</span>
+      </span>
+      <span className="legend-item">
+        <SolidSwatch color="rgba(239,68,68,0.6)" />
+        <span className="legend-label">LH/LL bearish</span>
+      </span>
+      <span className="legend-item">
+        <HatchSwatch stroke="rgba(239,68,68,0.85)" />
+        <span className="legend-label">HH/LL expansion</span>
+      </span>
+      <span className="legend-item">
+        <SolidSwatch color="rgba(156,163,175,0.45)" />
+        <span className="legend-label">unchanged</span>
       </span>
     </div>
   )
@@ -141,7 +162,7 @@ function ExpandedChart({ ticker }) {
       // works as the user said either is acceptable.
       const { data, error } = await supabase
         .from('hedgeye_signals_v')
-        .select('signal_date,buy_trade,sell_trade,prev_close,range_state,width_delta')
+        .select('signal_date,buy_trade,sell_trade,prev_close,range_state')
         .eq('ticker', ticker)
         .order('signal_date', { ascending: false })
         .limit(10)
@@ -156,7 +177,6 @@ function ExpandedChart({ ticker }) {
         sell: Number(r.sell_trade),
         close: Number(r.prev_close),
         state: r.range_state,
-        widthDelta: r.width_delta,
       }))
       setData(ordered)
     }
@@ -172,15 +192,15 @@ function ExpandedChart({ ticker }) {
 
   return (
     <div className="chart-wrap">
-      <div className="chart-meta">Last {data.length} sessions · per-day width direction</div>
+      <div className="chart-meta">Last {data.length} sessions · per-day range state</div>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <defs>
-            <pattern id="rr-widen" patternUnits="userSpaceOnUse" width="8" height="8">
-              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(239,68,68,0.45)" strokeWidth="1.5" />
+            <pattern id="pattern-lhhl" patternUnits="userSpaceOnUse" width="8" height="8">
+              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(34,197,94,0.5)" strokeWidth="1.5" />
             </pattern>
-            <pattern id="rr-narrow" patternUnits="userSpaceOnUse" width="8" height="8">
-              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(34,197,94,0.45)" strokeWidth="1.5" />
+            <pattern id="pattern-hhll" patternUnits="userSpaceOnUse" width="8" height="8">
+              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(239,68,68,0.5)" strokeWidth="1.5" />
             </pattern>
           </defs>
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -215,7 +235,7 @@ function ExpandedChart({ ticker }) {
               key={`band-${d.date}`}
               x1={d.date}
               x2={data[i + 1].date}
-              fill={widthFill(data[i + 1].widthDelta)}
+              fill={rangeFill(data[i + 1].state)}
               fillOpacity={1}
               stroke="none"
             />
@@ -359,12 +379,21 @@ function SignalCard({ row, change, setup, expanded, onToggle }) {
   )
 }
 
+function fmtTime(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 export default function App() {
   const [rows, setRows] = useState([])
   const [changes, setChanges] = useState({})
   const [signalDate, setSignalDate] = useState(null)
+  const [updatedAt, setUpdatedAt] = useState(null)
   const [view, setView] = useState('all') // 'all' | 'setups'
   const [active, setActive] = useState('All')
+  const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState(null)
@@ -397,7 +426,7 @@ export default function App() {
         return
       }
 
-      const [signalsRes, changesRes] = await Promise.all([
+      const [signalsRes, changesRes, parsedRes] = await Promise.all([
         supabase
           .from('hedgeye_signals_v')
           .select(
@@ -408,6 +437,16 @@ export default function App() {
           .from('hedgeye_trend_changes_v')
           .select('ticker,from_trend,to_trend')
           .eq('signal_date', date),
+        // MAX(parsed_at) for the current signal_date — raw `hedgeye_signals` is
+        // still RLS-blocked from the anon role, so this currently returns an
+        // empty array and the "Updated …" line is omitted. It'll light up
+        // automatically once the RLS policy is opened.
+        supabase
+          .from('hedgeye_signals')
+          .select('parsed_at')
+          .eq('signal_date', date)
+          .order('parsed_at', { ascending: false })
+          .limit(1),
       ])
 
       if (cancelled) return
@@ -423,6 +462,7 @@ export default function App() {
       setSignalDate(date)
       setRows(signalsRes.data ?? [])
       setChanges(changeMap)
+      setUpdatedAt(parsedRes.data?.[0]?.parsed_at ?? null)
       setStatus('ready')
     }
     load()
@@ -472,6 +512,7 @@ export default function App() {
   )
 
   const visibleCards = useMemo(() => {
+    let baseList
     if (view === 'setups') {
       const setups = rows
         .map((r) => ({ row: r, setup: getSetup(r), pct: rangePct(r) }))
@@ -488,29 +529,38 @@ export default function App() {
         // Mix: LONG before SHORT
         return a.setup === 'LONG' ? -1 : 1
       })
-      return setups.map((x) => x.row)
+      baseList = setups.map((x) => x.row)
+    } else {
+      const f = filters.find((x) => x.label === active)
+      let list
+      if (!f || f.value === null) list = rows
+      else if (f.value === '__uncat__') list = rows.filter((r) => !r.category)
+      else list = rows.filter((r) => r.category === f.value)
+
+      function tier(r) {
+        if (changes[r.ticker]) return 0
+        const pct = rangePct(r)
+        if (pct !== null && pct < NEAR_BUY) return 1
+        if (pct !== null && pct > NEAR_SELL) return 2
+        return 3
+      }
+      baseList = [...list].sort((a, b) => {
+        const ta = tier(a)
+        const tb = tier(b)
+        if (ta !== tb) return ta - tb
+        return a.ticker.localeCompare(b.ticker)
+      })
     }
 
-    const f = filters.find((x) => x.label === active)
-    let list
-    if (!f || f.value === null) list = rows
-    else if (f.value === '__uncat__') list = rows.filter((r) => !r.category)
-    else list = rows.filter((r) => r.category === f.value)
-
-    function tier(r) {
-      if (changes[r.ticker]) return 0
-      const pct = rangePct(r)
-      if (pct !== null && pct < NEAR_BUY) return 1
-      if (pct !== null && pct > NEAR_SELL) return 2
-      return 3
-    }
-    return [...list].sort((a, b) => {
-      const ta = tier(a)
-      const tb = tier(b)
-      if (ta !== tb) return ta - tb
-      return a.ticker.localeCompare(b.ticker)
+    const q = search.trim().toLowerCase()
+    if (!q) return baseList
+    return baseList.filter((r) => {
+      const ticker = (r.ticker ?? '').toLowerCase()
+      const display = (r.display_name ?? '').toLowerCase()
+      const name = (r.name ?? '').toLowerCase()
+      return ticker.includes(q) || display.includes(q) || name.includes(q)
     })
-  }, [view, filters, rows, active, changes])
+  }, [view, filters, rows, active, changes, search])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
@@ -525,6 +575,7 @@ export default function App() {
             {signalDate ? `Signal date: ${signalDate}` : 'Latest signals'} ·{' '}
             {status === 'ready' ? `${rows.length} tickers` : status}
             {status === 'ready' && Object.keys(changes).length > 0 ? ` · ${Object.keys(changes).length} flipped` : ''}
+            {status === 'ready' && updatedAt ? ` · Updated ${fmtTime(updatedAt)}` : ''}
           </p>
         </div>
       </header>
@@ -545,35 +596,59 @@ export default function App() {
           className={`view-tab${view === 'setups' ? ' active' : ''}`}
           onClick={() => setView('setups')}
         >
-          ⚡ Actionable Setups
+          ⚡ Active Setups
           <span className="view-tab-count">{setupCount}</span>
         </button>
       </nav>
 
-      {view === 'all' && (
-        <nav className="chips" role="tablist" aria-label="Category filters">
-          {visibleFilters.map((f) => (
-            <button
-              key={f.label}
-              role="tab"
-              aria-selected={active === f.label}
-              className={`chip${active === f.label ? ' active' : ''}`}
-              onClick={() => setActive(f.label)}
-            >
-              {f.label}
-              <span className="chip-count">{counts[f.label] ?? 0}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+      <div className="filter-row">
+        {view === 'all' ? (
+          <nav className="chips" role="tablist" aria-label="Category filters">
+            {visibleFilters.map((f) => (
+              <button
+                key={f.label}
+                role="tab"
+                aria-selected={active === f.label}
+                className={`chip${active === f.label ? ' active' : ''}`}
+                onClick={() => setActive(f.label)}
+              >
+                {f.label}
+                <span className="chip-count">{counts[f.label] ?? 0}</span>
+              </button>
+            ))}
+          </nav>
+        ) : (
+          <div />
+        )}
+        <div className="search-wrap">
+          <input
+            type="search"
+            className="search-input"
+            placeholder="Search ticker or name…"
+            aria-label="Search ticker or name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setSearch('')
+                e.currentTarget.blur()
+              }
+            }}
+          />
+        </div>
+      </div>
 
       {status === 'loading' && <div className="state">Loading…</div>}
       {status === 'error' && <div className="state error">Error: {error}</div>}
-      {status === 'ready' && view === 'setups' && visibleCards.length === 0 && (
-        <div className="state state-center">No active setups today.</div>
-      )}
-      {status === 'ready' && view === 'all' && visibleCards.length === 0 && (
-        <div className="state">No signals in this category for {signalDate}.</div>
+      {status === 'ready' && visibleCards.length === 0 && (
+        search.trim() ? (
+          <div className="state">No tickers match “{search.trim()}”.</div>
+        ) : view === 'setups' ? (
+          <div className="state state-center">No active setups today.</div>
+        ) : (
+          <div className="state">No signals in this category for {signalDate}.</div>
+        )
       )}
 
       {status === 'ready' && visibleCards.length > 0 && (
