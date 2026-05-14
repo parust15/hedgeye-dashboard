@@ -10,12 +10,17 @@ import {
   CartesianGrid,
 } from 'recharts'
 import { supabase } from './lib/supabase'
+import { useMarketState, formatNextChange } from './lib/marketState'
+import { useLivePrices } from './lib/livePrices'
+import { getPriceDisplay } from './lib/priceDisplay'
 import './App.css'
 
 const NEAR_BUY = 0.20
 const NEAR_SELL = 0.80
-const LONG_SETUP_PCT = 0.25
-const SHORT_SETUP_PCT = 0.75
+const LIVE_NEAR_BUY = 0.05
+const LIVE_NEAR_SELL = 0.95
+const LONG_SETUP_PCT = 0.20
+const SHORT_SETUP_PCT = 0.80
 
 const CATEGORY_LABELS = {
   us_sectors: 'Sectors',
@@ -53,6 +58,13 @@ function fmt(n) {
   return num.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
+function formatPrice(n) {
+  if (n === null || n === undefined) return '—'
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '—'
+  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 function rangePct(row) {
   const buy = Number(row.buy_trade)
   const sell = Number(row.sell_trade)
@@ -63,25 +75,39 @@ function rangePct(row) {
   return (close - buy) / span
 }
 
-function getSetup(row) {
-  const pct = rangePct(row)
+// Resolve the pct used by setup logic: live if available, else prev-close.
+function effectivePct(row, display) {
+  if (display && display.livePct !== null && display.livePct !== undefined) return display.livePct
+  return rangePct(row)
+}
+
+function getSetup(row, display) {
+  const pct = effectivePct(row, display)
   if (pct === null) return null
   if (row.trend === 'BULLISH' && pct < LONG_SETUP_PCT) return 'LONG'
   if (row.trend === 'BEARISH' && pct > SHORT_SETUP_PCT) return 'SHORT'
   return null
 }
 
-function PositionBar({ pct }) {
-  if (pct === null) {
+function PositionBar({ markerPct, ghostPct, zone }) {
+  if (markerPct === null || markerPct === undefined) {
     return <div className="posbar disabled" aria-hidden="true" />
   }
-  const clamped = Math.max(0, Math.min(1, pct))
-  let zone = 'mid'
-  if (pct < NEAR_BUY) zone = 'near-buy'
-  else if (pct > NEAR_SELL) zone = 'near-sell'
+  const clamped = Math.max(0, Math.min(1, markerPct))
+  const ghost =
+    ghostPct !== null && ghostPct !== undefined
+      ? Math.max(0, Math.min(1, ghostPct))
+      : null
   return (
-    <div className={`posbar ${zone}`}>
+    <div className={`posbar ${zone ?? 'mid'}`}>
       <div className="posbar-track" />
+      {ghost !== null && (
+        <div
+          className="posbar-ghost"
+          style={{ left: `${ghost * 100}%` }}
+          aria-hidden="true"
+        />
+      )}
       <div
         className="posbar-marker"
         style={{ left: `${clamped * 100}%` }}
@@ -104,6 +130,34 @@ function SetupBadge({ setup }) {
   if (setup === 'LONG') return <span className="setup setup-long">⚡ LONG SETUP</span>
   if (setup === 'SHORT') return <span className="setup setup-short">🔻 SHORT SETUP</span>
   return null
+}
+
+function LivePriceBlock({ display }) {
+  if (!display || display.state === 'none') return null
+  const cls = `price-block price-${display.state}`
+  return (
+    <div className={cls} aria-label={`Price ${display.timeLabel}`}>
+      {display.state === 'live' && <span className="pulse-dot" aria-hidden="true" />}
+      <span className="price-value">{formatPrice(display.price)}</span>
+      <span className="price-sep">·</span>
+      <span className="price-time">{display.timeLabel}</span>
+    </div>
+  )
+}
+
+function MarketStatePill({ market }) {
+  const open = market.isOpen
+  const title = formatNextChange(market)
+  return (
+    <span
+      className={`market-pill ${open ? 'market-open' : 'market-closed'}`}
+      title={title}
+      aria-label={open ? 'Market open' : 'Market closed'}
+    >
+      <span className="market-dot" aria-hidden="true" />
+      {open ? 'MARKET OPEN' : 'MARKET CLOSED'}
+    </span>
+  )
 }
 
 function SolidSwatch({ color }) {
@@ -150,16 +204,15 @@ function ChartLegend() {
   )
 }
 
-function ExpandedChart({ ticker }) {
+function ExpandedChart({ ticker, display }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      // Note: raw `hedgeye_signals` returns 0 rows to the anon role (RLS blocks
-      // it), so we explicitly use the view filtered by ticker. Same columns,
-      // works as the user said either is acceptable.
+      // Raw `hedgeye_signals` is still RLS-blocked from the anon role, so we
+      // explicitly use the view filtered by ticker. Same columns.
       const { data, error } = await supabase
         .from('hedgeye_signals_v')
         .select('signal_date,buy_trade,sell_trade,prev_close,range_state')
@@ -190,17 +243,61 @@ function ExpandedChart({ ticker }) {
   if (data === null) return <div className="chart-state">Loading chart…</div>
   if (data.length === 0) return <div className="chart-state">No history for {ticker}.</div>
 
+  // For the close-path line: if live/closed and we have a price, swap the
+  // terminal point's close value so the dotted line ends at the live price.
+  const liveState = display?.state
+  const livePrice = display?.price
+  const useLiveEndpoint =
+    (liveState === 'live' || liveState === 'closed') && Number.isFinite(livePrice)
+
+  const lastIdx = data.length - 1
+  const closeData = useLiveEndpoint
+    ? data.map((d, i) => (i === lastIdx ? { ...d, close: livePrice } : d))
+    : data
+
+  const renderCloseDot = (props) => {
+    const { cx, cy, index, key } = props
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return <g key={key} />
+    if (index !== lastIdx) {
+      return <circle key={key} cx={cx} cy={cy} r={2} fill="#f3f5fa" />
+    }
+    if (liveState === 'live') {
+      return (
+        <circle
+          key={key}
+          cx={cx}
+          cy={cy}
+          r={8}
+          fill="#22c55e"
+          className="pulse-dot-svg"
+        />
+      )
+    }
+    if (liveState === 'closed') {
+      return <circle key={key} cx={cx} cy={cy} r={6} fill="#ffffff" />
+    }
+    return <circle key={key} cx={cx} cy={cy} r={2} fill="#f3f5fa" />
+  }
+
   return (
     <div className="chart-wrap">
       <div className="chart-meta">Last {data.length} sessions · per-day range state</div>
       <ResponsiveContainer width="100%" height={220}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+        <ComposedChart data={closeData} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <defs>
             <pattern id="pattern-lhhl" patternUnits="userSpaceOnUse" width="8" height="8">
-              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(34,197,94,0.5)" strokeWidth="1.5" />
+              <path
+                d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2"
+                stroke="rgba(34,197,94,0.55)"
+                strokeWidth="1.5"
+              />
             </pattern>
             <pattern id="pattern-hhll" patternUnits="userSpaceOnUse" width="8" height="8">
-              <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="rgba(239,68,68,0.5)" strokeWidth="1.5" />
+              <path
+                d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2"
+                stroke="rgba(239,68,68,0.55)"
+                strokeWidth="1.5"
+              />
             </pattern>
           </defs>
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -265,7 +362,7 @@ function ExpandedChart({ ticker }) {
             stroke="#f3f5fa"
             strokeWidth={1.5}
             strokeDasharray="4 3"
-            dot={{ r: 2, fill: '#f3f5fa' }}
+            dot={renderCloseDot}
             isAnimationActive={false}
           />
         </ComposedChart>
@@ -292,12 +389,31 @@ function WidthDeltaPct({ row }) {
   return <span className={cls}>{sign}{rounded}%</span>
 }
 
-function SignalCard({ row, change, setup, expanded, onToggle }) {
-  const pct = rangePct(row)
+function SignalCard({ row, change, setup, display, expanded, onToggle }) {
+  const prevPct = rangePct(row)
+  const useLive =
+    display &&
+    (display.state === 'live' || display.state === 'closed') &&
+    display.livePct !== null &&
+    display.livePct !== undefined
+
+  // Marker drives off live pct when live/closed; otherwise prev-close pct.
+  const markerPct = useLive ? display.livePct : prevPct
+  // Ghost tick only shown in live/closed states.
+  const ghostPct = useLive ? prevPct : null
+  // Zone label uses live thresholds (0.05/0.95) in live/closed, else fallback (0.20/0.80).
   let zoneLabel = null
-  if (pct !== null) {
-    if (pct < NEAR_BUY) zoneLabel = 'Near buy'
-    else if (pct > NEAR_SELL) zoneLabel = 'Near sell'
+  let zone = 'mid'
+  if (markerPct !== null && markerPct !== undefined) {
+    const lo = useLive ? LIVE_NEAR_BUY : NEAR_BUY
+    const hi = useLive ? LIVE_NEAR_SELL : NEAR_SELL
+    if (markerPct < lo) {
+      zoneLabel = 'Near buy'
+      zone = 'near-buy'
+    } else if (markerPct > hi) {
+      zoneLabel = 'Near sell'
+      zone = 'near-sell'
+    }
   }
 
   const cardClasses = [
@@ -323,12 +439,13 @@ function SignalCard({ row, change, setup, expanded, onToggle }) {
       }}
     >
       <header className="card-head">
-        <div>
+        <div className="card-id">
           <div className="ticker">{row.ticker}</div>
           {row.display_name || row.name ? (
             <div className="name">{row.display_name || row.name}</div>
           ) : null}
         </div>
+        <LivePriceBlock display={display} />
         <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
       </header>
 
@@ -362,17 +479,23 @@ function SignalCard({ row, change, setup, expanded, onToggle }) {
       </dl>
 
       <div className="posbar-section">
-        <PositionBar pct={pct} />
+        <PositionBar markerPct={markerPct} ghostPct={ghostPct} zone={zone} />
         <div className="posbar-labels">
           <span className="posbar-end buy">{fmt(row.buy_trade)}</span>
-          {zoneLabel ? <span className={`zone-tag zone-${zoneLabel === 'Near buy' ? 'buy' : 'sell'}`}>{zoneLabel}</span> : <span />}
+          {zoneLabel ? (
+            <span className={`zone-tag zone-${zone === 'near-buy' ? 'buy' : 'sell'}`}>
+              {zoneLabel}
+            </span>
+          ) : (
+            <span />
+          )}
           <span className="posbar-end sell">{fmt(row.sell_trade)}</span>
         </div>
       </div>
 
       {expanded && (
         <div className="chart-panel" onClick={(e) => e.stopPropagation()}>
-          <ExpandedChart ticker={row.ticker} />
+          <ExpandedChart ticker={row.ticker} display={display} />
         </div>
       )}
     </article>
@@ -397,6 +520,9 @@ export default function App() {
   const [expanded, setExpanded] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState(null)
+
+  const market = useMarketState()
+  const livePrices = useLivePrices(market.isOpen)
 
   useEffect(() => {
     let cancelled = false
@@ -437,10 +563,9 @@ export default function App() {
           .from('hedgeye_trend_changes_v')
           .select('ticker,from_trend,to_trend')
           .eq('signal_date', date),
-        // MAX(parsed_at) for the current signal_date — raw `hedgeye_signals` is
-        // still RLS-blocked from the anon role, so this currently returns an
-        // empty array and the "Updated …" line is omitted. It'll light up
-        // automatically once the RLS policy is opened.
+        // MAX(parsed_at) — raw table is still RLS-blocked from anon, so this
+        // returns []. The "Updated …" header line lights up automatically
+        // once the policy opens.
         supabase
           .from('hedgeye_signals')
           .select('parsed_at')
@@ -471,6 +596,16 @@ export default function App() {
     }
   }, [])
 
+  // Map: ticker → priceDisplay. Recomputed when rows, live prices, or market
+  // state change. Cards read their slice via .get(ticker).
+  const displays = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) {
+      m.set(r.ticker, getPriceDisplay(r, livePrices.get(r.ticker), market.isOpen))
+    }
+    return m
+  }, [rows, livePrices, market.isOpen])
+
   const filters = useMemo(() => {
     const cats = new Set()
     for (const r of rows) if (r.category) cats.add(r.category)
@@ -495,38 +630,36 @@ export default function App() {
     return c
   }, [filters, rows])
 
-  // Hide zero-count chips, but always keep "All".
   const visibleFilters = useMemo(
     () => filters.filter((f) => f.value === null || (counts[f.label] ?? 0) > 0),
     [filters, counts]
   )
 
-  // If the active chip becomes hidden (e.g., data shifts), fall back to All.
   useEffect(() => {
     if (!visibleFilters.find((f) => f.label === active)) setActive('All')
   }, [visibleFilters, active])
 
   const setupCount = useMemo(
-    () => rows.reduce((n, r) => (getSetup(r) ? n + 1 : n), 0),
-    [rows]
+    () => rows.reduce((n, r) => (getSetup(r, displays.get(r.ticker)) ? n + 1 : n), 0),
+    [rows, displays]
   )
 
   const visibleCards = useMemo(() => {
     let baseList
     if (view === 'setups') {
       const setups = rows
-        .map((r) => ({ row: r, setup: getSetup(r), pct: rangePct(r) }))
+        .map((r) => {
+          const d = displays.get(r.ticker)
+          return { row: r, setup: getSetup(r, d), pct: effectivePct(r, d) }
+        })
         .filter((x) => x.setup !== null)
 
+      // Closest to threshold first: longs by pct asc, shorts by pct desc.
       setups.sort((a, b) => {
-        const fa = changes[a.row.ticker] ? 0 : 1
-        const fb = changes[b.row.ticker] ? 0 : 1
-        if (fa !== fb) return fa - fb
-        // Longs: pct ascending (closest to buy first)
-        // Shorts: pct descending (closest to sell first)
-        if (a.setup === 'LONG' && b.setup === 'LONG') return (a.pct ?? 0) - (b.pct ?? 0)
-        if (a.setup === 'SHORT' && b.setup === 'SHORT') return (b.pct ?? 0) - (a.pct ?? 0)
-        // Mix: LONG before SHORT
+        if (a.setup === b.setup) {
+          if (a.setup === 'LONG') return (a.pct ?? 0) - (b.pct ?? 0)
+          return (b.pct ?? 0) - (a.pct ?? 0)
+        }
         return a.setup === 'LONG' ? -1 : 1
       })
       baseList = setups.map((x) => x.row)
@@ -557,10 +690,9 @@ export default function App() {
     return baseList.filter((r) => {
       const ticker = (r.ticker ?? '').toLowerCase()
       const display = (r.display_name ?? '').toLowerCase()
-      const name = (r.name ?? '').toLowerCase()
-      return ticker.includes(q) || display.includes(q) || name.includes(q)
+      return ticker.includes(q) || display.includes(q)
     })
-  }, [view, filters, rows, active, changes, search])
+  }, [view, filters, rows, active, changes, search, displays])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
@@ -569,7 +701,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div>
+        <div className="topbar-left">
           <h1>Hedgeye Risk Ranges</h1>
           <p className="sub">
             {signalDate ? `Signal date: ${signalDate}` : 'Latest signals'} ·{' '}
@@ -578,6 +710,7 @@ export default function App() {
             {status === 'ready' && updatedAt ? ` · Updated ${fmtTime(updatedAt)}` : ''}
           </p>
         </div>
+        <MarketStatePill market={market} />
       </header>
 
       <nav className="view-tabs" role="tablist" aria-label="Dashboard view">
@@ -624,7 +757,7 @@ export default function App() {
           <input
             type="search"
             className="search-input"
-            placeholder="Search ticker or name…"
+            placeholder="Search ticker..."
             aria-label="Search ticker or name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -645,7 +778,7 @@ export default function App() {
         search.trim() ? (
           <div className="state">No tickers match “{search.trim()}”.</div>
         ) : view === 'setups' ? (
-          <div className="state state-center">No active setups today.</div>
+          <div className="state state-center">No setups currently active</div>
         ) : (
           <div className="state">No signals in this category for {signalDate}.</div>
         )
@@ -658,7 +791,8 @@ export default function App() {
               key={r.ticker}
               row={r}
               change={changes[r.ticker]}
-              setup={getSetup(r)}
+              setup={getSetup(r, displays.get(r.ticker))}
+              display={displays.get(r.ticker)}
               expanded={expanded === r.ticker}
               onToggle={toggleExpand}
             />
