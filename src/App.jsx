@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -27,11 +27,26 @@ const CATEGORY_LABELS = {
   fx: 'FX',
   vol: 'Vol',
 }
+// Display order for category groupings (ticker dropdown).
+const CATEGORY_ORDER = [
+  'stocks',
+  'us_sectors',
+  'indices',
+  'international',
+  'rates',
+  'fx',
+  'commodities',
+  'energy',
+  'crypto',
+  'vol',
+]
 function labelFor(category) {
   if (!category) return 'Uncategorized'
   if (CATEGORY_LABELS[category]) return CATEGORY_LABELS[category]
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
+
+const TICKER_STORAGE_KEY = 'dashboard.selectedTickers'
 
 const RANGE_FILL = {
   'HH/HL': 'rgba(34, 197, 94, 0.28)',
@@ -445,9 +460,10 @@ function SignalCard({ row, change, setup, display, expanded, onToggle }) {
             <div className="name">{row.display_name || row.name}</div>
           ) : null}
         </div>
-        <LivePriceBlock display={display} />
         <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
       </header>
+
+      <LivePriceBlock display={display} />
 
       {(setup || change) && (
         <div className="badge-row">
@@ -502,6 +518,206 @@ function SignalCard({ row, change, setup, display, expanded, onToggle }) {
   )
 }
 
+function TickerFilter({ allTickers, selectedTickers, setSelectedTickers }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [collapsed, setCollapsed] = useState(() => new Set())
+  const popoverRef = useRef(null)
+  const buttonRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e) {
+      if (popoverRef.current?.contains(e.target)) return
+      if (buttonRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  // Build groups in spec order, filtered by search.
+  const groups = useMemo(() => {
+    const byCat = new Map()
+    for (const r of allTickers) {
+      const cat = r.category || '__uncat__'
+      if (!byCat.has(cat)) byCat.set(cat, [])
+      byCat.get(cat).push(r)
+    }
+    for (const arr of byCat.values()) arr.sort((a, b) => a.ticker.localeCompare(b.ticker))
+
+    const q = search.trim().toLowerCase()
+    function matches(r) {
+      if (!q) return true
+      return (
+        (r.ticker ?? '').toLowerCase().includes(q) ||
+        (r.display_name ?? '').toLowerCase().includes(q)
+      )
+    }
+
+    const out = []
+    for (const cat of CATEGORY_ORDER) {
+      if (!byCat.has(cat)) continue
+      const items = byCat.get(cat).filter(matches)
+      if (items.length === 0) continue
+      out.push({ key: cat, label: labelFor(cat), total: byCat.get(cat).length, items })
+    }
+    if (byCat.has('__uncat__')) {
+      const items = byCat.get('__uncat__').filter(matches)
+      if (items.length > 0) {
+        out.push({
+          key: '__uncat__',
+          label: 'Uncategorized',
+          total: byCat.get('__uncat__').length,
+          items,
+        })
+      }
+    }
+    return out
+  }, [allTickers, search])
+
+  const total = allTickers.length
+  const selectedCount = selectedTickers
+    ? allTickers.reduce((n, r) => (selectedTickers.has(r.ticker) ? n + 1 : n), 0)
+    : total
+  const allSelected = total > 0 && selectedCount === total
+  const buttonLabel = allSelected ? 'Tickers (All)' : `Tickers (${selectedCount}/${total})`
+
+  function toggleTicker(ticker) {
+    setSelectedTickers((prev) => {
+      const next = new Set(prev ?? [])
+      if (next.has(ticker)) next.delete(ticker)
+      else next.add(ticker)
+      return next
+    })
+  }
+  function selectAll() {
+    setSelectedTickers(new Set(allTickers.map((r) => r.ticker)))
+  }
+  function clearAll() {
+    setSelectedTickers(new Set())
+  }
+  function resetToDefault() {
+    setSelectedTickers(new Set(allTickers.map((r) => r.ticker)))
+  }
+  function toggleGroupCollapse(key) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  function toggleGroupSelect(items) {
+    setSelectedTickers((prev) => {
+      const next = new Set(prev ?? [])
+      const allOn = items.every((r) => next.has(r.ticker))
+      if (allOn) for (const r of items) next.delete(r.ticker)
+      else for (const r of items) next.add(r.ticker)
+      return next
+    })
+  }
+
+  return (
+    <div className="ticker-filter">
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`ticker-filter-btn${!allSelected ? ' has-filter' : ''}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {!allSelected && <span className="ticker-filter-dot" aria-hidden="true" />}
+        {buttonLabel}
+      </button>
+      {open && (
+        <div ref={popoverRef} className="ticker-popover" role="dialog" aria-label="Filter tickers">
+          <div className="ticker-popover-head">
+            <input
+              type="search"
+              className="ticker-popover-search"
+              placeholder="Search tickers..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+            <div className="ticker-popover-actions">
+              <button type="button" onClick={selectAll}>Select all</button>
+              <button type="button" onClick={clearAll}>Clear</button>
+              <button type="button" onClick={resetToDefault}>Reset to default</button>
+            </div>
+          </div>
+          <div className="ticker-popover-body">
+            {groups.length === 0 && (
+              <div className="ticker-popover-empty">No tickers match.</div>
+            )}
+            {groups.map((g) => {
+              const isCollapsed = collapsed.has(g.key)
+              const groupSelected = g.items.filter((r) =>
+                (selectedTickers ?? new Set()).has(r.ticker)
+              ).length
+              const allInGroup = groupSelected === g.items.length
+              return (
+                <div key={g.key} className="ticker-group">
+                  <div className="ticker-group-head">
+                    <button
+                      type="button"
+                      className="ticker-group-toggle"
+                      aria-expanded={!isCollapsed}
+                      onClick={() => toggleGroupCollapse(g.key)}
+                    >
+                      <span className={`caret${isCollapsed ? '' : ' open'}`} aria-hidden="true">▸</span>
+                      <span className="ticker-group-name">{g.label}</span>
+                      <span className="ticker-group-count">({g.items.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="ticker-group-shortcut"
+                      onClick={() => toggleGroupSelect(g.items)}
+                    >
+                      {allInGroup ? 'Clear' : 'All'}
+                    </button>
+                  </div>
+                  {!isCollapsed && (
+                    <ul className="ticker-list">
+                      {g.items.map((r) => {
+                        const checked = (selectedTickers ?? new Set()).has(r.ticker)
+                        return (
+                          <li key={r.ticker} className="ticker-row">
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleTicker(r.ticker)}
+                              />
+                              <span className="ticker-row-symbol">{r.ticker}</span>
+                              {r.display_name ? (
+                                <span className="ticker-row-name">{r.display_name}</span>
+                              ) : null}
+                            </label>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function fmtTime(iso) {
   if (!iso) return null
   const d = new Date(iso)
@@ -515,7 +731,12 @@ export default function App() {
   const [signalDate, setSignalDate] = useState(null)
   const [updatedAt, setUpdatedAt] = useState(null)
   const [view, setView] = useState('all') // 'all' | 'setups'
-  const [active, setActive] = useState('All')
+  // Multi-select chip state: a Set of category labels. Empty set == "All" active.
+  const [activeCategories, setActiveCategories] = useState(() => new Set())
+  // Per-ticker visibility (Set<string>). null until first reconcile against
+  // loaded rows. While null, treat as "all selected" so initial render is
+  // unfiltered instead of empty.
+  const [selectedTickers, setSelectedTickers] = useState(null)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [status, setStatus] = useState('loading')
@@ -596,6 +817,58 @@ export default function App() {
     }
   }, [])
 
+  // Reconcile selectedTickers with the current rows when data arrives or
+  // changes. Stored shape: { selected: string[], known: string[] }. We use
+  // `known` (universe at last save) to distinguish "user deselected this"
+  // from "this ticker is new" — new tickers default to selected per spec.
+  useEffect(() => {
+    if (rows.length === 0) return
+    const universe = rows.map((r) => r.ticker)
+    let stored = null
+    try {
+      const raw = localStorage.getItem(TICKER_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && Array.isArray(parsed.selected) && Array.isArray(parsed.known)) {
+          stored = {
+            selected: new Set(parsed.selected),
+            known: new Set(parsed.known),
+          }
+        }
+      }
+    } catch {}
+
+    let next
+    if (stored) {
+      next = new Set()
+      for (const t of universe) {
+        if (stored.known.has(t)) {
+          // Known ticker: respect persisted selection state.
+          if (stored.selected.has(t)) next.add(t)
+        } else {
+          // New ticker: default to selected.
+          next.add(t)
+        }
+      }
+    } else {
+      // No prior state — everything selected.
+      next = new Set(universe)
+    }
+    setSelectedTickers(next)
+  }, [rows])
+
+  // Persist selection on every change.
+  useEffect(() => {
+    if (selectedTickers === null || rows.length === 0) return
+    try {
+      const payload = {
+        selected: Array.from(selectedTickers),
+        known: rows.map((r) => r.ticker),
+      }
+      localStorage.setItem(TICKER_STORAGE_KEY, JSON.stringify(payload))
+    } catch {}
+  }, [selectedTickers, rows])
+
   // Map: ticker → priceDisplay. Recomputed when rows, live prices, or market
   // state change. Cards read their slice via .get(ticker).
   const displays = useMemo(() => {
@@ -635,19 +908,55 @@ export default function App() {
     [filters, counts]
   )
 
+  // Drop any active category whose chip has disappeared (e.g., data shift).
   useEffect(() => {
-    if (!visibleFilters.find((f) => f.label === active)) setActive('All')
-  }, [visibleFilters, active])
+    setActiveCategories((prev) => {
+      const validLabels = new Set(visibleFilters.map((f) => f.label))
+      let changed = false
+      const next = new Set()
+      for (const label of prev) {
+        if (validLabels.has(label)) next.add(label)
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [visibleFilters])
 
+  const isAllActive = activeCategories.size === 0
+
+  function toggleChip(filter) {
+    if (filter.label === 'All') {
+      setActiveCategories(new Set())
+      return
+    }
+    setActiveCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(filter.label)) next.delete(filter.label)
+      else next.add(filter.label)
+      return next
+    })
+  }
+
+  // Tickers excluded via the dropdown are filtered out of the setup count
+  // too, since they're hidden everywhere on the dashboard.
   const setupCount = useMemo(
-    () => rows.reduce((n, r) => (getSetup(r, displays.get(r.ticker)) ? n + 1 : n), 0),
-    [rows, displays]
+    () =>
+      rows.reduce((n, r) => {
+        if (selectedTickers && !selectedTickers.has(r.ticker)) return n
+        return getSetup(r, displays.get(r.ticker)) ? n + 1 : n
+      }, 0),
+    [rows, displays, selectedTickers]
   )
 
   const visibleCards = useMemo(() => {
+    // Tickers hidden via the dropdown drop out before any other logic.
+    const visibleRows = selectedTickers
+      ? rows.filter((r) => selectedTickers.has(r.ticker))
+      : rows
+
     let baseList
     if (view === 'setups') {
-      const setups = rows
+      const setups = visibleRows
         .map((r) => {
           const d = displays.get(r.ticker)
           return { row: r, setup: getSetup(r, d), pct: effectivePct(r, d) }
@@ -664,11 +973,15 @@ export default function App() {
       })
       baseList = setups.map((x) => x.row)
     } else {
-      const f = filters.find((x) => x.label === active)
       let list
-      if (!f || f.value === null) list = rows
-      else if (f.value === '__uncat__') list = rows.filter((r) => !r.category)
-      else list = rows.filter((r) => r.category === f.value)
+      if (isAllActive) {
+        list = visibleRows
+      } else {
+        list = visibleRows.filter((r) => {
+          if (!r.category) return activeCategories.has('Uncategorized')
+          return activeCategories.has(labelFor(r.category))
+        })
+      }
 
       function tier(r) {
         if (changes[r.ticker]) return 0
@@ -692,7 +1005,7 @@ export default function App() {
       const display = (r.display_name ?? '').toLowerCase()
       return ticker.includes(q) || display.includes(q)
     })
-  }, [view, filters, rows, active, changes, search, displays])
+  }, [view, rows, activeCategories, isAllActive, changes, search, displays, selectedTickers])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
@@ -736,19 +1049,23 @@ export default function App() {
 
       <div className="filter-row">
         {view === 'all' ? (
-          <nav className="chips" role="tablist" aria-label="Category filters">
-            {visibleFilters.map((f) => (
-              <button
-                key={f.label}
-                role="tab"
-                aria-selected={active === f.label}
-                className={`chip${active === f.label ? ' active' : ''}`}
-                onClick={() => setActive(f.label)}
-              >
-                {f.label}
-                <span className="chip-count">{counts[f.label] ?? 0}</span>
-              </button>
-            ))}
+          <nav className="chips" aria-label="Category filters">
+            {visibleFilters.map((f) => {
+              const isActive =
+                f.label === 'All' ? isAllActive : activeCategories.has(f.label)
+              return (
+                <button
+                  key={f.label}
+                  type="button"
+                  aria-pressed={isActive}
+                  className={`chip${isActive ? ' active' : ''}`}
+                  onClick={() => toggleChip(f)}
+                >
+                  {f.label}
+                  <span className="chip-count">{counts[f.label] ?? 0}</span>
+                </button>
+              )
+            })}
           </nav>
         ) : (
           <div />
@@ -770,6 +1087,11 @@ export default function App() {
             }}
           />
         </div>
+        <TickerFilter
+          allTickers={rows}
+          selectedTickers={selectedTickers}
+          setSelectedTickers={setSelectedTickers}
+        />
       </div>
 
       {status === 'loading' && <div className="state">Loading…</div>}
