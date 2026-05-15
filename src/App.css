@@ -1966,3 +1966,295 @@
   color: var(--text-dim);
   opacity: 0.7;
 }
+
+/* === Risk Ranges: trend filter row (second filter below category chips) === */
+
+.trend-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.trend-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+/* Inactive variants — outlined in the trend's tint. */
+.trend-chip.trend-chip-bullish { border-color: rgba(34, 197, 94, 0.4); color: #22c55e; }
+.trend-chip.trend-chip-bearish { border-color: rgba(239, 68, 68, 0.4); color: #ef4444; }
+.trend-chip.trend-chip-neutral { border-color: rgba(156, 163, 175, 0.4); color: #9ca3af; }
+
+/* Active variants — filled fill matching the trend. */
+.trend-chip.trend-chip-all.active { background: var(--accent); border-color: var(--accent); color: #0b0d12; }
+.trend-chip.trend-chip-bullish.active { background: rgba(34, 197, 94, 0.85); border-color: rgba(34, 197, 94, 0.85); color: #08120c; }
+.trend-chip.trend-chip-bearish.active { background: rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 0.85); color: #1a0707; }
+.trend-chip.trend-chip-neutral.active { background: rgba(156, 163, 175, 0.85); border-color: rgba(156, 163, 175, 0.85); color: #0b0d12; }
+
+/* === "↗ VIEW CALL INFO" cross-panel button on RR cards === */
+
+.btn-view-call {
+  align-self: flex-start;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.btn-view-call:hover {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+
+/* === The Call: TODAY | ALL TIME toggle === */
+
+.call-view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+
+.call-view-pill {
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.call-view-pill:hover {
+  color: var(--text-strong);
+}
+
+.call-view-pill.active {
+  background: #f59e0b;
+  color: #000;
+}
+
+/* === Sector grouping (both Today and All Time views) === */
+
+.call-sector-group,
+.all-time-sector-group {
+  margin-bottom: 16px;
+}
+
+.sector-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+/* === All Time view === */
+
+.all-time-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.all-time-stats {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.sector-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.sector-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sector-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.sector-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0d12;
+}
+
+.all-time-search {
+  margin-bottom: 8px;
+  max-width: 320px;
+}
+
+.all-time-search .search-input {
+  width: 100%;
+}
+
+.all-time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .all-time-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .all-time-grid { grid-template-columns: 1fr; }
+}
+
+/* === All Time card (compact: ~100px) === */
+
+.all-time-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease;
+  min-height: 100px;
+}
+
+.all-time-card.border-long { border-left-color: #22c55e; }
+.all-time-card.border-short { border-left-color: #ef4444; }
+.all-time-card.border-neutral { border-left-color: #9ca3af; }
+
+.all-time-card:hover { border-color: var(--border-strong); }
+
+.all-time-card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+.atc-row-id {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atc-ticker {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.atc-company {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.atc-row-pill,
+.atc-row-counts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+.atc-last-seen {
+  color: var(--text-dim);
+}
+
+.atc-active {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.atc-top5 {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+/* Thin relative-frequency bar — relative to the universe's max, not the
+   0-75 conviction score. */
+.atc-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.atc-bar-fill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 2px;
+}

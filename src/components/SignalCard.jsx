@@ -243,7 +243,7 @@ function WidthDeltaPct({ row }) {
   return <span className={cls}>{sign}{rounded}%</span>
 }
 
-export function SignalCard({ row, change, setup, display, expanded, onToggle }) {
+export function SignalCard({ row, change, setup, display, expanded, onToggle, onViewCall }) {
   const { markerPct, ghostPct, zone, zoneLabel } = positionBarFor(row, display)
 
   const cardClasses = [
@@ -329,6 +329,20 @@ export function SignalCard({ row, change, setup, display, expanded, onToggle }) 
           <span className="posbar-end sell">{formatNumber(row.sell_trade)}</span>
         </div>
       </div>
+
+      {onViewCall && (
+        <button
+          type="button"
+          className="btn-view-call"
+          onClick={(e) => {
+            // Cross-panel jump — don't let the card-level expand toggle fire too.
+            e.stopPropagation()
+            onViewCall(row.ticker)
+          }}
+        >
+          ↗ VIEW CALL INFO
+        </button>
+      )}
 
       {expanded && (
         <div className="chart-panel" onClick={(e) => e.stopPropagation()}>

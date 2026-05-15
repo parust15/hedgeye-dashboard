@@ -6,10 +6,23 @@ import { useLivePrices } from '../lib/livePrices'
 import { useMarketState } from '../lib/marketState'
 import { formatPrice, formatNumber } from '../lib/format'
 import { parseMacroBullets } from '../lib/macroBullets'
-import { TickerDetailModal } from './TickerDetailModal'
 import { PerformanceSection } from './PerformanceSection'
+import { CallAllTimeView } from './CallAllTimeView'
+import { abbreviateSector, canonicalSector, OTHER_SECTOR } from '../lib/sectors'
 
 const MACRO_BULLETS_VISIBLE = 6
+const CALL_VIEW_KEY = 'dashboard.callView'
+const VALID_CALL_VIEWS = ['today', 'all_time']
+
+function loadInitialCallView() {
+  try {
+    const raw = localStorage.getItem(CALL_VIEW_KEY)
+    if (raw && VALID_CALL_VIEWS.includes(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read callView from localStorage:', err)
+  }
+  return 'today'
+}
 
 // "Best Idea LONG" / "Best Idea SHORT" phrasing in the rationale flags
 // Hedgeye's highest-conviction calls. Case-insensitive match per spec.
@@ -386,18 +399,26 @@ function MacroCommentarySection({ commentary }) {
 
 // --- panel ---
 
-export function TheCallPanel() {
+export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   const { rows, signalDate, isToday, status } = useCallPositions()
   const { top5, macroCommentary } = useCallExtras(signalDate)
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
   const [filter, setFilter] = useState('ALL')
+  const [callView, setCallView] = useState(loadInitialCallView)
 
-  // Modal state: the position row currently shown in the detail modal, or
-  // null when closed.
-  const [modalPosition, setModalPosition] = useState(null)
-  const openModal = (row) => setModalPosition(row)
-  const closeModal = () => setModalPosition(null)
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALL_VIEW_KEY, callView)
+    } catch (err) {
+      console.warn('Failed to persist callView to localStorage:', err)
+    }
+  }, [callView])
+
+  // Modal opener now provided by App — both panels share one modal at the
+  // root. Keep the same function shape so the existing card callsites just
+  // forward the position-like object.
+  const openModal = onOpenModal
 
   // ticker → position row lookup, used by the Top 5 highlight cards so the
   // direction pill / modal header can read the full position record even
@@ -437,15 +458,37 @@ export function TheCallPanel() {
     return formatCallReceivedEt(sample?.call_received_at_et)
   }, [rows])
 
-  // Filter + sort: position_type filter, then conviction_score DESC.
-  const visible = useMemo(() => {
+  // Filter + sector group + sort. Each sector is its own group ordered by
+  // conviction_score DESC; sectors render in the order the rows happened
+  // to introduce them, with "Other" pinned to the bottom.
+  const visibleGroups = useMemo(() => {
     const filtered = filter === 'ALL' ? rows : rows.filter((r) => r.position_type === filter)
-    return [...filtered].sort((a, b) => {
-      const av = Number(a.conviction_score) || 0
-      const bv = Number(b.conviction_score) || 0
-      return bv - av
+
+    const groupMap = new Map() // sector → rows
+    for (const r of filtered) {
+      const sector = canonicalSector(allTickersByTicker?.get(r.ticker)?.sector)
+      if (!groupMap.has(sector)) groupMap.set(sector, [])
+      groupMap.get(sector).push(r)
+    }
+    for (const arr of groupMap.values()) {
+      arr.sort((a, b) => (Number(b.conviction_score) || 0) - (Number(a.conviction_score) || 0))
+    }
+
+    const sectors = [...groupMap.keys()]
+    // Push the Other catch-all to the bottom per spec.
+    sectors.sort((a, b) => {
+      if (a === OTHER_SECTOR && b !== OTHER_SECTOR) return 1
+      if (b === OTHER_SECTOR && a !== OTHER_SECTOR) return -1
+      return 0
     })
-  }, [rows, filter])
+    return sectors.map((sector) => ({ sector, rows: groupMap.get(sector) }))
+  }, [rows, filter, allTickersByTicker])
+
+  // Flat count for the "no positions" fallback message.
+  const visibleCount = useMemo(
+    () => visibleGroups.reduce((n, g) => n + g.rows.length, 0),
+    [visibleGroups]
+  )
 
   // Counts per filter for the chip badges.
   const counts = useMemo(() => {
@@ -493,6 +536,31 @@ export function TheCallPanel() {
         </div>
       </header>
 
+      <nav className="call-view-toggle" role="tablist" aria-label="Call view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={callView === 'today'}
+          className={`call-view-pill${callView === 'today' ? ' active' : ''}`}
+          onClick={() => setCallView('today')}
+        >
+          TODAY
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={callView === 'all_time'}
+          className={`call-view-pill${callView === 'all_time' ? ' active' : ''}`}
+          onClick={() => setCallView('all_time')}
+        >
+          ALL TIME
+        </button>
+      </nav>
+
+      {callView === 'all_time' ? (
+        <CallAllTimeView allTickers={allTickers} onOpen={openModal} />
+      ) : (
+      <>
       {!isToday && (
         <div className="call-stale-banner">
           Today's call hasn't arrived yet. Last call: {formatSignalDate(signalDate)}
@@ -518,38 +586,41 @@ export function TheCallPanel() {
       <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
       <MacroCommentarySection commentary={macroCommentary} />
 
-      {visible.length === 0 ? (
+      {visibleCount === 0 ? (
         <div className="state">No {filter.toLowerCase()} positions in today's call.</div>
       ) : (
-        <section className="call-grid">
-          {visible.map((row) => {
-            const live = livePrices.get(row.ticker)
-            const rrCrossover = rrTickers.has(row.ticker)
-            return row.top5_rank != null ? (
-              <Top5Card
-                key={row.ticker}
-                row={row}
-                live={live}
-                rrCrossover={rrCrossover}
-                onOpen={openModal}
-              />
-            ) : (
-              <PositionCard
-                key={row.ticker}
-                row={row}
-                live={live}
-                rrCrossover={rrCrossover}
-                onOpen={openModal}
-              />
-            )
-          })}
-        </section>
+        visibleGroups.map((group) => (
+          <section key={group.sector} className="call-sector-group">
+            <div className="sector-group-header">{group.sector}</div>
+            <div className="call-grid">
+              {group.rows.map((row) => {
+                const live = livePrices.get(row.ticker)
+                const rrCrossover = rrTickers.has(row.ticker)
+                return row.top5_rank != null ? (
+                  <Top5Card
+                    key={row.ticker}
+                    row={row}
+                    live={live}
+                    rrCrossover={rrCrossover}
+                    onOpen={openModal}
+                  />
+                ) : (
+                  <PositionCard
+                    key={row.ticker}
+                    row={row}
+                    live={live}
+                    rrCrossover={rrCrossover}
+                    onOpen={openModal}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        ))
       )}
 
       <PerformanceSection positionRows={rows} />
-
-      {modalPosition && (
-        <TickerDetailModal position={modalPosition} onClose={closeModal} />
+      </>
       )}
     </div>
   )

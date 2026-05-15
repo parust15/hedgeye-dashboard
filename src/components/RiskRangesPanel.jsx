@@ -19,8 +19,27 @@ import { TickerFilter } from './TickerFilter'
 import { MarketStatePill } from './MarketStatePill'
 
 const TICKER_STORAGE_KEY = 'dashboard.selectedTickers'
+const TREND_FILTER_KEY = 'dashboard.trendFilter'
+const VALID_TRENDS = ['ALL', 'BULLISH', 'BEARISH', 'NEUTRAL']
 
-export function RiskRangesPanel() {
+function loadInitialTrendFilter() {
+  try {
+    const raw = localStorage.getItem(TREND_FILTER_KEY)
+    if (raw && VALID_TRENDS.includes(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read trendFilter from localStorage:', err)
+  }
+  return 'ALL'
+}
+
+const TREND_FILTERS = [
+  { id: 'ALL', label: 'ALL TRENDS' },
+  { id: 'BULLISH', label: 'BULLISH' },
+  { id: 'BEARISH', label: 'BEARISH' },
+  { id: 'NEUTRAL', label: 'NEUTRAL' },
+]
+
+export function RiskRangesPanel({ allTickersByTicker, onViewCall }) {
   // `error` from useDashboardData is intentionally not destructured — the UI
   // surfaces a generic message and the hook console.errors the raw detail.
   const { rows, changes, signalDate, updatedAt, status } = useDashboardData()
@@ -33,6 +52,15 @@ export function RiskRangesPanel() {
   const [selectedTickers, setSelectedTickers] = useState(null)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
+  const [trendFilter, setTrendFilter] = useState(loadInitialTrendFilter)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TREND_FILTER_KEY, trendFilter)
+    } catch (err) {
+      console.warn('Failed to persist trendFilter to localStorage:', err)
+    }
+  }, [trendFilter])
 
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
@@ -182,11 +210,24 @@ export function RiskRangesPanel() {
     [rows, displays, selectedTickers]
   )
 
-  // Step 1: tickers hidden via the dropdown drop out before any other logic.
-  const visibleRows = useMemo(
-    () => (selectedTickers ? rows.filter((r) => selectedTickers.has(r.ticker)) : rows),
-    [rows, selectedTickers]
-  )
+  // Step 1: tickers hidden via the dropdown drop out before any other
+  // logic. Trend filter (BULLISH/BEARISH/NEUTRAL) is applied alongside —
+  // both filters AND together.
+  const visibleRows = useMemo(() => {
+    let list = selectedTickers ? rows.filter((r) => selectedTickers.has(r.ticker)) : rows
+    if (trendFilter !== 'ALL') {
+      list = list.filter((r) => r.trend === trendFilter)
+    }
+    return list
+  }, [rows, selectedTickers, trendFilter])
+
+  const trendCounts = useMemo(() => {
+    const c = { ALL: rows.length, BULLISH: 0, BEARISH: 0, NEUTRAL: 0 }
+    for (const r of rows) {
+      if (r.trend in c) c[r.trend] += 1
+    }
+    return c
+  }, [rows])
 
   // Step 2a: Active Setups view — sorted longs/shorts, closest-to-threshold first.
   const orderedSetups = useMemo(() => {
@@ -339,6 +380,25 @@ export function RiskRangesPanel() {
         />
       </div>
 
+      {/* Trend filter row sits just below the category-chips row. The two
+          filter rows AND together — a card must match both to render. */}
+      {view === 'all' && (
+        <nav className="trend-filters" aria-label="Trend filter">
+          {TREND_FILTERS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={trendFilter === t.id}
+              className={`trend-chip trend-chip-${t.id.toLowerCase()}${trendFilter === t.id ? ' active' : ''}`}
+              onClick={() => setTrendFilter(t.id)}
+            >
+              {t.label}
+              <span className="chip-count">{trendCounts[t.id] ?? 0}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
       {status === 'loading' && <div className="state">Loading…</div>}
       {status === 'error' && <div className="state error">Could not load dashboard data.</div>}
       {status === 'ready' && visibleCards.length === 0 && (
@@ -353,17 +413,36 @@ export function RiskRangesPanel() {
 
       {status === 'ready' && visibleCards.length > 0 && (
         <section className="cards">
-          {visibleCards.map((r) => (
-            <SignalCard
-              key={r.ticker}
-              row={r}
-              change={changes[r.ticker]}
-              setup={getSetup(r, displays.get(r.ticker))}
-              display={displays.get(r.ticker)}
-              expanded={expanded === r.ticker}
-              onToggle={toggleExpand}
-            />
-          ))}
+          {visibleCards.map((r) => {
+            // VIEW CALL button shows only when the ticker has a call
+            // history record. The handler hops to The Call tab and pre-
+            // opens the modal with whatever context we have from the
+            // all-tickers view.
+            const callRow = allTickersByTicker?.get(r.ticker)
+            const handleViewCall = callRow
+              ? () =>
+                  onViewCall?.({
+                    ticker: r.ticker,
+                    company_name: callRow.company_name,
+                    position_type: callRow.last_position_type,
+                    conviction_score: 0,
+                    signal_date: callRow.last_seen_date,
+                    top5_appearances_90d: callRow.top5_appearances,
+                  })
+              : null
+            return (
+              <SignalCard
+                key={r.ticker}
+                row={r}
+                change={changes[r.ticker]}
+                setup={getSetup(r, displays.get(r.ticker))}
+                display={displays.get(r.ticker)}
+                expanded={expanded === r.ticker}
+                onToggle={toggleExpand}
+                onViewCall={handleViewCall}
+              />
+            )
+          })}
         </section>
       )}
     </div>
