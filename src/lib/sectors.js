@@ -28,6 +28,14 @@ export function canonicalSector(raw) {
   return trimmed
 }
 
+// Stable filter/dedup key for a sector. Lowercases the canonical form so
+// e.g. "Restaurants" and "restaurants " collapse to a single chip. Used
+// for Set membership in the multi-select sector filter; the display name
+// is preserved via a parallel map (first-seen casing wins).
+export function normalizeSectorKey(raw) {
+  return canonicalSector(raw).toLowerCase()
+}
+
 // Compact name for a sector chip. Maps the known long ones via the
 // abbreviation table, otherwise truncates at 18 chars with ellipsis.
 export function abbreviateSector(raw) {

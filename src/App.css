@@ -2162,51 +2162,6 @@
   margin-bottom: 16px;
 }
 
-.sector-group-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--text);
-}
-
-/* Clickable group header — sector chips disguised as headers. Hover
-   brightens, active gets an amber underline + bold per spec. */
-.sector-group-header-button {
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  border-top: 0;
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 1px solid var(--border);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--text);
-  transition: color 120ms ease, border-color 120ms ease;
-}
-
-.sector-group-header-button:hover {
-  color: var(--text-strong);
-  border-bottom-color: var(--border-strong);
-}
-
-.sector-group-header-button.active {
-  color: #fbbf24;
-  border-bottom: 2px solid #F59E0B;
-  font-weight: 800;
-}
-
 /* === All Time view === */
 
 .all-time-view {
@@ -2220,53 +2175,6 @@
   font-size: 13px;
   color: var(--text-dim);
   margin-bottom: 4px;
-}
-
-.sector-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 4px 0 8px;
-}
-
-.sector-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--text);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
-  white-space: nowrap;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sector-chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-
-.sector-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0b0d12;
-}
-
-.all-time-search {
-  margin-bottom: 8px;
-  max-width: 320px;
-}
-
-.all-time-search .search-input {
-  width: 100%;
 }
 
 .all-time-grid {
@@ -2427,28 +2335,6 @@
 .search-clear:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text);
-}
-
-/* ALL SECTORS × chip — appears in the filter row when a sector is
-   selected. Amber border to echo the active sector header. */
-.all-sectors-clear-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  border: 1px solid rgba(245, 158, 11, 0.55);
-  background: rgba(245, 158, 11, 0.10);
-  color: #fbbf24;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.all-sectors-clear-chip:hover {
-  background: rgba(245, 158, 11, 0.18);
 }
 
 /* RETURNING filter chip — amber border (matches the badge) instead of

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import {
   canonicalSector,
-  abbreviateSector,
+  normalizeSectorKey,
   buildCallTickerGroups,
   OTHER_SECTOR,
 } from '../lib/sectors'
@@ -175,31 +175,48 @@ export function CallAllTimeView({
   }, [allTickers, positionFilter, search, selectedCallTickers])
 
   // Stage 2: chipBaseRows after sector filter, sorted by total_appearances
-  // DESC. Flat — no sector grouping in the rendered grid.
+  // DESC. Flat — no sector grouping in the rendered grid. Sector filter
+  // is a Set<normalizedKey> with OR semantics across active chips.
   const visibleCards = useMemo(() => {
     let list = chipBaseRows
-    if (sectorFilter !== 'ALL') {
-      list = list.filter((r) => canonicalSector(r.sector) === sectorFilter)
+    if (sectorFilter.size > 0) {
+      list = list.filter((r) => sectorFilter.has(normalizeSectorKey(r.sector)))
     }
     return [...list].sort(
       (a, b) => (Number(b.total_appearances) || 0) - (Number(a.total_appearances) || 0)
     )
   }, [chipBaseRows, sectorFilter])
 
-  // Sector chip data: one chip per sector with ≥1 row in chipBaseRows.
+  // Sector chip data: dedup by lowercase-trimmed key so "Restaurants" and
+  // "restaurants " collapse to one chip. First-seen canonical casing
+  // becomes the chip label.
   const sectorChipData = useMemo(() => {
     const counts = new Map()
+    const displayBy = new Map()
     for (const r of chipBaseRows) {
-      const sector = canonicalSector(r.sector)
-      counts.set(sector, (counts.get(sector) ?? 0) + 1)
+      const canon = canonicalSector(r.sector)
+      const key = canon.toLowerCase()
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+      if (!displayBy.has(key)) displayBy.set(key, canon)
     }
-    const sectors = [...counts.keys()].sort((a, b) => {
-      if (a === OTHER_SECTOR) return 1
-      if (b === OTHER_SECTOR) return -1
-      return a.localeCompare(b)
+    const keys = [...counts.keys()].sort((a, b) => {
+      const da = displayBy.get(a)
+      const db = displayBy.get(b)
+      if (da === OTHER_SECTOR) return 1
+      if (db === OTHER_SECTOR) return -1
+      return da.localeCompare(db)
     })
-    return sectors.map((s) => ({ sector: s, count: counts.get(s) }))
+    return keys.map((k) => ({ key: k, display: displayBy.get(k), count: counts.get(k) }))
   }, [chipBaseRows])
+
+  function toggleSectorChip(key) {
+    setSectorFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   return (
     <div className="all-time-view">
@@ -259,31 +276,34 @@ export function CallAllTimeView({
         />
       </div>
 
-      {/* Filter row 2: sector chip row, RR-style. Replaces the old
-          sticky sector group headers. */}
+      {/* Filter row 2: sector chip row, RR-style. Multi-select with OR
+          semantics — clicking a sector toggles it in/out of the active
+          set; ALL clears. Full sector labels (no abbreviation), wraps. */}
       <nav className="chips call-sector-chips" aria-label="Sector filter">
         <button
           type="button"
-          aria-pressed={sectorFilter === 'ALL'}
-          className={`chip${sectorFilter === 'ALL' ? ' active' : ''}`}
-          onClick={() => setSectorFilter('ALL')}
+          aria-pressed={sectorFilter.size === 0}
+          className={`chip${sectorFilter.size === 0 ? ' active' : ''}`}
+          onClick={() => setSectorFilter(new Set())}
         >
-          All
+          ALL SECTORS
           <span className="chip-count">{chipBaseRows.length}</span>
         </button>
-        {sectorChipData.map(({ sector, count }) => (
-          <button
-            key={sector}
-            type="button"
-            aria-pressed={sectorFilter === sector}
-            className={`chip${sectorFilter === sector ? ' active' : ''}`}
-            onClick={() => setSectorFilter(sectorFilter === sector ? 'ALL' : sector)}
-            title={sector}
-          >
-            {abbreviateSector(sector)}
-            <span className="chip-count">{count}</span>
-          </button>
-        ))}
+        {sectorChipData.map(({ key, display, count }) => {
+          const active = sectorFilter.has(key)
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              className={`chip${active ? ' active' : ''}`}
+              onClick={() => toggleSectorChip(key)}
+            >
+              {display}
+              <span className="chip-count">{count}</span>
+            </button>
+          )
+        })}
       </nav>
 
       {visibleCards.length === 0 ? (

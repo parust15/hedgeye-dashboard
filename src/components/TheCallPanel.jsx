@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
@@ -10,8 +10,8 @@ import { PerformanceSection } from './PerformanceSection'
 import { CallAllTimeView } from './CallAllTimeView'
 import { TickerFilter } from './TickerFilter'
 import {
-  abbreviateSector,
   canonicalSector,
+  normalizeSectorKey,
   buildCallTickerGroups,
   OTHER_SECTOR,
 } from '../lib/sectors'
@@ -32,14 +32,30 @@ function loadInitialCallView() {
   return 'today'
 }
 
+// Sector filter is a Set<normalizedKey>. Empty set = "show all sectors"
+// (ALL chip active). Stored as a JSON array. Migration from the old
+// single-string format ('ALL' or a sector name) is handled at load time
+// so existing users don't see their preference wiped on first deploy.
 function loadInitialCallSector() {
   try {
     const raw = localStorage.getItem(CALL_SECTOR_KEY)
-    if (raw && typeof raw === 'string') return raw
+    if (!raw) return new Set()
+    // New format: JSON array of normalized sector keys.
+    if (raw.startsWith('[')) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        return new Set(
+          parsed.filter((s) => typeof s === 'string').map((s) => s.toLowerCase())
+        )
+      }
+    }
+    // Legacy single-string format.
+    if (raw === 'ALL') return new Set()
+    return new Set([raw.toLowerCase()])
   } catch (err) {
     console.warn('Failed to read callSector from localStorage:', err)
   }
-  return 'ALL'
+  return new Set()
 }
 
 // "Best Idea LONG" / "Best Idea SHORT" phrasing in the rationale flags
@@ -553,7 +569,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(CALL_SECTOR_KEY, sectorFilter)
+      localStorage.setItem(CALL_SECTOR_KEY, JSON.stringify(Array.from(sectorFilter)))
     } catch (err) {
       console.warn('Failed to persist callSector to localStorage:', err)
     }
@@ -690,9 +706,10 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
 
   const visibleCards = useMemo(() => {
     let list = chipBaseRows
-    if (sectorFilter !== 'ALL') {
-      list = list.filter(
-        (r) => canonicalSector(allTickersByTicker?.get(r.ticker)?.sector) === sectorFilter
+    if (sectorFilter.size > 0) {
+      // OR semantics: row passes if its sector is in any active chip.
+      list = list.filter((r) =>
+        sectorFilter.has(normalizeSectorKey(allTickersByTicker?.get(r.ticker)?.sector))
       )
     }
     // Stable tier sort: FLIPPED → RETURNING → new ADDED → UNCHANGED, then
@@ -705,22 +722,40 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     })
   }, [chipBaseRows, sectorFilter, allTickersByTicker])
 
-  // Sector chip data: one chip per sector that has ≥1 row in chipBaseRows.
-  // Sorted alphabetically with the Other catch-all pinned last. Items in
-  // the row include their per-sector count for the chip badge.
+  // Sector chip data: dedup by normalized (trimmed-lowercase) key so
+  // "Restaurants" and "restaurants " collapse to one chip. The first
+  // canonical-cased name seen for that key becomes the chip label.
+  // Sorted alphabetically by display name with Other pinned last.
   const sectorChipData = useMemo(() => {
-    const counts = new Map()
+    const counts = new Map() // normalized key → count
+    const displayBy = new Map() // normalized key → first-seen canonical name
     for (const r of chipBaseRows) {
-      const sector = canonicalSector(allTickersByTicker?.get(r.ticker)?.sector)
-      counts.set(sector, (counts.get(sector) ?? 0) + 1)
+      const canon = canonicalSector(allTickersByTicker?.get(r.ticker)?.sector)
+      const key = canon.toLowerCase()
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+      if (!displayBy.has(key)) displayBy.set(key, canon)
     }
-    const sectors = [...counts.keys()].sort((a, b) => {
-      if (a === OTHER_SECTOR) return 1
-      if (b === OTHER_SECTOR) return -1
-      return a.localeCompare(b)
+    const keys = [...counts.keys()].sort((a, b) => {
+      const da = displayBy.get(a)
+      const db = displayBy.get(b)
+      if (da === OTHER_SECTOR) return 1
+      if (db === OTHER_SECTOR) return -1
+      return da.localeCompare(db)
     })
-    return sectors.map((s) => ({ sector: s, count: counts.get(s) }))
+    return keys.map((k) => ({ key: k, display: displayBy.get(k), count: counts.get(k) }))
   }, [chipBaseRows, allTickersByTicker])
+
+  // Toggle a sector chip in/out of the active filter set. Clicking ALL
+  // clears. Stable identity via useCallback so child handlers don't churn.
+  const toggleSectorChip = useCallback((key) => {
+    setSectorFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  const clearSectorChips = useCallback(() => setSectorFilter(new Set()), [])
 
   const visibleCount = visibleCards.length
 
@@ -885,31 +920,36 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
         />
       </div>
 
-      {/* Filter row 2: sector chip row, RR-style. Replaces the old inline
-          sector group headers — cards now render in a flat grid below. */}
+      {/* Filter row 2: sector chip row, RR-style. Multi-select — clicking
+          a sector toggles it in/out of the active set; positions match
+          via OR (sector ∈ active set). ALL is active when the set is
+          empty and clicking it clears. Labels show full sector text
+          (no abbreviation); the row wraps. */}
       <nav className="chips call-sector-chips" aria-label="Sector filter">
         <button
           type="button"
-          aria-pressed={sectorFilter === 'ALL'}
-          className={`chip${sectorFilter === 'ALL' ? ' active' : ''}`}
-          onClick={() => setSectorFilter('ALL')}
+          aria-pressed={sectorFilter.size === 0}
+          className={`chip${sectorFilter.size === 0 ? ' active' : ''}`}
+          onClick={clearSectorChips}
         >
-          All
+          ALL SECTORS
           <span className="chip-count">{chipBaseRows.length}</span>
         </button>
-        {sectorChipData.map(({ sector, count }) => (
-          <button
-            key={sector}
-            type="button"
-            aria-pressed={sectorFilter === sector}
-            className={`chip${sectorFilter === sector ? ' active' : ''}`}
-            onClick={() => setSectorFilter(sectorFilter === sector ? 'ALL' : sector)}
-            title={sector}
-          >
-            {abbreviateSector(sector)}
-            <span className="chip-count">{count}</span>
-          </button>
-        ))}
+        {sectorChipData.map(({ key, display, count }) => {
+          const active = sectorFilter.has(key)
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              className={`chip${active ? ' active' : ''}`}
+              onClick={() => toggleSectorChip(key)}
+            >
+              {display}
+              <span className="chip-count">{count}</span>
+            </button>
+          )
+        })}
       </nav>
 
       <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
