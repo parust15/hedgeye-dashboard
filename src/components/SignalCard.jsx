@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import {
   positionBarFor,
   rangePct,
@@ -7,8 +7,15 @@ import {
   SHORT_SETUP_PCT,
 } from '../lib/range'
 import { formatNumber, formatPrice } from '../lib/format'
-import { ExpandedChart } from './ExpandedChart'
 import { VixBucketBadge } from './VixBucketPill'
+
+// Code-split the recharts-heavy chart so it isn't part of the initial
+// bundle — only loaded the first time a user expands a card. ExpandedChart
+// is a named export, so we adapt it to the default export shape lazy()
+// expects.
+const ExpandedChart = lazy(() =>
+  import('./ExpandedChart').then((m) => ({ default: m.ExpandedChart }))
+)
 
 function trendClass(trend) {
   if (trend === 'BULLISH') return 'trend bullish'
@@ -359,7 +366,11 @@ export function SignalCard({
 
       {expanded && (
         <div className="chart-panel" onClick={(e) => e.stopPropagation()}>
-          <ExpandedChart ticker={row.ticker} display={display} />
+          <Suspense
+            fallback={<div className="chart-loading" style={{ height: 280 }} />}
+          >
+            <ExpandedChart ticker={row.ticker} display={display} />
+          </Suspense>
         </div>
       )}
     </article>
