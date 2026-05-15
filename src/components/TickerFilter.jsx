@@ -68,7 +68,16 @@ function TickerGroup({
   )
 }
 
-export function TickerFilter({ allTickers, selectedTickers, setSelectedTickers }) {
+export function TickerFilter({
+  allTickers,
+  selectedTickers,
+  setSelectedTickers,
+  // Optional override for grouping logic. Defaults to RR's category-based
+  // groupings (buildTickerGroups from lib/categories.js). The Call panel
+  // passes buildCallTickerGroups from lib/sectors.js to group by sector
+  // instead of category.
+  buildGroups = buildTickerGroups,
+}) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState(() => new Set())
@@ -93,7 +102,7 @@ export function TickerFilter({ allTickers, selectedTickers, setSelectedTickers }
     }
   }, [open])
 
-  const groups = useMemo(() => buildTickerGroups(allTickers, search), [allTickers, search])
+  const groups = useMemo(() => buildGroups(allTickers, search), [buildGroups, allTickers, search])
 
   const total = allTickers.length
   const selectedCount = selectedTickers

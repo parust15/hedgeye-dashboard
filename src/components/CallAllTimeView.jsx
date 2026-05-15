@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
-import { canonicalSector, abbreviateSector, OTHER_SECTOR } from '../lib/sectors'
+import {
+  canonicalSector,
+  abbreviateSector,
+  buildCallTickerGroups,
+  OTHER_SECTOR,
+} from '../lib/sectors'
+import { TickerFilter } from './TickerFilter'
 
 // "May 14" from YYYY-MM-DD.
 function formatLastSeen(iso) {
@@ -78,15 +84,14 @@ function AllTimeCard({ row, maxAppearances, onOpen }) {
 }
 
 /**
- * All Time view: ~470-row sector-grouped grid of every ticker that has
- * appeared in Hedgeye's call. Position + sector + search filters are
- * lifted to TheCallPanel and passed in as props so they persist across
- * the TODAY ↔ ALL TIME toggle.
+ * All Time view: flat grid of every ticker that has appeared in Hedgeye's
+ * call. Cards are no longer grouped under sticky sector headers — sector
+ * is now a chip filter (RR-style) sitting alongside the position chips
+ * and search bar.
  *
- * Sector group headers are clickable filter chips (same behavior as the
- * Today view) — clicking one filters the grid to just that sector;
- * clicking the active sector clears the filter. The standalone sector
- * chip row at the top is kept for direct navigation across 470 tickers.
+ * Filter state (position / sector / search / selectedCallTickers) is
+ * owned by TheCallPanel and passed in as props, so it persists across
+ * the TODAY ↔ ALL TIME toggle.
  */
 export function CallAllTimeView({
   allTickers,
@@ -97,6 +102,8 @@ export function CallAllTimeView({
   setPositionFilter,
   sectorFilter,
   setSectorFilter,
+  selectedCallTickers,
+  setSelectedCallTickers,
 }) {
   const POSITION_FILTERS = [
     { id: 'ALL', label: 'ALL' },
@@ -125,28 +132,15 @@ export function CallAllTimeView({
     }
   }, [allTickers])
 
-  // Distinct sectors in canonical form, sorted alphabetically with the
-  // Other catch-all pinned at the end.
-  const sectorChips = useMemo(() => {
-    const set = new Set()
-    for (const r of allTickers) set.add(canonicalSector(r.sector))
-    const list = [...set].sort((a, b) => {
-      if (a === OTHER_SECTOR) return 1
-      if (b === OTHER_SECTOR) return -1
-      return a.localeCompare(b)
-    })
-    return list
-  }, [allTickers])
-
   // Highest total_appearances drives the relative-frequency bar width.
   const maxAppearances = useMemo(
     () => allTickers.reduce((m, r) => Math.max(m, Number(r.total_appearances) || 0), 0),
     [allTickers]
   )
 
-  // Counts for the position chip badges. RETURNING is in TheCallPanel's
-  // chips only — All Time's source data doesn't carry change_status so
-  // the filter is meaningless here.
+  // Counts for the position chip badges. RETURNING is a Today-only signal
+  // (depends on change_status which All Time doesn't carry) — treated as
+  // ALL when triggered from this view's chip set, so it doesn't appear here.
   const positionCounts = useMemo(() => {
     const c = { ALL: allTickers.length, LONG: 0, SHORT: 0, NEUTRAL: 0 }
     for (const r of allTickers) {
@@ -156,12 +150,11 @@ export function CallAllTimeView({
     return c
   }, [allTickers])
 
-  // Apply filters → group by sector → sort within each group by
-  // total_appearances DESC.
-  const visibleGroups = useMemo(() => {
+  // Stage 1: rows after position + search + ticker filter (before sector
+  // filter). Drives sector chip counts.
+  const chipBaseRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const filtered = allTickers.filter((r) => {
-      // RETURNING is a Today-only filter; in All Time treat it as ALL.
+    return allTickers.filter((r) => {
       if (
         positionFilter !== 'ALL' &&
         positionFilter !== 'RETURNING' &&
@@ -169,42 +162,44 @@ export function CallAllTimeView({
       ) {
         return false
       }
-      const sector = canonicalSector(r.sector)
-      if (sectorFilter !== 'ALL' && sector !== sectorFilter) return false
       if (q) {
         const ticker = (r.ticker ?? '').toLowerCase()
         const company = (r.company_name ?? '').toLowerCase()
         if (!ticker.includes(q) && !company.includes(q)) return false
       }
+      if (selectedCallTickers !== null && !selectedCallTickers.has(r.ticker)) {
+        return false
+      }
       return true
     })
+  }, [allTickers, positionFilter, search, selectedCallTickers])
 
-    const byCat = new Map()
-    for (const r of filtered) {
+  // Stage 2: chipBaseRows after sector filter, sorted by total_appearances
+  // DESC. Flat — no sector grouping in the rendered grid.
+  const visibleCards = useMemo(() => {
+    let list = chipBaseRows
+    if (sectorFilter !== 'ALL') {
+      list = list.filter((r) => canonicalSector(r.sector) === sectorFilter)
+    }
+    return [...list].sort(
+      (a, b) => (Number(b.total_appearances) || 0) - (Number(a.total_appearances) || 0)
+    )
+  }, [chipBaseRows, sectorFilter])
+
+  // Sector chip data: one chip per sector with ≥1 row in chipBaseRows.
+  const sectorChipData = useMemo(() => {
+    const counts = new Map()
+    for (const r of chipBaseRows) {
       const sector = canonicalSector(r.sector)
-      if (!byCat.has(sector)) byCat.set(sector, [])
-      byCat.get(sector).push(r)
+      counts.set(sector, (counts.get(sector) ?? 0) + 1)
     }
-    for (const arr of byCat.values()) {
-      arr.sort((a, b) => (Number(b.total_appearances) || 0) - (Number(a.total_appearances) || 0))
-    }
-
-    const sectors = [...byCat.keys()].sort((a, b) => {
+    const sectors = [...counts.keys()].sort((a, b) => {
       if (a === OTHER_SECTOR) return 1
       if (b === OTHER_SECTOR) return -1
       return a.localeCompare(b)
     })
-    return sectors.map((s) => ({ sector: s, rows: byCat.get(s) }))
-  }, [allTickers, positionFilter, sectorFilter, search])
-
-  const totalVisible = useMemo(
-    () => visibleGroups.reduce((n, g) => n + g.rows.length, 0),
-    [visibleGroups]
-  )
-
-  function toggleSectorHeader(sector) {
-    setSectorFilter(sectorFilter === sector ? 'ALL' : sector)
-  }
+    return sectors.map((s) => ({ sector: s, count: counts.get(s) }))
+  }, [chipBaseRows])
 
   return (
     <div className="all-time-view">
@@ -212,8 +207,8 @@ export function CallAllTimeView({
         {stats.tickers} tickers · {stats.tradingDays} trading days
       </div>
 
-      {/* Unified filter row: position chips left, ALL SECTORS × chip,
-          search right. Same layout as Today view + Risk Ranges. */}
+      {/* Filter row 1: position chips left, search center, TickerFilter
+          dropdown right. Identical layout to Today + RR. */}
       <div className="call-filter-row">
         <nav className="call-filters" aria-label="Position type filter">
           {POSITION_FILTERS.map((p) => (
@@ -229,17 +224,6 @@ export function CallAllTimeView({
             </button>
           ))}
         </nav>
-        {sectorFilter !== 'ALL' && (
-          <button
-            type="button"
-            className="all-sectors-clear-chip"
-            onClick={() => setSectorFilter('ALL')}
-            title={`Showing only ${sectorFilter} — click to clear`}
-            aria-label={`Clear sector filter (currently ${sectorFilter})`}
-          >
-            ALL SECTORS ×
-          </button>
-        )}
         <div className="search-wrap call-search-wrap">
           <input
             type="search"
@@ -267,63 +251,54 @@ export function CallAllTimeView({
             </button>
           )}
         </div>
+        <TickerFilter
+          allTickers={allTickers}
+          selectedTickers={selectedCallTickers}
+          setSelectedTickers={setSelectedCallTickers}
+          buildGroups={buildCallTickerGroups}
+        />
       </div>
 
-      {/* Standalone sector chip row — kept for direct navigation across
-          ~470 cards. Drives the same shared sectorFilter state. */}
-      <nav className="sector-chips" aria-label="Sector filter">
+      {/* Filter row 2: sector chip row, RR-style. Replaces the old
+          sticky sector group headers. */}
+      <nav className="chips call-sector-chips" aria-label="Sector filter">
         <button
           type="button"
           aria-pressed={sectorFilter === 'ALL'}
-          className={`sector-chip${sectorFilter === 'ALL' ? ' active' : ''}`}
+          className={`chip${sectorFilter === 'ALL' ? ' active' : ''}`}
           onClick={() => setSectorFilter('ALL')}
         >
-          ALL SECTORS
+          All
+          <span className="chip-count">{chipBaseRows.length}</span>
         </button>
-        {sectorChips.map((s) => (
+        {sectorChipData.map(({ sector, count }) => (
           <button
-            key={s}
+            key={sector}
             type="button"
-            aria-pressed={sectorFilter === s}
-            className={`sector-chip${sectorFilter === s ? ' active' : ''}`}
-            onClick={() => setSectorFilter(s)}
-            title={s}
+            aria-pressed={sectorFilter === sector}
+            className={`chip${sectorFilter === sector ? ' active' : ''}`}
+            onClick={() => setSectorFilter(sectorFilter === sector ? 'ALL' : sector)}
+            title={sector}
           >
-            {abbreviateSector(s)}
+            {abbreviateSector(sector)}
+            <span className="chip-count">{count}</span>
           </button>
         ))}
       </nav>
 
-      {totalVisible === 0 ? (
+      {visibleCards.length === 0 ? (
         <div className="state">No tickers match these filters.</div>
       ) : (
-        visibleGroups.map((g) => (
-          <section key={g.sector} className="all-time-sector-group">
-            <button
-              type="button"
-              className={`sector-group-header sector-group-header-button${sectorFilter === g.sector ? ' active' : ''}`}
-              onClick={() => toggleSectorHeader(g.sector)}
-              aria-pressed={sectorFilter === g.sector}
-              title={
-                sectorFilter === g.sector
-                  ? 'Click to show all sectors'
-                  : `Click to filter to ${g.sector} only`
-              }
-            >
-              {g.sector}
-            </button>
-            <div className="all-time-grid">
-              {g.rows.map((r) => (
-                <AllTimeCard
-                  key={r.ticker}
-                  row={r}
-                  maxAppearances={maxAppearances}
-                  onOpen={onOpen}
-                />
-              ))}
-            </div>
-          </section>
-        ))
+        <div className="all-time-grid">
+          {visibleCards.map((r) => (
+            <AllTimeCard
+              key={r.ticker}
+              row={r}
+              maxAppearances={maxAppearances}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
       )}
     </div>
   )

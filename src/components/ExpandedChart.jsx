@@ -63,18 +63,6 @@ function ChartLegend() {
   )
 }
 
-// Resolve the close-line label for a given data point. Historical points
-// are always "Close" (each day's settle). Today's terminal point reads from
-// the live state: Live / Close / Last, with "Prev close" only as the
-// fallback when there's no live data at all.
-function closeLineLabel(isToday, liveState) {
-  if (!isToday) return 'Close'
-  if (liveState === 'live') return 'Live'
-  if (liveState === 'closed') return 'Close'
-  if (liveState === 'stale') return 'Last'
-  return 'Prev close'
-}
-
 // Pull the "HH:mm ET" suffix out of priceDisplay.timeLabel for annotation
 // alongside live/stale values. Returns '' if no time portion is present.
 function extractEtTime(timeLabel) {
@@ -83,38 +71,105 @@ function extractEtTime(timeLabel) {
   return m ? m[1] : ''
 }
 
-// Custom recharts tooltip content. recharts passes { active, payload, label }
-// where payload is an array of points at the hover position. We render one
-// row per data series with dynamic label/value styling.
-function ChartTooltipContent({ active, payload, label, lastDate, display }) {
+// Custom recharts tooltip content. Mirrors the range-bar tooltip styling
+// from SignalCard's RangeBarTooltip — same dark card, same row layout.
+// Adds Prev close + Position rows that the range-bar tooltip has but the
+// previous chart tooltip didn't.
+//
+// "Close" row label varies by point + live state per spec:
+//   - Terminal point + state=live  → "Live price", value = live price
+//   - Terminal point + state=closed → "Close", value = current price
+//   - Terminal point + state=stale → "Last", value = current price (dim row)
+//   - Terminal point + no live data → "Prev close", value = prev close
+//   - Historical points → "Close", value = the day's plotted close
+function ChartTooltipContent({ active, payload, label, ticker, lastDate, display }) {
   if (!active || !payload?.length) return null
   const isToday = label === lastDate
 
+  const buyEntry = payload.find((p) => p.dataKey === 'buy')
+  const sellEntry = payload.find((p) => p.dataKey === 'sell')
+  const closeEntry = payload.find((p) => p.dataKey === 'close')
+  const buy = buyEntry?.value ?? null
+  const sell = sellEntry?.value ?? null
+  // The chart's `close` series is mapped from DB prev_close at fetch time
+  // — so the value plotted IS the row's prev_close. For terminal point the
+  // useLiveEndpoint swap (in ExpandedChart) has already replaced this with
+  // the live price when we have one. We re-derive the "true prev close"
+  // by reading the DB-mapped value directly via the payload's payload row.
+  const chartClose = closeEntry?.value ?? null
+  // Original DB prev_close — preserved in the data row even when the
+  // terminal `close` was swapped to live for the chart line.
+  const dbPrevClose = closeEntry?.payload?.prev_close ?? chartClose
+
+  // Decide the close-row label + value per spec.
+  let closeLabel = 'Close'
+  let closeValue = chartClose
+  let staleClass = ''
+  if (isToday) {
+    const state = display?.state
+    if (state === 'live') {
+      closeLabel = 'Live price'
+      closeValue = Number.isFinite(display?.price) ? display.price : chartClose
+    } else if (state === 'closed') {
+      closeLabel = 'Close'
+      closeValue = Number.isFinite(display?.price) ? display.price : chartClose
+    } else if (state === 'stale') {
+      closeLabel = 'Last'
+      closeValue = Number.isFinite(display?.price) ? display.price : chartClose
+      staleClass = ' stale'
+    } else {
+      closeLabel = 'Prev close'
+      closeValue = chartClose
+    }
+  }
+
+  // Append HH:mm ET suffix to live/stale terminal values, matching the
+  // bar tooltip's behaviour.
+  let closeValueText = formatNumber(closeValue)
+  if (isToday && (display?.state === 'live' || display?.state === 'stale')) {
+    const time = extractEtTime(display?.timeLabel)
+    if (time) closeValueText = `${closeValueText} · ${time}`
+  }
+
+  // Position % = (close - buy) / (sell - buy), clamped to [0, 1], rounded.
+  let positionText = '—'
+  if (
+    Number.isFinite(buy) &&
+    Number.isFinite(sell) &&
+    Number.isFinite(closeValue) &&
+    sell !== buy
+  ) {
+    const raw = (closeValue - buy) / (sell - buy)
+    const pct = Math.round(Math.max(0, Math.min(1, raw)) * 100)
+    positionText = `${pct}% of range`
+  }
+
   return (
-    <div className="chart-tooltip-custom">
-      <div className="chart-tooltip-head">{label}</div>
-      {payload.map((p) => {
-        let name
-        let value = formatNumber(p.value)
-        if (p.dataKey === 'buy') {
-          name = 'LRR (buy)'
-        } else if (p.dataKey === 'sell') {
-          name = 'TRR (sell)'
-        } else {
-          // dataKey === 'close' — the dynamic-label line
-          name = closeLineLabel(isToday, display?.state)
-          if (isToday && (display?.state === 'live' || display?.state === 'stale')) {
-            const time = extractEtTime(display.timeLabel)
-            if (time) value = `${value} · ${time}`
-          }
-        }
-        return (
-          <div key={p.dataKey} className="chart-tooltip-row">
-            <span>{name}</span>
-            <span>{value}</span>
-          </div>
-        )
-      })}
+    <div className="chart-tooltip-card">
+      <div className="range-tooltip-head">
+        {ticker}
+        {label ? ` · ${label}` : ''}
+      </div>
+      <div className="range-tooltip-row buy">
+        <span>LRR (buy)</span>
+        <span>{formatNumber(buy)}</span>
+      </div>
+      <div className={`range-tooltip-row${staleClass}`}>
+        <span>{closeLabel}</span>
+        <span>{closeValueText}</span>
+      </div>
+      <div className="range-tooltip-row">
+        <span>Prev close</span>
+        <span>{formatNumber(dbPrevClose)}</span>
+      </div>
+      <div className="range-tooltip-row sell">
+        <span>TRR (sell)</span>
+        <span>{formatNumber(sell)}</span>
+      </div>
+      <div className="range-tooltip-row">
+        <span>Position</span>
+        <span>{positionText}</span>
+      </div>
     </div>
   )
 }
@@ -150,6 +205,10 @@ export function ExpandedChart({ ticker, display }) {
         buy: Number(r.buy_trade),
         sell: Number(r.sell_trade),
         close: Number(r.prev_close),
+        // Snapshot of the DB prev_close so the chart tooltip's "Prev close"
+        // row reads the real prior-day settle even after the terminal
+        // `close` gets swapped with the live price.
+        prev_close: Number(r.prev_close),
         state: r.range_state,
       }))
       chartHistoryCache.set(ticker, ordered)
@@ -239,10 +298,13 @@ export function ExpandedChart({ ticker, display }) {
           <Tooltip
             content={
               <ChartTooltipContent
+                ticker={ticker}
                 lastDate={data[data.length - 1]?.date}
                 display={display}
               />
             }
+            allowEscapeViewBox={{ x: false, y: true }}
+            wrapperStyle={{ outline: 'none', zIndex: 5 }}
           />
           {data.slice(0, -1).map((d, i) => (
             <ReferenceArea

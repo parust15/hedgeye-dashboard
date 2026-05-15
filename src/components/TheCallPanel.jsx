@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
@@ -8,10 +8,18 @@ import { formatPrice, formatNumber } from '../lib/format'
 import { parseMacroBullets } from '../lib/macroBullets'
 import { PerformanceSection } from './PerformanceSection'
 import { CallAllTimeView } from './CallAllTimeView'
-import { abbreviateSector, canonicalSector, OTHER_SECTOR } from '../lib/sectors'
+import { TickerFilter } from './TickerFilter'
+import {
+  abbreviateSector,
+  canonicalSector,
+  buildCallTickerGroups,
+  OTHER_SECTOR,
+} from '../lib/sectors'
 
 const MACRO_BULLETS_VISIBLE = 6
 const CALL_VIEW_KEY = 'dashboard.callView'
+const CALL_SECTOR_KEY = 'dashboard.callSector'
+const CALL_TICKERS_KEY = 'dashboard.selectedCallTickers'
 const VALID_CALL_VIEWS = ['today', 'all_time']
 
 function loadInitialCallView() {
@@ -22,6 +30,16 @@ function loadInitialCallView() {
     console.warn('Failed to read callView from localStorage:', err)
   }
   return 'today'
+}
+
+function loadInitialCallSector() {
+  try {
+    const raw = localStorage.getItem(CALL_SECTOR_KEY)
+    if (raw && typeof raw === 'string') return raw
+  } catch (err) {
+    console.warn('Failed to read callSector from localStorage:', err)
+  }
+  return 'ALL'
 }
 
 // "Best Idea LONG" / "Best Idea SHORT" phrasing in the rationale flags
@@ -514,9 +532,16 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
   const [filter, setFilter] = useState('ALL')
-  const [sectorFilter, setSectorFilter] = useState('ALL')
+  const [sectorFilter, setSectorFilter] = useState(loadInitialCallSector)
   const [search, setSearch] = useState('')
   const [callView, setCallView] = useState(loadInitialCallView)
+
+  // Per-ticker visibility for the Call panel — Set<string> mirroring the
+  // RR ticker filter shape. null while waiting for the first reconcile
+  // against the all-tickers universe so the initial render is unfiltered
+  // rather than empty.
+  const [selectedCallTickers, setSelectedCallTickers] = useState(null)
+  const callTickersPersistedRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -525,6 +550,70 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       console.warn('Failed to persist callView to localStorage:', err)
     }
   }, [callView])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALL_SECTOR_KEY, sectorFilter)
+    } catch (err) {
+      console.warn('Failed to persist callSector to localStorage:', err)
+    }
+  }, [sectorFilter])
+
+  // Reconcile selectedCallTickers against the all-tickers universe. The
+  // universe IS the All Time set (~470 tickers); the Today subset is just
+  // a view-time filter applied below. Storing the canonical universe in
+  // `known` keeps the reconcile stable across TODAY ↔ ALL TIME toggles.
+  useEffect(() => {
+    if (allTickers.length === 0) return
+    const universe = allTickers.map((r) => r.ticker)
+    let stored = null
+    try {
+      const raw = localStorage.getItem(CALL_TICKERS_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && Array.isArray(parsed.selected) && Array.isArray(parsed.known)) {
+          const onlyStrings = (arr) => arr.filter((t) => typeof t === 'string')
+          stored = {
+            selected: new Set(onlyStrings(parsed.selected)),
+            known: new Set(onlyStrings(parsed.known)),
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to read selectedCallTickers from localStorage:', err)
+    }
+
+    let next
+    if (stored) {
+      next = new Set()
+      for (const t of universe) {
+        if (stored.known.has(t)) {
+          if (stored.selected.has(t)) next.add(t)
+        } else {
+          // New ticker — default to selected.
+          next.add(t)
+        }
+      }
+    } else {
+      next = new Set(universe)
+    }
+    setSelectedCallTickers(next)
+  }, [allTickers])
+
+  useEffect(() => {
+    if (selectedCallTickers === null || allTickers.length === 0) return
+    if (callTickersPersistedRef.current === selectedCallTickers) return
+    try {
+      const payload = {
+        selected: Array.from(selectedCallTickers),
+        known: allTickers.map((r) => r.ticker),
+      }
+      localStorage.setItem(CALL_TICKERS_KEY, JSON.stringify(payload))
+      callTickersPersistedRef.current = selectedCallTickers
+    } catch (err) {
+      console.warn('Failed to persist selectedCallTickers to localStorage:', err)
+    }
+  }, [selectedCallTickers, allTickers])
 
   // Modal opener now provided by App — both panels share one modal at the
   // root. Keep the same function shape so the existing card callsites just
@@ -569,66 +658,71 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     return formatCallReceivedEt(sample?.call_received_at_et)
   }, [rows])
 
-  // Filter → sector group → sort. Sort within each group is now
-  // tier-then-conviction: FLIPPED first, RETURNING second, ADDED-new
-  // third, UNCHANGED last. Conviction breaks ties within tier.
-  // Filter chain: position (incl. RETURNING) → sector → search.
-  const visibleGroups = useMemo(() => {
-    let filtered = rows
+  // Filter pipeline split in two stages.
+  //
+  // Stage 1 — `chipBaseRows`: rows after position + search + ticker-filter
+  // but BEFORE sector filter. These drive the sector chip counts so the
+  // counts reflect "what's visible if you switch to this sector".
+  //
+  // Stage 2 — `visibleCards`: chipBaseRows after sector filter applied,
+  // sorted tier-then-conviction. Tier order: FLIPPED → RETURNING → new
+  // ADDED → UNCHANGED. Conviction DESC breaks ties.
+  const chipBaseRows = useMemo(() => {
+    let list = rows
     if (filter === 'RETURNING') {
-      filtered = filtered.filter((r) => isReturning(r))
+      list = list.filter((r) => isReturning(r))
     } else if (filter !== 'ALL') {
-      filtered = filtered.filter((r) => r.position_type === filter)
+      list = list.filter((r) => r.position_type === filter)
     }
-
     const q = search.trim().toLowerCase()
     if (q) {
-      filtered = filtered.filter((r) => {
+      list = list.filter((r) => {
         const t = (r.ticker ?? '').toLowerCase()
         const c = (r.company_name ?? '').toLowerCase()
         return t.includes(q) || c.includes(q)
       })
     }
+    if (selectedCallTickers !== null) {
+      list = list.filter((r) => selectedCallTickers.has(r.ticker))
+    }
+    return list
+  }, [rows, filter, search, selectedCallTickers])
 
-    // Sector filter is applied as a last step BEFORE grouping so the
-    // sector group header click target stays usable when the filter
-    // is active (i.e. we still emit a single group for the selected
-    // sector, with the same key).
+  const visibleCards = useMemo(() => {
+    let list = chipBaseRows
     if (sectorFilter !== 'ALL') {
-      filtered = filtered.filter(
+      list = list.filter(
         (r) => canonicalSector(allTickersByTicker?.get(r.ticker)?.sector) === sectorFilter
       )
     }
-
-    const groupMap = new Map() // sector → rows
-    for (const r of filtered) {
-      const sector = canonicalSector(allTickersByTicker?.get(r.ticker)?.sector)
-      if (!groupMap.has(sector)) groupMap.set(sector, [])
-      groupMap.get(sector).push(r)
-    }
-    for (const arr of groupMap.values()) {
-      arr.sort((a, b) => {
-        const ta = changeTier(a)
-        const tb = changeTier(b)
-        if (ta !== tb) return ta - tb
-        return (Number(b.conviction_score) || 0) - (Number(a.conviction_score) || 0)
-      })
-    }
-
-    const sectors = [...groupMap.keys()]
-    sectors.sort((a, b) => {
-      if (a === OTHER_SECTOR && b !== OTHER_SECTOR) return 1
-      if (b === OTHER_SECTOR && a !== OTHER_SECTOR) return -1
-      return 0
+    // Stable tier sort: FLIPPED → RETURNING → new ADDED → UNCHANGED, then
+    // conviction DESC within tier.
+    return [...list].sort((a, b) => {
+      const ta = changeTier(a)
+      const tb = changeTier(b)
+      if (ta !== tb) return ta - tb
+      return (Number(b.conviction_score) || 0) - (Number(a.conviction_score) || 0)
     })
-    return sectors.map((sector) => ({ sector, rows: groupMap.get(sector) }))
-  }, [rows, filter, sectorFilter, search, allTickersByTicker])
+  }, [chipBaseRows, sectorFilter, allTickersByTicker])
 
-  // Flat count for the "no positions" fallback message.
-  const visibleCount = useMemo(
-    () => visibleGroups.reduce((n, g) => n + g.rows.length, 0),
-    [visibleGroups]
-  )
+  // Sector chip data: one chip per sector that has ≥1 row in chipBaseRows.
+  // Sorted alphabetically with the Other catch-all pinned last. Items in
+  // the row include their per-sector count for the chip badge.
+  const sectorChipData = useMemo(() => {
+    const counts = new Map()
+    for (const r of chipBaseRows) {
+      const sector = canonicalSector(allTickersByTicker?.get(r.ticker)?.sector)
+      counts.set(sector, (counts.get(sector) ?? 0) + 1)
+    }
+    const sectors = [...counts.keys()].sort((a, b) => {
+      if (a === OTHER_SECTOR) return 1
+      if (b === OTHER_SECTOR) return -1
+      return a.localeCompare(b)
+    })
+    return sectors.map((s) => ({ sector: s, count: counts.get(s) }))
+  }, [chipBaseRows, allTickersByTicker])
+
+  const visibleCount = visibleCards.length
 
   // Counts per filter for the chip badges. RETURNING is computed across
   // ALL rows (not gated by current position_type filter) so the chip
@@ -643,14 +737,17 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     return c
   }, [rows])
 
-  // Click handler for sector group headers — toggles the sector filter.
-  // Clicking the active sector clears it. Used by both Today rendering
-  // below and (via prop) by CallAllTimeView.
-  const toggleSectorFilter = useMemo(
-    () => (sector) => {
-      setSectorFilter((prev) => (prev === sector ? 'ALL' : sector))
-    },
-    []
+  // Universe for the Today-view TickerFilter dropdown: today's positions
+  // mapped into the {ticker, company_name, sector} shape buildCallTickerGroups
+  // expects. Sector is joined from call_all_tickers_v.
+  const callTickerUniverse = useMemo(
+    () =>
+      rows.map((r) => ({
+        ticker: r.ticker,
+        company_name: r.company_name,
+        sector: allTickersByTicker?.get(r.ticker)?.sector ?? null,
+      })),
+    [rows, allTickersByTicker]
   )
 
   if (status === 'loading') {
@@ -724,6 +821,8 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           setSectorFilter={setSectorFilter}
           signalDate={signalDate}
           counts={counts}
+          selectedCallTickers={selectedCallTickers}
+          setSelectedCallTickers={setSelectedCallTickers}
         />
       ) : (
       <>
@@ -733,8 +832,8 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
         </div>
       )}
 
-      {/* Filter row: position chips left, optional ALL SECTORS × chip,
-          search input right. Mirrors the Risk Ranges filter-row layout. */}
+      {/* Filter row 1: position chips (left), search (right-of-center),
+          TickerFilter dropdown (top-right). Mirrors RR's .filter-row. */}
       <div className="call-filter-row">
         <nav className="call-filters" role="tablist" aria-label="Position type filter">
           {POSITION_FILTERS.map((f) => (
@@ -751,17 +850,6 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
             </button>
           ))}
         </nav>
-        {sectorFilter !== 'ALL' && (
-          <button
-            type="button"
-            className="all-sectors-clear-chip"
-            onClick={() => setSectorFilter('ALL')}
-            title={`Showing only ${sectorFilter} — click to clear`}
-            aria-label={`Clear sector filter (currently ${sectorFilter})`}
-          >
-            ALL SECTORS ×
-          </button>
-        )}
         <div className="search-wrap call-search-wrap">
           <input
             type="search"
@@ -789,7 +877,40 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
             </button>
           )}
         </div>
+        <TickerFilter
+          allTickers={callTickerUniverse}
+          selectedTickers={selectedCallTickers}
+          setSelectedTickers={setSelectedCallTickers}
+          buildGroups={buildCallTickerGroups}
+        />
       </div>
+
+      {/* Filter row 2: sector chip row, RR-style. Replaces the old inline
+          sector group headers — cards now render in a flat grid below. */}
+      <nav className="chips call-sector-chips" aria-label="Sector filter">
+        <button
+          type="button"
+          aria-pressed={sectorFilter === 'ALL'}
+          className={`chip${sectorFilter === 'ALL' ? ' active' : ''}`}
+          onClick={() => setSectorFilter('ALL')}
+        >
+          All
+          <span className="chip-count">{chipBaseRows.length}</span>
+        </button>
+        {sectorChipData.map(({ sector, count }) => (
+          <button
+            key={sector}
+            type="button"
+            aria-pressed={sectorFilter === sector}
+            className={`chip${sectorFilter === sector ? ' active' : ''}`}
+            onClick={() => setSectorFilter(sectorFilter === sector ? 'ALL' : sector)}
+            title={sector}
+          >
+            {abbreviateSector(sector)}
+            <span className="chip-count">{count}</span>
+          </button>
+        ))}
+      </nav>
 
       <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
       <MacroCommentarySection commentary={macroCommentary} />
@@ -799,49 +920,32 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           No positions match these filters{search.trim() ? ` for "${search.trim()}"` : ''}.
         </div>
       ) : (
-        visibleGroups.map((group) => (
-          <section key={group.sector} className="call-sector-group">
-            <button
-              type="button"
-              className={`sector-group-header sector-group-header-button${sectorFilter === group.sector ? ' active' : ''}`}
-              onClick={() => toggleSectorFilter(group.sector)}
-              aria-pressed={sectorFilter === group.sector}
-              title={
-                sectorFilter === group.sector
-                  ? 'Click to show all sectors'
-                  : `Click to filter to ${group.sector} only`
-              }
-            >
-              {group.sector}
-            </button>
-            <div className="call-grid">
-              {group.rows.map((row) => {
-                const live = livePrices.get(row.ticker)
-                const rrCrossover = rrTickers.has(row.ticker)
-                const returningMeta = getReturningMeta(row, allTickersByTicker, signalDate)
-                return row.top5_rank != null ? (
-                  <Top5Card
-                    key={row.ticker}
-                    row={row}
-                    live={live}
-                    rrCrossover={rrCrossover}
-                    onOpen={openModal}
-                    returningMeta={returningMeta}
-                  />
-                ) : (
-                  <PositionCard
-                    key={row.ticker}
-                    row={row}
-                    live={live}
-                    rrCrossover={rrCrossover}
-                    onOpen={openModal}
-                    returningMeta={returningMeta}
-                  />
-                )
-              })}
-            </div>
-          </section>
-        ))
+        <div className="call-grid">
+          {visibleCards.map((row) => {
+            const live = livePrices.get(row.ticker)
+            const rrCrossover = rrTickers.has(row.ticker)
+            const returningMeta = getReturningMeta(row, allTickersByTicker, signalDate)
+            return row.top5_rank != null ? (
+              <Top5Card
+                key={row.ticker}
+                row={row}
+                live={live}
+                rrCrossover={rrCrossover}
+                onOpen={openModal}
+                returningMeta={returningMeta}
+              />
+            ) : (
+              <PositionCard
+                key={row.ticker}
+                row={row}
+                live={live}
+                rrCrossover={rrCrossover}
+                onOpen={openModal}
+                returningMeta={returningMeta}
+              />
+            )
+          })}
+        </div>
       )}
 
       <PerformanceSection positionRows={rows} />

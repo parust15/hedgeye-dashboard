@@ -1021,10 +1021,13 @@
    overflow clipping. pointer-events: none keeps the cursor on the bar
    for continued mousemove. */
 
+/* Shared visual: dark card used by both the range-bar tooltip (positioned
+   manually via inline-style JS coords) and the chart tooltip (positioned
+   by recharts' own wrapper). Only the positioning differs between the
+   two — pulled out below. */
 .range-tooltip,
+.chart-tooltip-card,
 .chart-tooltip-custom {
-  position: fixed;
-  z-index: 1000;
   background: #14171f;
   border: 1px solid #364056;
   border-radius: 8px;
@@ -1035,6 +1038,20 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   min-width: 180px;
+}
+
+/* Range-bar tooltip: fixed positioning, driven by JS cursor coords so it
+   escapes any card overflow clipping. */
+.range-tooltip {
+  position: fixed;
+  z-index: 1000;
+}
+
+/* Chart tooltip: no position — recharts' .recharts-tooltip-wrapper places
+   it via absolute positioning. Setting position: fixed inside would break
+   that wrapper's left/top math. */
+.chart-tooltip-card {
+  position: static;
 }
 
 .range-tooltip-head,
@@ -2444,6 +2461,34 @@
   background: #F59E0B;
   border-color: #F59E0B;
   color: #000;
+}
+
+/* Sector chip row for The Call: RR-style chips (pill-shaped, amber when
+   active). Sits below the position chip row + ticker filter. Replaces
+   the old sticky sector group headers — cards now render in a flat grid. */
+.call-sector-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+/* The chips themselves reuse .chip (same as RR), so per-call sizing
+   here is just a slight scale-down so the row sits visually under the
+   position chip row without dominating. */
+.call-sector-chips .chip {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.call-sector-chips .chip-count {
+  font-size: 11px;
+}
+
+/* TickerFilter (right-edge dropdown) inside the unified call-filter-row.
+   Mirrors RR's positioning at the top-right of the filter area. */
+.call-filter-row .ticker-filter {
+  margin-left: 0;
 }
 
 /* Modal "CALL INFO — TICKER" overlay header. Renders only when the
