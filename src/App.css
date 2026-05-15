@@ -2279,18 +2279,6 @@
   color: var(--text);
 }
 
-/* RETURNING filter chip — amber border (matches the badge) instead of
-   the position-type color scheme. Active state mirrors the amber badge. */
-.call-chip.call-chip-returning {
-  border-color: rgba(245, 158, 11, 0.55);
-  color: #fbbf24;
-}
-.call-chip.call-chip-returning.active {
-  background: #F59E0B;
-  border-color: #F59E0B;
-  color: #000;
-}
-
 /* Sector chip row for The Call: RR-style chips (pill-shaped, amber when
    active). Sits below the position chip row + ticker filter. Replaces
    the old sticky sector group headers — cards now render in a flat grid. */

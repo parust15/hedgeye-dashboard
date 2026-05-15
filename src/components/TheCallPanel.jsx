@@ -75,7 +75,6 @@ const POSITION_FILTERS = [
   { id: 'LONG', label: 'LONG' },
   { id: 'SHORT', label: 'SHORT' },
   { id: 'NEUTRAL', label: 'NEUTRAL' },
-  { id: 'RETURNING', label: '↩ RETURNING' },
 ]
 
 const MAX_CONVICTION = 75
@@ -584,9 +583,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   // ADDED → UNCHANGED. Conviction DESC breaks ties.
   const chipBaseRows = useMemo(() => {
     let list = rows
-    if (filter === 'RETURNING') {
-      list = list.filter((r) => isReturning(r))
-    } else if (filter !== 'ALL') {
+    if (filter !== 'ALL') {
       list = list.filter((r) => r.position_type === filter)
     }
     const q = search.trim().toLowerCase()
@@ -658,15 +655,11 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
 
   const visibleCount = visibleCards.length
 
-  // Counts per filter for the chip badges. RETURNING is computed across
-  // ALL rows (not gated by current position_type filter) so the chip
-  // count reflects "how many actionable returns exist today" in absolute
-  // terms.
+  // Counts per position type for the chip badges.
   const counts = useMemo(() => {
-    const c = { ALL: rows.length, LONG: 0, SHORT: 0, NEUTRAL: 0, RETURNING: 0 }
+    const c = { ALL: rows.length, LONG: 0, SHORT: 0, NEUTRAL: 0 }
     for (const r of rows) {
       if (r.position_type in c) c[r.position_type] += 1
-      if (isReturning(r)) c.RETURNING += 1
     }
     return c
   }, [rows])

@@ -155,11 +155,7 @@ export function CallAllTimeView({
   const chipBaseRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return allTickers.filter((r) => {
-      if (
-        positionFilter !== 'ALL' &&
-        positionFilter !== 'RETURNING' &&
-        r.last_position_type !== positionFilter
-      ) {
+      if (positionFilter !== 'ALL' && r.last_position_type !== positionFilter) {
         return false
       }
       if (q) {
