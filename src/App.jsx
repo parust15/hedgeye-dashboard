@@ -3,7 +3,9 @@ import { TopTabs } from './components/TopTabs'
 import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
 import { TickerDetailModal } from './components/TickerDetailModal'
+import { VixHeaderPill } from './components/VixBucketPill'
 import { useAllTickers } from './lib/useAllTickers'
+import { useVixBucket } from './lib/useVixBucket'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
@@ -34,6 +36,11 @@ export default function App() {
   // for sector grouping + the All Time view.
   const { rows: allTickers, byTicker: allTickersByTicker } = useAllTickers()
 
+  // VIX regime — polled every 30min. Rendered top-right as a persistent
+  // header pill, and forwarded to RR so the VIX SignalCard can show the
+  // same bucket label next to its trend pill.
+  const { data: vixBucket } = useVixBucket()
+
   useEffect(() => {
     try {
       localStorage.setItem(ACTIVE_TAB_KEY, activeTab)
@@ -55,11 +62,15 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopTabs active={activeTab} onChange={setActiveTab} />
+      <div className="top-bar">
+        <TopTabs active={activeTab} onChange={setActiveTab} />
+        <VixHeaderPill data={vixBucket} />
+      </div>
       {activeTab === 'risk-ranges' && (
         <RiskRangesPanel
           allTickersByTicker={allTickersByTicker}
           onViewCall={openTickerModal}
+          vixBucket={vixBucket}
         />
       )}
       {activeTab === 'the-call' && (

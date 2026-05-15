@@ -39,7 +39,7 @@ const TREND_FILTERS = [
   { id: 'NEUTRAL', label: 'NEUTRAL' },
 ]
 
-export function RiskRangesPanel({ allTickersByTicker, onViewCall }) {
+export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
   // `error` from useDashboardData is intentionally not destructured — the UI
   // surfaces a generic message and the hook console.errors the raw detail.
   const { rows, changes, signalDate, updatedAt, status } = useDashboardData()
@@ -443,6 +443,7 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall }) {
                 expanded={expanded === r.ticker}
                 onToggle={toggleExpand}
                 onViewCall={handleViewCall}
+                vixBucket={r.ticker === 'VIX' ? vixBucket : null}
               />
             )
           })}

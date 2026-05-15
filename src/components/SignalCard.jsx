@@ -8,6 +8,7 @@ import {
 } from '../lib/range'
 import { formatNumber, formatPrice } from '../lib/format'
 import { ExpandedChart } from './ExpandedChart'
+import { VixBucketBadge } from './VixBucketPill'
 
 function trendClass(trend) {
   if (trend === 'BULLISH') return 'trend bullish'
@@ -243,7 +244,16 @@ function WidthDeltaPct({ row }) {
   return <span className={cls}>{sign}{rounded}%</span>
 }
 
-export function SignalCard({ row, change, setup, display, expanded, onToggle, onViewCall }) {
+export function SignalCard({
+  row,
+  change,
+  setup,
+  display,
+  expanded,
+  onToggle,
+  onViewCall,
+  vixBucket,
+}) {
   const { markerPct, ghostPct, zone, zoneLabel } = positionBarFor(row, display)
 
   const cardClasses = [
@@ -275,7 +285,10 @@ export function SignalCard({ row, change, setup, display, expanded, onToggle, on
             <div className="name">{row.display_name || row.name}</div>
           ) : null}
         </div>
-        <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
+        <div className="card-head-badges">
+          <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
+          {vixBucket && <VixBucketBadge data={vixBucket} />}
+        </div>
       </header>
 
       <LivePriceBlock display={display} />
