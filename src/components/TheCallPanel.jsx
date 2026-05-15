@@ -1,0 +1,556 @@
+import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { useCallPositions } from '../lib/useCallPositions'
+import { useCallExtras } from '../lib/useCallExtras'
+import { useLivePrices } from '../lib/livePrices'
+import { useMarketState } from '../lib/marketState'
+import { formatPrice, formatNumber } from '../lib/format'
+import { parseMacroBullets } from '../lib/macroBullets'
+import { TickerDetailModal } from './TickerDetailModal'
+import { PerformanceSection } from './PerformanceSection'
+
+const MACRO_BULLETS_VISIBLE = 6
+
+// "Best Idea LONG" / "Best Idea SHORT" phrasing in the rationale flags
+// Hedgeye's highest-conviction calls. Case-insensitive match per spec.
+const isBestIdea = (rationale) =>
+  !!(rationale && /best idea (long|short)/i.test(rationale))
+
+// A "returning" position is one that re-entered Hedgeye's call today
+// (status ADDED) but has appeared in the top-5 enough recently that it's
+// not genuinely new to viewers — render a calmer purple badge and skip
+// the new-position green glow.
+const isReturning = (row) =>
+  row.change_status === 'ADDED' && (row.top5_appearances_90d ?? 0) >= 2
+
+const POSITION_FILTERS = [
+  { id: 'ALL', label: 'ALL' },
+  { id: 'LONG', label: 'LONG' },
+  { id: 'SHORT', label: 'SHORT' },
+  { id: 'NEUTRAL', label: 'NEUTRAL' },
+]
+
+const MAX_CONVICTION = 75
+
+// --- formatters ---
+
+// "Wed May 14" from YYYY-MM-DD.
+function formatSignalDate(iso) {
+  if (!iso) return ''
+  // Parse as local date — no timezone math on a plain date string.
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y) return iso
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+// "h:mm A ET" from a timestamptz that may or may not include the offset.
+function formatCallReceivedEt(iso) {
+  if (!iso) return null
+  // call_received_at_et arrives without a `Z`/offset — treat as ET wall time.
+  // We render it back as h:mm A and tag "ET" rather than letting the user's
+  // local zone convert it.
+  const [datePart, timePart] = iso.split('T')
+  if (!datePart || !timePart) return null
+  const [hh, mm] = timePart.split(':').map(Number)
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null
+  const ampm = hh >= 12 ? 'PM' : 'AM'
+  const hour12 = ((hh + 11) % 12) + 1
+  return `${hour12}:${String(mm).padStart(2, '0')} ${ampm} ET`
+}
+
+function changeClass(change) {
+  if (change == null) return ''
+  if (change > 0) return 'up'
+  if (change < 0) return 'down'
+  return ''
+}
+
+// --- subcomponents ---
+
+function PositionTypePill({ type }) {
+  const cls = `position-pill position-${(type ?? 'neutral').toLowerCase()}`
+  return <span className={cls}>{type ?? 'NEUTRAL'}</span>
+}
+
+function ChangeStatusBadge({ row }) {
+  if (isReturning(row)) {
+    return <span className="badge-returning">↩ RETURNING</span>
+  }
+  if (row.change_status === 'ADDED') {
+    return <span className="status-badge status-added">● NEW TODAY</span>
+  }
+  if (row.change_status === 'FLIPPED') {
+    return <span className="status-badge status-flipped">⟳ FLIPPED</span>
+  }
+  return null
+}
+
+function BestIdeaBadge({ rationale }) {
+  if (!isBestIdea(rationale)) return null
+  return <span className="badge-best-idea">★ BEST IDEA</span>
+}
+
+function RankBadge({ rank }) {
+  if (rank == null) return null
+  return <span className="rank-badge">#{rank} MOST ACTIONABLE</span>
+}
+
+function LivePriceRow({ live }) {
+  if (!live || !Number.isFinite(Number(live.current_price))) {
+    return <div className="cc-price cc-price-none">—</div>
+  }
+  const price = Number(live.current_price)
+  const change = Number(live.change_amount)
+  const pct = Number(live.change_pct)
+  const cls = changeClass(change)
+  return (
+    <div className="cc-price-row">
+      <span className="cc-price">{formatPrice(price)}</span>
+      {Number.isFinite(change) && (
+        <span className={`cc-change ${cls}`}>
+          {change >= 0 ? '+' : ''}
+          {formatNumber(change)}
+        </span>
+      )}
+      {Number.isFinite(pct) && (
+        <span className={`cc-change-pct ${cls}`}>
+          {pct >= 0 ? '+' : ''}
+          {pct.toFixed(2)}%
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ConvictionBar({ score, rrCrossover }) {
+  const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0
+  const pct = Math.max(0, Math.min(1, safeScore / MAX_CONVICTION)) * 100
+  return (
+    <div className="conviction-row">
+      <div className="conviction-bar" aria-label={`Conviction ${safeScore} of ${MAX_CONVICTION}`}>
+        <div className="conviction-bar-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="conviction-score">{safeScore}</span>
+      {rrCrossover && <span className="badge-rr-crossover">↗ In Risk Ranges</span>}
+    </div>
+  )
+}
+
+// Click-to-expand rationale block. Collapsed: clamped to N lines with a
+// fade overflow; expanded: full text. stopPropagation keeps clicks here
+// from also triggering the card-level "open modal" handler.
+function Rationale({ text, maxLines = 4 }) {
+  const [open, setOpen] = useState(false)
+  if (!text) return null
+  const cls = open ? 'cc-rationale open' : `cc-rationale clamp-${maxLines}`
+  return (
+    <button
+      type="button"
+      className={cls}
+      onClick={(e) => {
+        e.stopPropagation()
+        setOpen((o) => !o)
+      }}
+      aria-expanded={open}
+    >
+      <span className="cc-rationale-text">{text}</span>
+    </button>
+  )
+}
+
+// --- cards ---
+
+// Reusable card-click handler factory. Both card variants forward to
+// onOpen(row), with Enter/Space activation for keyboard parity.
+function cardActivationProps(row, onOpen) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onClick: () => onOpen?.(row),
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onOpen?.(row)
+      }
+    },
+  }
+}
+
+function Top5Card({ row, live, rrCrossover, onOpen }) {
+  // Returning positions skip the green glow even though their change_status
+  // is ADDED — the calmer purple badge carries the signal instead.
+  const returning = isReturning(row)
+  const cls = [
+    'call-card',
+    'call-card-top5',
+    `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
+    row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
+    row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <article className={cls} {...cardActivationProps(row, onOpen)}>
+      <div className="cc-badge-row">
+        <PositionTypePill type={row.position_type} />
+        <BestIdeaBadge rationale={row.rationale} />
+        <RankBadge rank={row.top5_rank} />
+      </div>
+      <div className="cc-company-row">
+        <span className="cc-company">{row.company_name ?? row.ticker}</span>
+        <span className="cc-ticker">{row.ticker}</span>
+      </div>
+      <LivePriceRow live={live} />
+      {row.rationale ? <Rationale text={row.rationale} /> : null}
+      <div className="cc-footer">
+        <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
+        {row.consecutive_days > 1 && (
+          <span className="cc-streak">{row.consecutive_days} days</span>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function PositionCard({ row, live, rrCrossover, onOpen }) {
+  const returning = isReturning(row)
+  const cls = [
+    'call-card',
+    `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
+    row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
+    row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <article className={cls} {...cardActivationProps(row, onOpen)}>
+      <div className="cc-badge-row">
+        <PositionTypePill type={row.position_type} />
+        <BestIdeaBadge rationale={row.rationale} />
+        <ChangeStatusBadge row={row} />
+      </div>
+      <div className="cc-company-row">
+        <span className="cc-company">{row.company_name ?? row.ticker}</span>
+        <span className="cc-ticker">{row.ticker}</span>
+      </div>
+      <LivePriceRow live={live} />
+      <div className="cc-footer">
+        <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
+        {row.top5_appearances_90d >= 3 && (
+          <span className="cc-streak">★ {row.top5_appearances_90d} appearances 90d</span>
+        )}
+      </div>
+    </article>
+  )
+}
+
+// --- Top 5 highlight section (horizontal scroll above the main grid) ---
+
+// One Top 5 "highlight" card. Differs from Top5Card above in that it's
+// driven by the hedgeye_call_top5 table (rank + rationale only) — the
+// position_type for the direction pill comes from the positions data via
+// `positionByTicker` lookup.
+function Top5HighlightCard({ entry, positionByTicker, onOpen }) {
+  const position = positionByTicker.get(entry.ticker)
+  const positionType = position?.position_type ?? 'NEUTRAL'
+
+  function handleOpen() {
+    // Prefer the full position record (richer header for the modal) but
+    // fall back to a synthetic record if the ticker isn't in today's
+    // positions for any reason.
+    onOpen?.(position ?? {
+      ticker: entry.ticker,
+      company_name: entry.company_name,
+      position_type: positionType,
+      rationale: entry.rationale,
+      signal_date: position?.signal_date ?? null,
+      conviction_score: position?.conviction_score ?? 0,
+    })
+  }
+
+  return (
+    <article
+      className={`call-card call-card-highlight border-${positionType.toLowerCase()}`}
+      role="button"
+      tabIndex={0}
+      onClick={handleOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleOpen()
+        }
+      }}
+    >
+      <div className="top5-head-row">
+        <span className="top5-rank-circle">#{entry.rank}</span>
+        <PositionTypePill type={positionType} />
+        <BestIdeaBadge rationale={entry.rationale} />
+      </div>
+      <div className="cc-company-row">
+        <span className="cc-company">{entry.company_name ?? entry.ticker}</span>
+        <span className="cc-ticker">{entry.ticker}</span>
+      </div>
+      {entry.rationale ? <Rationale text={entry.rationale} maxLines={5} /> : null}
+    </article>
+  )
+}
+
+// Collapsible TOP 5 MOST ACTIONABLE section. Empty top5 → quiet message
+// (instead of an empty section). Open by default.
+function Top5Section({ top5, positionByTicker, onOpen }) {
+  const [open, setOpen] = useState(true)
+  const isEmpty = top5.length === 0
+
+  return (
+    <section className="call-section call-section-top5">
+      <button
+        type="button"
+        className="call-section-head"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className={`caret${open ? ' open' : ''}`} aria-hidden="true">▸</span>
+        <span className="call-section-title">TOP 5 MOST ACTIONABLE</span>
+      </button>
+      {open && (
+        isEmpty ? (
+          <div className="call-section-empty">No formal Top 5 named today</div>
+        ) : (
+          <div className="top5-scroll" role="list">
+            {top5.map((entry) => (
+              <Top5HighlightCard
+                key={`${entry.rank}-${entry.ticker}`}
+                entry={entry}
+                positionByTicker={positionByTicker}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
+        )
+      )}
+    </section>
+  )
+}
+
+// Collapsible MACRO COMMENTARY section. Collapsed by default per spec.
+// Bullets >6 are hidden behind "Show more". Empty commentary → render nothing.
+function MacroCommentarySection({ commentary }) {
+  const [open, setOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const bullets = useMemo(() => parseMacroBullets(commentary), [commentary])
+
+  if (bullets.length === 0) return null
+
+  const visible = showAll ? bullets : bullets.slice(0, MACRO_BULLETS_VISIBLE)
+  const hidden = bullets.length - visible.length
+
+  return (
+    <section className="call-section">
+      <button
+        type="button"
+        className="call-section-head"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className={`caret${open ? ' open' : ''}`} aria-hidden="true">▸</span>
+        <span className="call-section-title">MACRO COMMENTARY</span>
+      </button>
+      {open && (
+        <div className="macro-body">
+          <ul className="macro-list">
+            {visible.map((b, i) => (
+              <li key={i} className="macro-bullet">{b}</li>
+            ))}
+          </ul>
+          {hidden > 0 && (
+            <button
+              type="button"
+              className="macro-more"
+              onClick={() => setShowAll(true)}
+            >
+              Show more ({hidden} more)
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// --- panel ---
+
+export function TheCallPanel() {
+  const { rows, signalDate, isToday, status } = useCallPositions()
+  const { top5, macroCommentary } = useCallExtras(signalDate)
+  const market = useMarketState()
+  const livePrices = useLivePrices(market.isOpen)
+  const [filter, setFilter] = useState('ALL')
+
+  // Modal state: the position row currently shown in the detail modal, or
+  // null when closed.
+  const [modalPosition, setModalPosition] = useState(null)
+  const openModal = (row) => setModalPosition(row)
+  const closeModal = () => setModalPosition(null)
+
+  // ticker → position row lookup, used by the Top 5 highlight cards so the
+  // direction pill / modal header can read the full position record even
+  // though hedgeye_call_top5 only carries rank+rationale.
+  const positionByTicker = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) m.set(r.ticker, r)
+    return m
+  }, [rows])
+
+  // Tickers that appear in the Risk Ranges view — used to render the
+  // "↗ In Risk Ranges" crossover breadcrumb. One-shot fetch on mount; the
+  // RR universe is daily and stable enough that polling isn't worth it.
+  const [rrTickers, setRrTickers] = useState(() => new Set())
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('hedgeye_signals_v')
+      .select('ticker')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          console.warn('TheCallPanel: rr-tickers fetch failed:', error)
+          return
+        }
+        if (data) setRrTickers(new Set(data.map((r) => r.ticker)))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Pull a representative call_received_at_et off any row (all rows share
+  // it for a given signal_date).
+  const callReceivedEt = useMemo(() => {
+    const sample = rows.find((r) => r.call_received_at_et)
+    return formatCallReceivedEt(sample?.call_received_at_et)
+  }, [rows])
+
+  // Filter + sort: position_type filter, then conviction_score DESC.
+  const visible = useMemo(() => {
+    const filtered = filter === 'ALL' ? rows : rows.filter((r) => r.position_type === filter)
+    return [...filtered].sort((a, b) => {
+      const av = Number(a.conviction_score) || 0
+      const bv = Number(b.conviction_score) || 0
+      return bv - av
+    })
+  }, [rows, filter])
+
+  // Counts per filter for the chip badges.
+  const counts = useMemo(() => {
+    const c = { ALL: rows.length, LONG: 0, SHORT: 0, NEUTRAL: 0 }
+    for (const r of rows) {
+      if (r.position_type in c) c[r.position_type] += 1
+    }
+    return c
+  }, [rows])
+
+  if (status === 'loading') {
+    return (
+      <div className="panel">
+        <div className="state">Loading call data…</div>
+      </div>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <div className="panel">
+        <div className="state error">Could not load call data.</div>
+      </div>
+    )
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="panel">
+        <div className="state state-center">No call data available.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`panel call-panel${isToday ? '' : ' panel-dim'}`}>
+      <header className="call-header">
+        <div className="call-header-left">
+          <h1 className="call-title">THE CALL</h1>
+          <p className="call-subtitle">HEDGEYE DAILY POSITIONS</p>
+        </div>
+        <div className="call-header-right">
+          {callReceivedEt && (
+            <div className="call-meta">Call data as of {callReceivedEt}</div>
+          )}
+          <div className="call-date">{formatSignalDate(signalDate)}</div>
+        </div>
+      </header>
+
+      {!isToday && (
+        <div className="call-stale-banner">
+          Today's call hasn't arrived yet. Last call: {formatSignalDate(signalDate)}
+        </div>
+      )}
+
+      <nav className="call-filters" role="tablist" aria-label="Position type filter">
+        {POSITION_FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === f.id}
+            className={`call-chip call-chip-${f.id.toLowerCase()}${filter === f.id ? ' active' : ''}`}
+            onClick={() => setFilter(f.id)}
+          >
+            {f.label}
+            <span className="call-chip-count">{counts[f.id] ?? 0}</span>
+          </button>
+        ))}
+      </nav>
+
+      <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
+      <MacroCommentarySection commentary={macroCommentary} />
+
+      {visible.length === 0 ? (
+        <div className="state">No {filter.toLowerCase()} positions in today's call.</div>
+      ) : (
+        <section className="call-grid">
+          {visible.map((row) => {
+            const live = livePrices.get(row.ticker)
+            const rrCrossover = rrTickers.has(row.ticker)
+            return row.top5_rank != null ? (
+              <Top5Card
+                key={row.ticker}
+                row={row}
+                live={live}
+                rrCrossover={rrCrossover}
+                onOpen={openModal}
+              />
+            ) : (
+              <PositionCard
+                key={row.ticker}
+                row={row}
+                live={live}
+                rrCrossover={rrCrossover}
+                onOpen={openModal}
+              />
+            )
+          })}
+        </section>
+      )}
+
+      <PerformanceSection positionRows={rows} />
+
+      {modalPosition && (
+        <TickerDetailModal position={modalPosition} onClose={closeModal} />
+      )}
+    </div>
+  )
+}

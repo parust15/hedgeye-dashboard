@@ -1,6 +1,64 @@
 .app {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+/* Top-level RISK RANGES | THE CALL tab bar. Sits above any panel. */
+.top-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0 24px;
+}
+
+.top-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 18px 24px;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.top-tab:hover {
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.top-tab.active {
+  color: var(--text-strong);
+}
+
+/* Accent left-border on the active tab. Green for Risk Ranges, amber for
+   The Call — matches the spec's color anchoring per panel. */
+.top-tab.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.top-tab.top-tab-green.active::before {
+  background: #22c55e;
+}
+
+.top-tab.top-tab-amber.active::before {
+  background: #f59e0b;
+}
+
+/* The container each panel renders inside — handles the page padding that
+   App used to own directly. */
+.panel {
   padding: 28px 24px 64px;
 }
 
@@ -1024,4 +1082,887 @@
 
 .range-tooltip-row.stale {
   opacity: 0.5;
+}
+
+/* === The Call panel === */
+
+.call-panel.panel-dim {
+  /* Stale-day data — dim everything except the banner. */
+  opacity: 0.7;
+}
+
+.call-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+
+.call-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.call-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.call-header-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.call-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.call-date {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.call-stale-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  opacity: 1;
+}
+
+/* Filter chips: ALL | LONG | SHORT | NEUTRAL, color-coded. */
+.call-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.call-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.call-chip:hover {
+  color: var(--text-strong);
+}
+
+/* Inactive: outlined. Active: filled with type-color background. */
+.call-chip.call-chip-all { border-color: var(--border-strong); color: var(--text); }
+.call-chip.call-chip-all.active { background: var(--accent); border-color: var(--accent); color: #0b0d12; }
+
+.call-chip.call-chip-long { border-color: rgba(34, 197, 94, 0.45); color: #22c55e; }
+.call-chip.call-chip-long.active { background: rgba(34, 197, 94, 0.85); border-color: rgba(34, 197, 94, 0.85); color: #08120c; }
+
+.call-chip.call-chip-short { border-color: rgba(239, 68, 68, 0.45); color: #ef4444; }
+.call-chip.call-chip-short.active { background: rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 0.85); color: #1a0707; }
+
+.call-chip.call-chip-neutral { border-color: rgba(156, 163, 175, 0.45); color: #9ca3af; }
+.call-chip.call-chip-neutral.active { background: rgba(156, 163, 175, 0.85); border-color: rgba(156, 163, 175, 0.85); color: #0b0d12; }
+
+.call-chip-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.call-chip:not(.active) .call-chip-count {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* === Card grid: 4 cols wide → 2 tablet → 1 mobile === */
+.call-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .call-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .call-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === Card === */
+.call-card {
+  position: relative;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.call-card.border-long { border-left-color: #22c55e; }
+.call-card.border-short { border-left-color: #ef4444; }
+.call-card.border-neutral { border-left-color: #9ca3af; }
+
+/* ADDED / FLIPPED glow — subtle, not garish. */
+.call-card.glow-added {
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3);
+}
+.call-card.glow-flipped {
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+}
+
+/* Top 5 cards get a touch more vertical breathing room for the rationale. */
+.call-card-top5 {
+  gap: 10px;
+}
+
+.cc-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.position-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.position-long { background: rgba(34, 197, 94, 0.18); color: #22c55e; }
+.position-short { background: rgba(239, 68, 68, 0.18); color: #ef4444; }
+.position-neutral { background: rgba(156, 163, 175, 0.18); color: #9ca3af; }
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.status-added { background: rgba(34, 197, 94, 0.18); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+.status-flipped { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+/* "★ BEST IDEA" — Hedgeye's highest-conviction flag inferred from rationale. */
+.badge-best-idea {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+/* "↩ RETURNING" — outlined purple, replaces the green NEW TODAY for
+   positions that have appeared in the top-5 twice or more in the past 90d. */
+.badge-returning {
+  background: transparent;
+  border: 1px solid #a855f7;
+  color: #a855f7;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.rank-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.cc-company-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cc-company {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-ticker {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.cc-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-price {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.cc-price.cc-price-none {
+  color: var(--text-dim);
+}
+
+.cc-change,
+.cc-change-pct {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cc-change.up,
+.cc-change-pct.up { color: #22c55e; }
+
+.cc-change.down,
+.cc-change-pct.down { color: #ef4444; }
+
+/* Rationale: 4-line clamp with bottom fade, click to expand. */
+.cc-rationale {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  position: relative;
+  max-height: calc(1.5em * 4);
+  overflow: hidden;
+}
+
+.cc-rationale::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5em;
+  background: linear-gradient(to bottom, transparent, var(--bg-elev));
+  pointer-events: none;
+}
+
+.cc-rationale.clamp-4 {
+  max-height: calc(1.5em * 4);
+}
+
+.cc-rationale.clamp-5 {
+  max-height: calc(1.5em * 5);
+}
+
+.cc-rationale.open {
+  max-height: none;
+}
+
+.cc-rationale.open::after {
+  display: none;
+}
+
+.cc-rationale-text {
+  white-space: pre-wrap;
+}
+
+.cc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.cc-streak {
+  font-size: 11px;
+  color: #fbbf24;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Conviction bar: 4px tall amber fill on a dark track, score to the right. */
+.conviction-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.conviction-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.conviction-bar-fill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 2px;
+}
+
+.conviction-score {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* "↗ In Risk Ranges" — cross-panel breadcrumb shown when this call ticker
+   also appears in the Risk Ranges watchlist. Outlined blue, low emphasis. */
+.badge-rr-crossover {
+  background: transparent;
+  border: 1px solid rgba(99, 179, 237, 0.5);
+  color: #63b3ed;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .call-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .call-header-right {
+    text-align: left;
+  }
+}
+
+/* === Collapsible sections (TOP 5, MACRO COMMENTARY, PERFORMANCE) === */
+
+.call-section {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.call-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+
+.call-section-head:hover {
+  color: var(--text-strong);
+}
+
+/* Caret rotates from ▸ to ▾ when expanded (matches the ticker dropdown
+   caret behavior). */
+.call-section-head .caret {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 120ms ease;
+}
+
+.call-section-head .caret.open {
+  transform: rotate(90deg);
+}
+
+.call-section-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.call-section-empty {
+  padding: 0 14px 14px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* === TOP 5 horizontal scroll row === */
+
+.top5-scroll {
+  display: flex;
+  gap: 12px;
+  padding: 0 14px 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.top5-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.top5-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.call-card.call-card-highlight {
+  flex: 0 0 280px;
+  min-width: 280px;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.top5-head-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Rank circle: 22px filled amber pill with black digits. */
+.top5-rank-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+
+/* === MACRO COMMENTARY === */
+
+.macro-body {
+  padding: 0 14px 14px;
+}
+
+.macro-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+  color: var(--text);
+}
+
+.macro-bullet {
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+
+.macro-bullet:last-child {
+  margin-bottom: 0;
+}
+
+.macro-more {
+  margin-top: 10px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.macro-more:hover {
+  color: var(--text-strong);
+  text-decoration: underline;
+}
+
+/* === Make position cards keyboard-activatable / hoverable === */
+
+.call-card[role='button'] {
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.call-card[role='button']:hover {
+  border-color: var(--border-strong);
+}
+
+.call-card[role='button']:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+/* === Ticker detail modal === */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.modal-close:hover {
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.modal-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.modal-head-row1 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-right: 32px; /* leave room for close button */
+}
+
+.modal-company {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.modal-ticker {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.modal-head-row2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.modal-conviction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.modal-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.modal-section {
+  margin-top: 18px;
+}
+
+.modal-section-head {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.modal-note-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.modal-note-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.modal-top5-list,
+.modal-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal-top5-item,
+.modal-history-item {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+}
+
+.modal-top5-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.modal-top5-date,
+.modal-history-date {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.modal-top5-rank {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.modal-history-item {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  padding-left: 0;
+  border-left: none;
+}
+
+.modal-history-body p {
+  margin: 0;
+}
+
+.modal-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  justify-content: center;
+}
+
+.modal-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spinner-rotate 0.9s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+.modal-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* === PERFORMANCE section === */
+
+.perf-section {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.perf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.perf-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.perf-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.perf-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .perf-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.perf-col-head {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.perf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perf-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.perf-ticker {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.perf-company {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perf-pct {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.perf-pct.up { color: #22c55e; }
+.perf-pct.down { color: #ef4444; }
+
+.perf-empty {
+  padding: 28px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.perf-empty-sub {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.7;
 }
