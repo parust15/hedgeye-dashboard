@@ -415,9 +415,11 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall }) {
         <section className="cards">
           {visibleCards.map((r) => {
             // VIEW CALL button shows only when the ticker has a call
-            // history record. The handler hops to The Call tab and pre-
-            // opens the modal with whatever context we have from the
-            // all-tickers view.
+            // history record. The handler opens the modal IN PLACE — the
+            // user stays on the RR tab. `source: 'risk-ranges'` tells
+            // TickerDetailModal to render the amber "CALL INFO — TICKER"
+            // overlay header so the user knows this is call data on top
+            // of their RR view.
             const callRow = allTickersByTicker?.get(r.ticker)
             const handleViewCall = callRow
               ? () =>
@@ -428,6 +430,7 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall }) {
                     conviction_score: 0,
                     signal_date: callRow.last_seen_date,
                     top5_appearances_90d: callRow.top5_appearances,
+                    source: 'risk-ranges',
                   })
               : null
             return (

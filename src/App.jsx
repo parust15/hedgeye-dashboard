@@ -42,11 +42,12 @@ export default function App() {
     }
   }, [activeTab])
 
-  // Open the modal AND switch tabs. RR's "VIEW CALL" button uses this so
-  // a user clicking the button on a Risk Ranges card lands on The Call
-  // with the modal already open.
-  const openCallModal = useCallback((position) => {
-    setActiveTab('the-call')
+  // Open the ticker modal IN PLACE — the active tab does not change. RR's
+  // "VIEW CALL INFO" button uses this so the user can peek at call data
+  // without losing their Risk Ranges context. The caller tags the
+  // position object with source='risk-ranges' so the modal renders a
+  // "CALL INFO — TICKER" overlay header.
+  const openTickerModal = useCallback((position) => {
     setModalPosition(position)
   }, [])
 
@@ -58,7 +59,7 @@ export default function App() {
       {activeTab === 'risk-ranges' && (
         <RiskRangesPanel
           allTickersByTicker={allTickersByTicker}
-          onViewCall={openCallModal}
+          onViewCall={openTickerModal}
         />
       )}
       {activeTab === 'the-call' && (

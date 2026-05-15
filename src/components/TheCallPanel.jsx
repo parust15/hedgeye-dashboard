@@ -41,9 +41,72 @@ const POSITION_FILTERS = [
   { id: 'LONG', label: 'LONG' },
   { id: 'SHORT', label: 'SHORT' },
   { id: 'NEUTRAL', label: 'NEUTRAL' },
+  { id: 'RETURNING', label: '↩ RETURNING' },
 ]
 
 const MAX_CONVICTION = 75
+
+// Calendar-days difference between two YYYY-MM-DD strings (end - start).
+// Returns null for unparseable input. Used to compute "Away N days" for
+// RETURNING positions — relies on call_all_tickers_v.last_seen_date
+// representing the last appearance BEFORE today's re-entry.
+function daysBetweenDates(startIso, endIso) {
+  if (!startIso || !endIso) return null
+  const [sy, sm, sd] = startIso.split('-').map(Number)
+  const [ey, em, ed] = endIso.split('-').map(Number)
+  if (!sy || !ey) return null
+  const start = Date.UTC(sy, sm - 1, sd)
+  const end = Date.UTC(ey, em - 1, ed)
+  return Math.round((end - start) / (24 * 60 * 60 * 1000))
+}
+
+// "May 2, 2026" from YYYY-MM-DD.
+function formatLongDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y) return iso
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+// Build the returning-meta object for a single row. Returns null when the
+// row isn't a returning position. Reads call_all_tickers_v history via
+// `tickerHistory` Map<ticker, allTickersRow>.
+function getReturningMeta(row, tickerHistory, signalDate) {
+  if (!isReturning(row)) return null
+  const hist = tickerHistory?.get?.(row.ticker)
+  const awayDays =
+    hist?.last_seen_date && signalDate
+      ? daysBetweenDates(hist.last_seen_date, signalDate)
+      : null
+  const appearances = hist?.total_appearances ?? null
+  const lastSeenLabel = hist?.last_seen_date ? formatLongDate(hist.last_seen_date) : null
+  const lastType = hist?.last_position_type ?? row.position_type ?? 'LONG'
+  const daysHeld = lastType === 'SHORT' ? hist?.short_days : hist?.long_days
+  const tooltipLines = []
+  if (daysHeld != null) {
+    tooltipLines.push(`Previously ${lastType} for ${daysHeld} days total.`)
+  }
+  if (lastSeenLabel) {
+    tooltipLines.push(`Last seen ${lastSeenLabel}.`)
+  }
+  if (hist?.top5_appearances != null) {
+    tooltipLines.push(`Appeared ${hist.top5_appearances} times in Top 5.`)
+  }
+  return { awayDays, appearances, tooltipLines }
+}
+
+// Tier sort: FLIPPED first → RETURNING → ADDED (new, not returning) →
+// UNCHANGED. Within tier, callers add a secondary conviction sort.
+function changeTier(row) {
+  if (row.change_status === 'FLIPPED') return 0
+  if (isReturning(row)) return 1
+  if (row.change_status === 'ADDED') return 2
+  return 3
+}
 
 // --- formatters ---
 
@@ -90,9 +153,34 @@ function PositionTypePill({ type }) {
   return <span className={cls}>{type ?? 'NEUTRAL'}</span>
 }
 
-function ChangeStatusBadge({ row }) {
+// Filled amber badge with a hover tooltip describing the ticker's prior
+// history (days held, last seen, top-5 appearances). Tooltip is CSS-only —
+// shown via `:hover` / `:focus-within` on the wrapper. stopPropagation on
+// the wrapper keeps card-level click handlers from firing when the user
+// only meant to read the tooltip.
+function ReturningBadge({ tooltipLines }) {
+  return (
+    <span
+      className="returning-badge-wrap"
+      tabIndex={0}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <span className="badge-returning">↩ RETURNING</span>
+      {tooltipLines && tooltipLines.length > 0 && (
+        <span className="returning-tooltip" role="tooltip">
+          {tooltipLines.map((line, i) => (
+            <span key={i} className="returning-tooltip-line">{line}</span>
+          ))}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function ChangeStatusBadge({ row, returningMeta }) {
   if (isReturning(row)) {
-    return <span className="badge-returning">↩ RETURNING</span>
+    return <ReturningBadge tooltipLines={returningMeta?.tooltipLines} />
   }
   if (row.change_status === 'ADDED') {
     return <span className="status-badge status-added">● NEW TODAY</span>
@@ -101,6 +189,22 @@ function ChangeStatusBadge({ row }) {
     return <span className="status-badge status-flipped">⟳ FLIPPED</span>
   }
   return null
+}
+
+// Single-line meta shown under the badge row when a position is RETURNING.
+// Reads days-away + prior-appearance count from getReturningMeta output.
+function ReturningMetaLine({ meta }) {
+  if (!meta) return null
+  const { awayDays, appearances } = meta
+  if (awayDays == null && appearances == null) return null
+  const parts = []
+  if (awayDays != null) {
+    parts.push(`Away ${awayDays} day${awayDays === 1 ? '' : 's'}`)
+  }
+  if (appearances != null) {
+    parts.push(`${appearances} prior appearance${appearances === 1 ? '' : 's'}`)
+  }
+  return <div className="returning-meta">{parts.join(' · ')}</div>
 }
 
 function BestIdeaBadge({ rationale }) {
@@ -194,9 +298,9 @@ function cardActivationProps(row, onOpen) {
   }
 }
 
-function Top5Card({ row, live, rrCrossover, onOpen }) {
+function Top5Card({ row, live, rrCrossover, onOpen, returningMeta }) {
   // Returning positions skip the green glow even though their change_status
-  // is ADDED — the calmer purple badge carries the signal instead.
+  // is ADDED — the amber badge + meta line carries the signal instead.
   const returning = isReturning(row)
   const cls = [
     'call-card',
@@ -204,6 +308,7 @@ function Top5Card({ row, live, rrCrossover, onOpen }) {
     `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
     row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
     row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
+    returning ? 'is-returning' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -214,7 +319,9 @@ function Top5Card({ row, live, rrCrossover, onOpen }) {
         <PositionTypePill type={row.position_type} />
         <BestIdeaBadge rationale={row.rationale} />
         <RankBadge rank={row.top5_rank} />
+        {returning && <ReturningBadge tooltipLines={returningMeta?.tooltipLines} />}
       </div>
+      <ReturningMetaLine meta={returningMeta} />
       <div className="cc-company-row">
         <span className="cc-company">{row.company_name ?? row.ticker}</span>
         <span className="cc-ticker">{row.ticker}</span>
@@ -231,13 +338,14 @@ function Top5Card({ row, live, rrCrossover, onOpen }) {
   )
 }
 
-function PositionCard({ row, live, rrCrossover, onOpen }) {
+function PositionCard({ row, live, rrCrossover, onOpen, returningMeta }) {
   const returning = isReturning(row)
   const cls = [
     'call-card',
     `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
     row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
     row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
+    returning ? 'is-returning' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -247,8 +355,9 @@ function PositionCard({ row, live, rrCrossover, onOpen }) {
       <div className="cc-badge-row">
         <PositionTypePill type={row.position_type} />
         <BestIdeaBadge rationale={row.rationale} />
-        <ChangeStatusBadge row={row} />
+        <ChangeStatusBadge row={row} returningMeta={returningMeta} />
       </div>
+      <ReturningMetaLine meta={returningMeta} />
       <div className="cc-company-row">
         <span className="cc-company">{row.company_name ?? row.ticker}</span>
         <span className="cc-ticker">{row.ticker}</span>
@@ -405,6 +514,8 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
   const [filter, setFilter] = useState('ALL')
+  const [sectorFilter, setSectorFilter] = useState('ALL')
+  const [search, setSearch] = useState('')
   const [callView, setCallView] = useState(loadInitialCallView)
 
   useEffect(() => {
@@ -458,11 +569,36 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     return formatCallReceivedEt(sample?.call_received_at_et)
   }, [rows])
 
-  // Filter + sector group + sort. Each sector is its own group ordered by
-  // conviction_score DESC; sectors render in the order the rows happened
-  // to introduce them, with "Other" pinned to the bottom.
+  // Filter → sector group → sort. Sort within each group is now
+  // tier-then-conviction: FLIPPED first, RETURNING second, ADDED-new
+  // third, UNCHANGED last. Conviction breaks ties within tier.
+  // Filter chain: position (incl. RETURNING) → sector → search.
   const visibleGroups = useMemo(() => {
-    const filtered = filter === 'ALL' ? rows : rows.filter((r) => r.position_type === filter)
+    let filtered = rows
+    if (filter === 'RETURNING') {
+      filtered = filtered.filter((r) => isReturning(r))
+    } else if (filter !== 'ALL') {
+      filtered = filtered.filter((r) => r.position_type === filter)
+    }
+
+    const q = search.trim().toLowerCase()
+    if (q) {
+      filtered = filtered.filter((r) => {
+        const t = (r.ticker ?? '').toLowerCase()
+        const c = (r.company_name ?? '').toLowerCase()
+        return t.includes(q) || c.includes(q)
+      })
+    }
+
+    // Sector filter is applied as a last step BEFORE grouping so the
+    // sector group header click target stays usable when the filter
+    // is active (i.e. we still emit a single group for the selected
+    // sector, with the same key).
+    if (sectorFilter !== 'ALL') {
+      filtered = filtered.filter(
+        (r) => canonicalSector(allTickersByTicker?.get(r.ticker)?.sector) === sectorFilter
+      )
+    }
 
     const groupMap = new Map() // sector → rows
     for (const r of filtered) {
@@ -471,18 +607,22 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       groupMap.get(sector).push(r)
     }
     for (const arr of groupMap.values()) {
-      arr.sort((a, b) => (Number(b.conviction_score) || 0) - (Number(a.conviction_score) || 0))
+      arr.sort((a, b) => {
+        const ta = changeTier(a)
+        const tb = changeTier(b)
+        if (ta !== tb) return ta - tb
+        return (Number(b.conviction_score) || 0) - (Number(a.conviction_score) || 0)
+      })
     }
 
     const sectors = [...groupMap.keys()]
-    // Push the Other catch-all to the bottom per spec.
     sectors.sort((a, b) => {
       if (a === OTHER_SECTOR && b !== OTHER_SECTOR) return 1
       if (b === OTHER_SECTOR && a !== OTHER_SECTOR) return -1
       return 0
     })
     return sectors.map((sector) => ({ sector, rows: groupMap.get(sector) }))
-  }, [rows, filter, allTickersByTicker])
+  }, [rows, filter, sectorFilter, search, allTickersByTicker])
 
   // Flat count for the "no positions" fallback message.
   const visibleCount = useMemo(
@@ -490,14 +630,28 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     [visibleGroups]
   )
 
-  // Counts per filter for the chip badges.
+  // Counts per filter for the chip badges. RETURNING is computed across
+  // ALL rows (not gated by current position_type filter) so the chip
+  // count reflects "how many actionable returns exist today" in absolute
+  // terms.
   const counts = useMemo(() => {
-    const c = { ALL: rows.length, LONG: 0, SHORT: 0, NEUTRAL: 0 }
+    const c = { ALL: rows.length, LONG: 0, SHORT: 0, NEUTRAL: 0, RETURNING: 0 }
     for (const r of rows) {
       if (r.position_type in c) c[r.position_type] += 1
+      if (isReturning(r)) c.RETURNING += 1
     }
     return c
   }, [rows])
+
+  // Click handler for sector group headers — toggles the sector filter.
+  // Clicking the active sector clears it. Used by both Today rendering
+  // below and (via prop) by CallAllTimeView.
+  const toggleSectorFilter = useMemo(
+    () => (sector) => {
+      setSectorFilter((prev) => (prev === sector ? 'ALL' : sector))
+    },
+    []
+  )
 
   if (status === 'loading') {
     return (
@@ -558,7 +712,19 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       </nav>
 
       {callView === 'all_time' ? (
-        <CallAllTimeView allTickers={allTickers} onOpen={openModal} />
+        <CallAllTimeView
+          allTickers={allTickers}
+          allTickersByTicker={allTickersByTicker}
+          onOpen={openModal}
+          search={search}
+          setSearch={setSearch}
+          positionFilter={filter}
+          setPositionFilter={setFilter}
+          sectorFilter={sectorFilter}
+          setSectorFilter={setSectorFilter}
+          signalDate={signalDate}
+          counts={counts}
+        />
       ) : (
       <>
       {!isToday && (
@@ -567,35 +733,92 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
         </div>
       )}
 
-      <nav className="call-filters" role="tablist" aria-label="Position type filter">
-        {POSITION_FILTERS.map((f) => (
+      {/* Filter row: position chips left, optional ALL SECTORS × chip,
+          search input right. Mirrors the Risk Ranges filter-row layout. */}
+      <div className="call-filter-row">
+        <nav className="call-filters" role="tablist" aria-label="Position type filter">
+          {POSITION_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.id}
+              className={`call-chip call-chip-${f.id.toLowerCase()}${filter === f.id ? ' active' : ''}`}
+              onClick={() => setFilter(f.id)}
+            >
+              {f.label}
+              <span className="call-chip-count">{counts[f.id] ?? 0}</span>
+            </button>
+          ))}
+        </nav>
+        {sectorFilter !== 'ALL' && (
           <button
-            key={f.id}
             type="button"
-            role="tab"
-            aria-selected={filter === f.id}
-            className={`call-chip call-chip-${f.id.toLowerCase()}${filter === f.id ? ' active' : ''}`}
-            onClick={() => setFilter(f.id)}
+            className="all-sectors-clear-chip"
+            onClick={() => setSectorFilter('ALL')}
+            title={`Showing only ${sectorFilter} — click to clear`}
+            aria-label={`Clear sector filter (currently ${sectorFilter})`}
           >
-            {f.label}
-            <span className="call-chip-count">{counts[f.id] ?? 0}</span>
+            ALL SECTORS ×
           </button>
-        ))}
-      </nav>
+        )}
+        <div className="search-wrap call-search-wrap">
+          <input
+            type="search"
+            className="search-input"
+            placeholder="Search ticker or company..."
+            aria-label="Search ticker or company name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setSearch('')
+                e.currentTarget.blur()
+              }
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
 
       <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
       <MacroCommentarySection commentary={macroCommentary} />
 
       {visibleCount === 0 ? (
-        <div className="state">No {filter.toLowerCase()} positions in today's call.</div>
+        <div className="state">
+          No positions match these filters{search.trim() ? ` for "${search.trim()}"` : ''}.
+        </div>
       ) : (
         visibleGroups.map((group) => (
           <section key={group.sector} className="call-sector-group">
-            <div className="sector-group-header">{group.sector}</div>
+            <button
+              type="button"
+              className={`sector-group-header sector-group-header-button${sectorFilter === group.sector ? ' active' : ''}`}
+              onClick={() => toggleSectorFilter(group.sector)}
+              aria-pressed={sectorFilter === group.sector}
+              title={
+                sectorFilter === group.sector
+                  ? 'Click to show all sectors'
+                  : `Click to filter to ${group.sector} only`
+              }
+            >
+              {group.sector}
+            </button>
             <div className="call-grid">
               {group.rows.map((row) => {
                 const live = livePrices.get(row.ticker)
                 const rrCrossover = rrTickers.has(row.ticker)
+                const returningMeta = getReturningMeta(row, allTickersByTicker, signalDate)
                 return row.top5_rank != null ? (
                   <Top5Card
                     key={row.ticker}
@@ -603,6 +826,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
                     live={live}
                     rrCrossover={rrCrossover}
                     onOpen={openModal}
+                    returningMeta={returningMeta}
                   />
                 ) : (
                   <PositionCard
@@ -611,6 +835,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
                     live={live}
                     rrCrossover={rrCrossover}
                     onOpen={openModal}
+                    returningMeta={returningMeta}
                   />
                 )
               })}

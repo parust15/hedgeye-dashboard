@@ -74,6 +74,11 @@ export function TickerDetailModal({ position, onClose }) {
         </button>
 
         <header className="modal-head">
+          {position.source === 'risk-ranges' && (
+            <div className="modal-source-label" aria-label="Call info overlay">
+              CALL INFO — {position.ticker}
+            </div>
+          )}
           <div className="modal-head-row1">
             <h2 id="ticker-modal-title" className="modal-company">
               {position.company_name ?? position.ticker}

@@ -1293,17 +1293,86 @@
   text-transform: uppercase;
 }
 
-/* "↩ RETURNING" — outlined purple, replaces the green NEW TODAY for
+/* "↩ RETURNING" — filled amber, matching the conviction-bar palette so
+   it reads as "act on this" not "informational". Replaces NEW TODAY for
    positions that have appeared in the top-5 twice or more in the past 90d. */
 .badge-returning {
-  background: transparent;
-  border: 1px solid #a855f7;
-  color: #a855f7;
+  background: #F59E0B;
+  border: 1px solid #F59E0B;
+  color: #000;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 2px 7px;
   border-radius: 3px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
+}
+
+/* Hoverable wrapper for the RETURNING badge. The tooltip is rendered as
+   a positioned sibling that becomes visible on hover/focus. Keyboard
+   users can Tab to the wrap and see the same tooltip. */
+.returning-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  outline: none;
+  cursor: help;
+}
+
+.returning-badge-wrap:focus-visible .badge-returning {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+}
+
+.returning-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: #0b0d12;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.returning-badge-wrap:hover .returning-tooltip,
+.returning-badge-wrap:focus-within .returning-tooltip {
+  display: flex;
+}
+
+.returning-tooltip-line {
+  color: var(--text);
+}
+
+.returning-tooltip-line:first-child {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+/* "Away N days · X prior appearances" — meta line directly under the
+   badge row on RETURNING cards. Muted so it doesn't fight the badge. */
+.returning-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: -2px 0 2px;
+  letter-spacing: 0.2px;
+}
+
+/* Soft amber tint on the card itself — extremely subtle, just enough
+   to let the eye scan returning cards in a sector group. */
+.call-card.is-returning {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, var(--bg-elev) 50%);
+  border-color: rgba(245, 158, 11, 0.18);
 }
 
 .rank-badge {
@@ -2091,6 +2160,36 @@
   color: var(--text);
 }
 
+/* Clickable group header — sector chips disguised as headers. Hover
+   brightens, active gets an amber underline + bold per spec. */
+.sector-group-header-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--border);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.sector-group-header-button:hover {
+  color: var(--text-strong);
+  border-bottom-color: var(--border-strong);
+}
+
+.sector-group-header-button.active {
+  color: #fbbf24;
+  border-bottom: 2px solid #F59E0B;
+  font-weight: 800;
+}
+
 /* === All Time view === */
 
 .all-time-view {
@@ -2257,4 +2356,109 @@
   height: 100%;
   background: #f59e0b;
   border-radius: 2px;
+}
+
+/* === Call panel: unified filter row (Today + All Time) =================
+   Same layout as RR .filter-row: position chips left, optional ALL SECTORS
+   × clear chip, search input right with × clear. Wraps on narrow widths. */
+
+.call-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.call-filter-row .call-filters {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.call-search-wrap {
+  position: relative;
+  flex: 0 0 280px;
+  margin-left: auto;
+}
+
+.call-search-wrap .search-input {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.search-clear:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+/* ALL SECTORS × chip — appears in the filter row when a sector is
+   selected. Amber border to echo the active sector header. */
+.all-sectors-clear-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.10);
+  color: #fbbf24;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.all-sectors-clear-chip:hover {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+/* RETURNING filter chip — amber border (matches the badge) instead of
+   the position-type color scheme. Active state mirrors the amber badge. */
+.call-chip.call-chip-returning {
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fbbf24;
+}
+.call-chip.call-chip-returning.active {
+  background: #F59E0B;
+  border-color: #F59E0B;
+  color: #000;
+}
+
+/* Modal "CALL INFO — TICKER" overlay header. Renders only when the
+   TickerDetailModal is opened from RR (source='risk-ranges') so the
+   user knows this is call data overlaid on their RR view. */
+.modal-source-label {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  background: #F59E0B;
+  color: #000;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
 }

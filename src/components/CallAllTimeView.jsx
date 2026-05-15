@@ -1,12 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { canonicalSector, abbreviateSector, OTHER_SECTOR } from '../lib/sectors'
-
-const POSITION_FILTERS = [
-  { id: 'ALL', label: 'ALL' },
-  { id: 'LONG', label: 'LONG' },
-  { id: 'SHORT', label: 'SHORT' },
-  { id: 'NEUTRAL', label: 'NEUTRAL' },
-]
 
 // "May 14" from YYYY-MM-DD.
 function formatLastSeen(iso) {
@@ -85,14 +78,32 @@ function AllTimeCard({ row, maxAppearances, onOpen }) {
 }
 
 /**
- * All Time view: 469-row sector-grouped grid of every ticker that has
- * appeared in Hedgeye's call. Filters: position chips + sector chips +
- * search. Header shows total ticker + trading-day counts.
+ * All Time view: ~470-row sector-grouped grid of every ticker that has
+ * appeared in Hedgeye's call. Position + sector + search filters are
+ * lifted to TheCallPanel and passed in as props so they persist across
+ * the TODAY ↔ ALL TIME toggle.
+ *
+ * Sector group headers are clickable filter chips (same behavior as the
+ * Today view) — clicking one filters the grid to just that sector;
+ * clicking the active sector clears the filter. The standalone sector
+ * chip row at the top is kept for direct navigation across 470 tickers.
  */
-export function CallAllTimeView({ allTickers, onOpen }) {
-  const [positionFilter, setPositionFilter] = useState('ALL')
-  const [sectorFilter, setSectorFilter] = useState('ALL')
-  const [search, setSearch] = useState('')
+export function CallAllTimeView({
+  allTickers,
+  onOpen,
+  search,
+  setSearch,
+  positionFilter,
+  setPositionFilter,
+  sectorFilter,
+  setSectorFilter,
+}) {
+  const POSITION_FILTERS = [
+    { id: 'ALL', label: 'ALL' },
+    { id: 'LONG', label: 'LONG' },
+    { id: 'SHORT', label: 'SHORT' },
+    { id: 'NEUTRAL', label: 'NEUTRAL' },
+  ]
 
   // Header counts. Trading-day approximation spans first_seen min →
   // last_seen max across the universe.
@@ -133,12 +144,31 @@ export function CallAllTimeView({ allTickers, onOpen }) {
     [allTickers]
   )
 
+  // Counts for the position chip badges. RETURNING is in TheCallPanel's
+  // chips only — All Time's source data doesn't carry change_status so
+  // the filter is meaningless here.
+  const positionCounts = useMemo(() => {
+    const c = { ALL: allTickers.length, LONG: 0, SHORT: 0, NEUTRAL: 0 }
+    for (const r of allTickers) {
+      const p = r.last_position_type
+      if (p in c) c[p] += 1
+    }
+    return c
+  }, [allTickers])
+
   // Apply filters → group by sector → sort within each group by
   // total_appearances DESC.
   const visibleGroups = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = allTickers.filter((r) => {
-      if (positionFilter !== 'ALL' && r.last_position_type !== positionFilter) return false
+      // RETURNING is a Today-only filter; in All Time treat it as ALL.
+      if (
+        positionFilter !== 'ALL' &&
+        positionFilter !== 'RETURNING' &&
+        r.last_position_type !== positionFilter
+      ) {
+        return false
+      }
       const sector = canonicalSector(r.sector)
       if (sectorFilter !== 'ALL' && sector !== sectorFilter) return false
       if (q) {
@@ -172,26 +202,75 @@ export function CallAllTimeView({ allTickers, onOpen }) {
     [visibleGroups]
   )
 
+  function toggleSectorHeader(sector) {
+    setSectorFilter(sectorFilter === sector ? 'ALL' : sector)
+  }
+
   return (
     <div className="all-time-view">
       <div className="all-time-stats">
         {stats.tickers} tickers · {stats.tradingDays} trading days
       </div>
 
-      <nav className="call-filters" aria-label="Position type filter">
-        {POSITION_FILTERS.map((p) => (
+      {/* Unified filter row: position chips left, ALL SECTORS × chip,
+          search right. Same layout as Today view + Risk Ranges. */}
+      <div className="call-filter-row">
+        <nav className="call-filters" aria-label="Position type filter">
+          {POSITION_FILTERS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={positionFilter === p.id}
+              className={`call-chip call-chip-${p.id.toLowerCase()}${positionFilter === p.id ? ' active' : ''}`}
+              onClick={() => setPositionFilter(p.id)}
+            >
+              {p.label}
+              <span className="call-chip-count">{positionCounts[p.id] ?? 0}</span>
+            </button>
+          ))}
+        </nav>
+        {sectorFilter !== 'ALL' && (
           <button
-            key={p.id}
             type="button"
-            aria-pressed={positionFilter === p.id}
-            className={`call-chip call-chip-${p.id.toLowerCase()}${positionFilter === p.id ? ' active' : ''}`}
-            onClick={() => setPositionFilter(p.id)}
+            className="all-sectors-clear-chip"
+            onClick={() => setSectorFilter('ALL')}
+            title={`Showing only ${sectorFilter} — click to clear`}
+            aria-label={`Clear sector filter (currently ${sectorFilter})`}
           >
-            {p.label}
+            ALL SECTORS ×
           </button>
-        ))}
-      </nav>
+        )}
+        <div className="search-wrap call-search-wrap">
+          <input
+            type="search"
+            className="search-input"
+            placeholder="Search ticker or company..."
+            aria-label="Search ticker or company name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setSearch('')
+                e.currentTarget.blur()
+              }
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
 
+      {/* Standalone sector chip row — kept for direct navigation across
+          ~470 cards. Drives the same shared sectorFilter state. */}
       <nav className="sector-chips" aria-label="Sector filter">
         <button
           type="button"
@@ -215,30 +294,24 @@ export function CallAllTimeView({ allTickers, onOpen }) {
         ))}
       </nav>
 
-      <div className="all-time-search">
-        <input
-          type="search"
-          className="search-input"
-          placeholder="Search ticker or name..."
-          aria-label="Search ticker or company name"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.preventDefault()
-              setSearch('')
-              e.currentTarget.blur()
-            }
-          }}
-        />
-      </div>
-
       {totalVisible === 0 ? (
         <div className="state">No tickers match these filters.</div>
       ) : (
         visibleGroups.map((g) => (
           <section key={g.sector} className="all-time-sector-group">
-            <div className="sector-group-header">{g.sector}</div>
+            <button
+              type="button"
+              className={`sector-group-header sector-group-header-button${sectorFilter === g.sector ? ' active' : ''}`}
+              onClick={() => toggleSectorHeader(g.sector)}
+              aria-pressed={sectorFilter === g.sector}
+              title={
+                sectorFilter === g.sector
+                  ? 'Click to show all sectors'
+                  : `Click to filter to ${g.sector} only`
+              }
+            >
+              {g.sector}
+            </button>
             <div className="all-time-grid">
               {g.rows.map((r) => (
                 <AllTimeCard
