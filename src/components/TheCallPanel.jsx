@@ -80,61 +80,11 @@ const POSITION_FILTERS = [
 
 const MAX_CONVICTION = 75
 
-// Calendar-days difference between two YYYY-MM-DD strings (end - start).
-// Returns null for unparseable input. Used to compute "Away N days" for
-// RETURNING positions — relies on call_all_tickers_v.last_seen_date
-// representing the last appearance BEFORE today's re-entry.
-function daysBetweenDates(startIso, endIso) {
-  if (!startIso || !endIso) return null
-  const [sy, sm, sd] = startIso.split('-').map(Number)
-  const [ey, em, ed] = endIso.split('-').map(Number)
-  if (!sy || !ey) return null
-  const start = Date.UTC(sy, sm - 1, sd)
-  const end = Date.UTC(ey, em - 1, ed)
-  return Math.round((end - start) / (24 * 60 * 60 * 1000))
-}
-
-// "May 2, 2026" from YYYY-MM-DD.
-function formatLongDate(iso) {
-  if (!iso) return ''
-  const [y, m, d] = iso.split('-').map(Number)
-  if (!y) return iso
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-// Build the returning-meta object for a single row. Returns null when the
-// row isn't a returning position. Reads call_all_tickers_v history via
-// `tickerHistory` Map<ticker, allTickersRow>.
-function getReturningMeta(row, tickerHistory, signalDate) {
-  if (!isReturning(row)) return null
-  const hist = tickerHistory?.get?.(row.ticker)
-  const awayDays =
-    hist?.last_seen_date && signalDate
-      ? daysBetweenDates(hist.last_seen_date, signalDate)
-      : null
-  const appearances = hist?.total_appearances ?? null
-  const lastSeenLabel = hist?.last_seen_date ? formatLongDate(hist.last_seen_date) : null
-  const lastType = hist?.last_position_type ?? row.position_type ?? 'LONG'
-  const daysHeld = lastType === 'SHORT' ? hist?.short_days : hist?.long_days
-  const tooltipLines = []
-  if (daysHeld != null) {
-    tooltipLines.push(`Previously ${lastType} for ${daysHeld} days total.`)
-  }
-  if (lastSeenLabel) {
-    tooltipLines.push(`Last seen ${lastSeenLabel}.`)
-  }
-  if (hist?.top5_appearances != null) {
-    tooltipLines.push(`Appeared ${hist.top5_appearances} times in Top 5.`)
-  }
-  return { awayDays, appearances, tooltipLines }
-}
-
 // Tier sort: FLIPPED first → RETURNING → ADDED (new, not returning) →
 // UNCHANGED. Within tier, callers add a secondary conviction sort.
+// The visual RETURNING badge was removed in May 2026, but tier sort is
+// kept so returning positions still bubble up above unchanged ones — and
+// the ↩ RETURNING filter chip still works.
 function changeTier(row) {
   if (row.change_status === 'FLIPPED') return 0
   if (isReturning(row)) return 1
@@ -187,35 +137,7 @@ function PositionTypePill({ type }) {
   return <span className={cls}>{type ?? 'NEUTRAL'}</span>
 }
 
-// Filled amber badge with a hover tooltip describing the ticker's prior
-// history (days held, last seen, top-5 appearances). Tooltip is CSS-only —
-// shown via `:hover` / `:focus-within` on the wrapper. stopPropagation on
-// the wrapper keeps card-level click handlers from firing when the user
-// only meant to read the tooltip.
-function ReturningBadge({ tooltipLines }) {
-  return (
-    <span
-      className="returning-badge-wrap"
-      tabIndex={0}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <span className="badge-returning">↩ RETURNING</span>
-      {tooltipLines && tooltipLines.length > 0 && (
-        <span className="returning-tooltip" role="tooltip">
-          {tooltipLines.map((line, i) => (
-            <span key={i} className="returning-tooltip-line">{line}</span>
-          ))}
-        </span>
-      )}
-    </span>
-  )
-}
-
-function ChangeStatusBadge({ row, returningMeta }) {
-  if (isReturning(row)) {
-    return <ReturningBadge tooltipLines={returningMeta?.tooltipLines} />
-  }
+function ChangeStatusBadge({ row }) {
   if (row.change_status === 'ADDED') {
     return <span className="status-badge status-added">● NEW TODAY</span>
   }
@@ -223,22 +145,6 @@ function ChangeStatusBadge({ row, returningMeta }) {
     return <span className="status-badge status-flipped">⟳ FLIPPED</span>
   }
   return null
-}
-
-// Single-line meta shown under the badge row when a position is RETURNING.
-// Reads days-away + prior-appearance count from getReturningMeta output.
-function ReturningMetaLine({ meta }) {
-  if (!meta) return null
-  const { awayDays, appearances } = meta
-  if (awayDays == null && appearances == null) return null
-  const parts = []
-  if (awayDays != null) {
-    parts.push(`Away ${awayDays} day${awayDays === 1 ? '' : 's'}`)
-  }
-  if (appearances != null) {
-    parts.push(`${appearances} prior appearance${appearances === 1 ? '' : 's'}`)
-  }
-  return <div className="returning-meta">{parts.join(' · ')}</div>
 }
 
 function BestIdeaBadge({ rationale }) {
@@ -332,20 +238,17 @@ function cardActivationProps(row, onOpen) {
   }
 }
 
-function Top5Card({ row, live, rrCrossover, onOpen, returningMeta }) {
-  // Returning positions skip the green glow even though their change_status
-  // is ADDED — the amber badge + meta line carries the signal instead.
-  const returning = isReturning(row)
+function Top5Card({ row, live, rrCrossover, onOpen }) {
   const cls = [
     'call-card',
     'call-card-top5',
     `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
-    row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
+    row.change_status === 'ADDED' ? 'glow-added' : '',
     row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
-    returning ? 'is-returning' : '',
   ]
     .filter(Boolean)
     .join(' ')
+  const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
@@ -353,10 +256,8 @@ function Top5Card({ row, live, rrCrossover, onOpen, returningMeta }) {
         <PositionTypePill type={row.position_type} />
         <BestIdeaBadge rationale={row.rationale} />
         <RankBadge rank={row.top5_rank} />
-        {returning && <ReturningBadge tooltipLines={returningMeta?.tooltipLines} />}
       </div>
-      <ReturningMetaLine meta={returningMeta} />
-      <div className="cc-company-row">
+      <div className={`cc-company-row ${directionClass}`}>
         <span className="cc-company">{row.company_name ?? row.ticker}</span>
         <span className="cc-ticker">{row.ticker}</span>
       </div>
@@ -372,27 +273,25 @@ function Top5Card({ row, live, rrCrossover, onOpen, returningMeta }) {
   )
 }
 
-function PositionCard({ row, live, rrCrossover, onOpen, returningMeta }) {
-  const returning = isReturning(row)
+function PositionCard({ row, live, rrCrossover, onOpen }) {
   const cls = [
     'call-card',
     `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
-    row.change_status === 'ADDED' && !returning ? 'glow-added' : '',
+    row.change_status === 'ADDED' ? 'glow-added' : '',
     row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
-    returning ? 'is-returning' : '',
   ]
     .filter(Boolean)
     .join(' ')
+  const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
       <div className="cc-badge-row">
         <PositionTypePill type={row.position_type} />
         <BestIdeaBadge rationale={row.rationale} />
-        <ChangeStatusBadge row={row} returningMeta={returningMeta} />
+        <ChangeStatusBadge row={row} />
       </div>
-      <ReturningMetaLine meta={returningMeta} />
-      <div className="cc-company-row">
+      <div className={`cc-company-row ${directionClass}`}>
         <span className="cc-company">{row.company_name ?? row.ticker}</span>
         <span className="cc-ticker">{row.ticker}</span>
       </div>
@@ -964,7 +863,6 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           {visibleCards.map((row) => {
             const live = livePrices.get(row.ticker)
             const rrCrossover = rrTickers.has(row.ticker)
-            const returningMeta = getReturningMeta(row, allTickersByTicker, signalDate)
             return row.top5_rank != null ? (
               <Top5Card
                 key={row.ticker}
@@ -972,7 +870,6 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
                 live={live}
                 rrCrossover={rrCrossover}
                 onOpen={openModal}
-                returningMeta={returningMeta}
               />
             ) : (
               <PositionCard
@@ -981,7 +878,6 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
                 live={live}
                 rrCrossover={rrCrossover}
                 onOpen={openModal}
-                returningMeta={returningMeta}
               />
             )
           })}

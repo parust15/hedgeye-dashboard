@@ -1310,86 +1310,28 @@
   text-transform: uppercase;
 }
 
-/* "↩ RETURNING" — filled amber, matching the conviction-bar palette so
-   it reads as "act on this" not "informational". Replaces NEW TODAY for
-   positions that have appeared in the top-5 twice or more in the past 90d. */
-.badge-returning {
-  background: #F59E0B;
-  border: 1px solid #F59E0B;
-  color: #000;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 3px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+/* Direction-tinted ticker + company-name text on position cards. Reads
+   .direction-{long|short|neutral} class set on the row wrapper and
+   colors both the ticker symbol and company name accordingly. */
+.cc-company-row.direction-long .cc-ticker,
+.cc-company-row.direction-long .cc-company,
+.atc-row-id.direction-long .atc-ticker,
+.atc-row-id.direction-long .atc-company {
+  color: #22c55e;
 }
 
-/* Hoverable wrapper for the RETURNING badge. The tooltip is rendered as
-   a positioned sibling that becomes visible on hover/focus. Keyboard
-   users can Tab to the wrap and see the same tooltip. */
-.returning-badge-wrap {
-  position: relative;
-  display: inline-flex;
-  outline: none;
-  cursor: help;
+.cc-company-row.direction-short .cc-ticker,
+.cc-company-row.direction-short .cc-company,
+.atc-row-id.direction-short .atc-ticker,
+.atc-row-id.direction-short .atc-company {
+  color: #ef4444;
 }
 
-.returning-badge-wrap:focus-visible .badge-returning {
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
-}
-
-.returning-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 240px;
-  max-width: 320px;
-  padding: 10px 12px;
-  background: #0b0d12;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--text);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
-  z-index: 50;
-  pointer-events: none;
-  white-space: normal;
-}
-
-.returning-badge-wrap:hover .returning-tooltip,
-.returning-badge-wrap:focus-within .returning-tooltip {
-  display: flex;
-}
-
-.returning-tooltip-line {
-  color: var(--text);
-}
-
-.returning-tooltip-line:first-child {
-  color: #fbbf24;
-  font-weight: 600;
-}
-
-/* "Away N days · X prior appearances" — meta line directly under the
-   badge row on RETURNING cards. Muted so it doesn't fight the badge. */
-.returning-meta {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin: -2px 0 2px;
-  letter-spacing: 0.2px;
-}
-
-/* Soft amber tint on the card itself — extremely subtle, just enough
-   to let the eye scan returning cards in a sector group. */
-.call-card.is-returning {
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, var(--bg-elev) 50%);
-  border-color: rgba(245, 158, 11, 0.18);
+.cc-company-row.direction-neutral .cc-ticker,
+.cc-company-row.direction-neutral .cc-company,
+.atc-row-id.direction-neutral .atc-ticker,
+.atc-row-id.direction-neutral .atc-company {
+  color: #9ca3af;
 }
 
 .rank-badge {
@@ -2392,4 +2334,101 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+}
+
+/* === AI ticker summary section (above TODAY'S ANALYST NOTE) === */
+
+.modal-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-summary-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal-summary-thesis {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-strong);
+  letter-spacing: -0.2px;
+}
+
+.modal-summary-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  opacity: 0.85;
+}
+
+.modal-summary-badges {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.modal-summary-breaks {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.modal-summary-catalyst {
+  margin: 0;
+  font-size: 11px;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.modal-summary-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 14px 0 4px;
+}
+
+/* Small uppercase pill — used by SummaryBadge to render data_freshness,
+   consistency, and language_momentum values. Color tones map per
+   SUMMARY_BADGE_COLORS in TickerDetailModal.jsx. */
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.summary-badge-green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.summary-badge-grey {
+  background: rgba(156, 163, 175, 0.12);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.summary-badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.summary-badge-red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
 }

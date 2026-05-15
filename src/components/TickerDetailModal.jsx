@@ -1,7 +1,42 @@
 import { useEffect } from 'react'
 import { useTickerDetail } from '../lib/useTickerDetail'
+import { useTickerSummary } from '../lib/useTickerSummary'
 
 const MAX_CONVICTION = 75
+
+// Color map for the AI-summary status badges. Each badge is a small
+// uppercase pill rendered with one of four tones — green/grey/amber/red
+// — keyed off the column value the table emits.
+const SUMMARY_BADGE_COLORS = {
+  // data_freshness
+  ACTIVE: 'green',
+  RECENT: 'grey',
+  COOLING: 'amber',
+  STALE: 'red',
+  // consistency
+  BUILDING: 'green',
+  STABLE: 'grey',
+  FADING: 'amber',
+  REVERSED: 'red',
+  // language_momentum
+  ACCELERATING: 'green',
+  STEADY: 'grey',
+  DECELERATING: 'amber',
+}
+
+function SummaryBadge({ value, label }) {
+  if (!value) return null
+  const upper = String(value).toUpperCase()
+  const tone = SUMMARY_BADGE_COLORS[upper] ?? 'grey'
+  return (
+    <span
+      className={`summary-badge summary-badge-${tone}`}
+      title={label ? `${label}: ${upper}` : undefined}
+    >
+      {upper}
+    </span>
+  )
+}
 
 // "Mon May 13" from YYYY-MM-DD.
 function formatNoteDate(iso) {
@@ -35,6 +70,7 @@ function ModalConvictionBar({ score }) {
 
 export function TickerDetailModal({ position, onClose }) {
   const { notes, top5History, status } = useTickerDetail(position?.ticker ?? null)
+  const { summary } = useTickerSummary(position?.ticker ?? null)
 
   // Close on Escape.
   useEffect(() => {
@@ -108,6 +144,38 @@ export function TickerDetailModal({ position, onClose }) {
 
         {noData && (
           <div className="modal-empty">No analyst notes on file for {position.ticker}</div>
+        )}
+
+        {summary && (
+          <section className="modal-section modal-summary">
+            <div className="modal-summary-head">
+              <PositionTypePill type={summary.position_type ?? position.position_type} />
+              <SummaryBadge value={summary.data_freshness} label="Freshness" />
+            </div>
+            {summary.core_thesis && (
+              <h3 className="modal-summary-thesis">{summary.core_thesis}</h3>
+            )}
+            {summary.summary && (
+              <p className="modal-summary-body">{summary.summary}</p>
+            )}
+            {(summary.consistency || summary.language_momentum) && (
+              <div className="modal-summary-badges">
+                <SummaryBadge value={summary.consistency} label="Consistency" />
+                <SummaryBadge value={summary.language_momentum} label="Momentum" />
+              </div>
+            )}
+            {summary.what_breaks_thesis && (
+              <p className="modal-summary-breaks">
+                What breaks this: {summary.what_breaks_thesis}
+              </p>
+            )}
+            {summary.upcoming_catalyst && (
+              <p className="modal-summary-catalyst">
+                Catalyst: {summary.upcoming_catalyst}
+              </p>
+            )}
+            <hr className="modal-summary-divider" />
+          </section>
         )}
 
         {todayNote && (

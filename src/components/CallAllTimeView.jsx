@@ -59,7 +59,7 @@ function AllTimeCard({ row, maxAppearances, onOpen }) {
         }
       }}
     >
-      <div className="atc-row-id">
+      <div className={`atc-row-id direction-${type}`}>
         <span className="atc-ticker">{row.ticker}</span>
         <span className="atc-company">{row.company_name ?? ''}</span>
       </div>
