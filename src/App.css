@@ -3165,6 +3165,37 @@ body,
   100% { transform: translate(-50%, -50%) scale(110);  opacity: 0;    }
 }
 
+/* Mobile: drop the most expensive cosmic layers. Phone GPUs stutter on
+   SVG feDisplacementMap, the 800px-radius supernova shadow, the
+   blurred rotating galaxy, and 420 box-shadow stars. What survives is
+   navy gradient + dominant-pool nebula + 120 mid stars (with parallax)
+   + 8 static bright-star cores + ticker data layer + sweep + vignette.
+   Still reads as cosmic; runs smooth on mobile hardware. */
+@media (max-width: 720px) {
+  .ambient-nebula,
+  .ambient-galaxy,
+  .ambient-supernova,
+  .ambient-stars-far,
+  .ambient-constellation,
+  .ambient-noise {
+    display: none;
+  }
+  .ambient-bright-star {
+    animation: none;
+  }
+  .ambient-bright-star::before,
+  .ambient-bright-star::after {
+    display: none;
+  }
+  .ambient-dominant-pool {
+    filter: blur(40px);
+    animation-duration: 18s;
+  }
+  .ambient-stars-mid {
+    filter: none;
+  }
+}
+
 /* Reduce-motion: freeze the cosmic motion + the per-card orbit +
    the hover sheen + chart-tooltip transitions. Static cards still
    tint and respond to hover; only the long-running idle loops stop. */
