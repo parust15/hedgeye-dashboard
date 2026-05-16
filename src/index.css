@@ -15,6 +15,15 @@
   --neutral: #9ca3af;
   --neutral-bg: rgba(156, 163, 175, 0.12);
 
+  --radius-card: 10px;
+  --radius-badge: 4px;
+  --radius-pill: 999px;
+  --radius-input: 8px;
+  --bg-chart: #111318;
+  --live: #4ade80;
+  --amber-strong: #f59e0b;
+  --amber-light: #fbbf24;
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 

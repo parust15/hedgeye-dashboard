@@ -4,6 +4,7 @@ import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
+import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
 import './App.css'
@@ -62,6 +63,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <AmbientBackground />
       <div className="top-bar">
         <TopTabs active={activeTab} onChange={setActiveTab} />
         <VixHeaderPill data={vixBucket} />

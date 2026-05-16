@@ -156,28 +156,65 @@ function RankBadge({ rank }) {
   return <span className="rank-badge">#{rank} MOST ACTIONABLE</span>
 }
 
+// Inline transient flash class on .cc-price when the displayed live
+// price changes. Tracks the previous numeric value via a ref so we can
+// distinguish initial render (no flash) from a real tick (flash up/down).
+function useFlashOnChange(value) {
+  const prevRef = useRef(null)
+  const [flash, setFlash] = useState('')
+  useEffect(() => {
+    if (!Number.isFinite(value)) return
+    const prev = prevRef.current
+    prevRef.current = value
+    if (prev == null || !Number.isFinite(prev) || prev === value) return
+    setFlash(value > prev ? 'flash-up' : 'flash-down')
+    const id = setTimeout(() => setFlash(''), 350)
+    return () => clearTimeout(id)
+  }, [value])
+  return flash
+}
+
 function LivePriceRow({ live }) {
-  if (!live || !Number.isFinite(Number(live.current_price))) {
-    return <div className="cc-price cc-price-none">—</div>
+  const priceVal = Number(live?.current_price)
+  const flash = useFlashOnChange(Number.isFinite(priceVal) ? priceVal : null)
+  if (!live || !Number.isFinite(priceVal)) {
+    return (
+      <div className="cc-price-row">
+        <div className="cc-price-cell">
+          <div className="label">Price</div>
+          <span className="cc-price cc-price-none">—</span>
+        </div>
+      </div>
+    )
   }
-  const price = Number(live.current_price)
   const change = Number(live.change_amount)
   const pct = Number(live.change_pct)
   const cls = changeClass(change)
+  const hasChange = Number.isFinite(change) || Number.isFinite(pct)
   return (
     <div className="cc-price-row">
-      <span className="cc-price">{formatPrice(price)}</span>
-      {Number.isFinite(change) && (
-        <span className={`cc-change ${cls}`}>
-          {change >= 0 ? '+' : ''}
-          {formatNumber(change)}
-        </span>
-      )}
-      {Number.isFinite(pct) && (
-        <span className={`cc-change-pct ${cls}`}>
-          {pct >= 0 ? '+' : ''}
-          {pct.toFixed(2)}%
-        </span>
+      <div className="cc-price-cell">
+        <div className="label">Price</div>
+        <span className={`cc-price ${flash}`}>{formatPrice(priceVal)}</span>
+      </div>
+      {hasChange && (
+        <div className="cc-change-cell">
+          <div className="label">Change</div>
+          <div className="cc-change-stack">
+            {Number.isFinite(change) && (
+              <span className={`cc-change ${cls}`}>
+                {change >= 0 ? '+' : ''}
+                {formatNumber(change)}
+              </span>
+            )}
+            {Number.isFinite(pct) && (
+              <span className={`cc-change-pct ${cls}`}>
+                {pct >= 0 ? '+' : ''}
+                {pct.toFixed(2)}%
+              </span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -248,20 +285,32 @@ function Top5Card({ row, live, rrCrossover, onOpen }) {
     .filter(Boolean)
     .join(' ')
   const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
+  const hasRank = row.top5_rank != null
+  const isBest = isBestIdea(row.rationale)
+  const hasAccent = hasRank || isBest
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
-      <div className="cc-badge-row">
+      <header className="cc-head">
+        <div className={`cc-head-id ${directionClass}`}>
+          <div className="cc-ticker">{row.ticker}</div>
+          {row.company_name && <div className="cc-name">{row.company_name}</div>}
+        </div>
         <PositionTypePill type={row.position_type} />
-        <BestIdeaBadge rationale={row.rationale} />
-        <RankBadge rank={row.top5_rank} />
-      </div>
-      <div className={`cc-company-row ${directionClass}`}>
-        <span className="cc-company">{row.company_name ?? row.ticker}</span>
-        <span className="cc-ticker">{row.ticker}</span>
-      </div>
+      </header>
+      {hasAccent && (
+        <div className="cc-accent-row">
+          <RankBadge rank={row.top5_rank} />
+          <BestIdeaBadge rationale={row.rationale} />
+        </div>
+      )}
       <LivePriceRow live={live} />
-      {row.rationale ? <Rationale text={row.rationale} /> : null}
+      {row.rationale ? (
+        <div className="cc-rationale-block">
+          <div className="label">Rationale</div>
+          <Rationale text={row.rationale} />
+        </div>
+      ) : null}
       <div className="cc-footer">
         <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
         {row.consecutive_days > 1 && (
@@ -282,24 +331,28 @@ function PositionCard({ row, live, rrCrossover, onOpen }) {
     .filter(Boolean)
     .join(' ')
   const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
+  const hasChangeStatus = row.change_status === 'ADDED' || row.change_status === 'FLIPPED'
+  const isBest = isBestIdea(row.rationale)
+  const hasAccent = hasChangeStatus || isBest
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
-      <div className="cc-badge-row">
+      <header className="cc-head">
+        <div className={`cc-head-id ${directionClass}`}>
+          <div className="cc-ticker">{row.ticker}</div>
+          {row.company_name && <div className="cc-name">{row.company_name}</div>}
+        </div>
         <PositionTypePill type={row.position_type} />
-        <BestIdeaBadge rationale={row.rationale} />
-        <ChangeStatusBadge row={row} />
-      </div>
-      <div className={`cc-company-row ${directionClass}`}>
-        <span className="cc-company">{row.company_name ?? row.ticker}</span>
-        <span className="cc-ticker">{row.ticker}</span>
-      </div>
+      </header>
+      {hasAccent && (
+        <div className="cc-accent-row">
+          <ChangeStatusBadge row={row} />
+          <BestIdeaBadge rationale={row.rationale} />
+        </div>
+      )}
       <LivePriceRow live={live} />
       <div className="cc-footer">
         <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
-        {row.top5_appearances_90d >= 3 && (
-          <span className="cc-streak">★ {row.top5_appearances_90d} appearances 90d</span>
-        )}
       </div>
     </article>
   )
@@ -329,6 +382,7 @@ function Top5HighlightCard({ entry, positionByTicker, onOpen }) {
     })
   }
 
+  const directionClass = `direction-${positionType.toLowerCase()}`
   return (
     <article
       className={`call-card call-card-highlight border-${positionType.toLowerCase()}`}
@@ -342,14 +396,16 @@ function Top5HighlightCard({ entry, positionByTicker, onOpen }) {
         }
       }}
     >
-      <div className="top5-head-row">
-        <span className="top5-rank-circle">#{entry.rank}</span>
+      <header className="cc-head">
+        <div className={`cc-head-id ${directionClass}`}>
+          <div className="cc-ticker">{entry.ticker}</div>
+          {entry.company_name && <div className="cc-name">{entry.company_name}</div>}
+        </div>
         <PositionTypePill type={positionType} />
+      </header>
+      <div className="cc-accent-row">
+        <span className="top5-rank-circle">#{entry.rank}</span>
         <BestIdeaBadge rationale={entry.rationale} />
-      </div>
-      <div className="cc-company-row">
-        <span className="cc-company">{entry.company_name ?? entry.ticker}</span>
-        <span className="cc-ticker">{entry.ticker}</span>
       </div>
       {entry.rationale ? <Rationale text={entry.rationale} maxLines={5} /> : null}
     </article>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import {
   positionBarFor,
   rangePct,
@@ -221,13 +221,35 @@ function SetupBadge({ setup }) {
   return null
 }
 
+// Tracks the previous numeric live price via a ref so we can flash the
+// price-value tile green on an uptick or red on a downtick for 350ms.
+// Initial render and unchanged ticks don't flash.
+function useFlashOnChange(value) {
+  const prevRef = useRef(null)
+  const [flash, setFlash] = useState('')
+  useEffect(() => {
+    if (!Number.isFinite(value)) return
+    const prev = prevRef.current
+    prevRef.current = value
+    if (prev == null || !Number.isFinite(prev) || prev === value) return
+    setFlash(value > prev ? 'flash-up' : 'flash-down')
+    const id = setTimeout(() => setFlash(''), 350)
+    return () => clearTimeout(id)
+  }, [value])
+  return flash
+}
+
 function LivePriceBlock({ display }) {
+  const priceVal = display?.price
+  const flash = useFlashOnChange(
+    Number.isFinite(priceVal) ? priceVal : null
+  )
   if (!display || display.state === 'none') return null
   const cls = `price-block price-${display.state}`
   return (
     <div className={cls} aria-label={`Price ${display.timeLabel}`}>
       {display.state === 'live' && <span className="pulse-dot" aria-hidden="true" />}
-      <span className="price-value">{formatPrice(display.price)}</span>
+      <span className={`price-value ${flash}`}>{formatPrice(priceVal)}</span>
       <span className="price-sep">·</span>
       <span className="price-time">{display.timeLabel}</span>
     </div>
