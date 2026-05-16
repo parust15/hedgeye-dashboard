@@ -7,6 +7,7 @@ import {
   SHORT_SETUP_PCT,
 } from '../lib/range'
 import { formatNumber, formatPrice } from '../lib/format'
+import { useCountUp } from '../lib/useCountUp'
 import { VixBucketBadge } from './VixBucketPill'
 
 // Code-split the recharts-heavy chart so it isn't part of the initial
@@ -16,6 +17,14 @@ import { VixBucketBadge } from './VixBucketPill'
 const ExpandedChart = lazy(() =>
   import('./ExpandedChart').then((m) => ({ default: m.ExpandedChart }))
 )
+
+// Wraps useCountUp + a formatter so the JSX stays declarative. Null /
+// non-finite values render as em-dash via formatNumber/formatPrice
+// without animating.
+function CountUpNumber({ value, format = formatNumber }) {
+  const tweened = useCountUp(Number(value))
+  return <>{format(tweened)}</>
+}
 
 function trendClass(trend) {
   if (trend === 'BULLISH') return 'trend bullish'
@@ -216,8 +225,20 @@ function TrendChangeBadge({ change }) {
 }
 
 function SetupBadge({ setup }) {
-  if (setup === 'LONG') return <span className="setup setup-long">⚡ LONG SETUP</span>
-  if (setup === 'SHORT') return <span className="setup setup-short">🔻 SHORT SETUP</span>
+  if (setup === 'LONG') {
+    return (
+      <span className="setup setup-long">
+        <span className="setup-icon" aria-hidden="true">⚡</span> LONG SETUP
+      </span>
+    )
+  }
+  if (setup === 'SHORT') {
+    return (
+      <span className="setup setup-short">
+        <span className="setup-icon" aria-hidden="true">🔻</span> SHORT SETUP
+      </span>
+    )
+  }
   return null
 }
 
@@ -249,7 +270,9 @@ function LivePriceBlock({ display }) {
   return (
     <div className={cls} aria-label={`Price ${display.timeLabel}`}>
       {display.state === 'live' && <span className="pulse-dot" aria-hidden="true" />}
-      <span className={`price-value ${flash}`}>{formatPrice(priceVal)}</span>
+      <span className={`price-value ${flash}`}>
+        <CountUpNumber value={priceVal} format={formatPrice} />
+      </span>
       <span className="price-sep">·</span>
       <span className="price-time">{display.timeLabel}</span>
     </div>
@@ -287,6 +310,7 @@ export function SignalCard({
 
   const cardClasses = [
     'card',
+    `card-trend-${(row.trend ?? 'neutral').toLowerCase()}`,
     expanded ? 'expanded' : '',
     change ? 'flipped' : '',
     setup ? `has-setup setup-${setup.toLowerCase()}` : '',
@@ -332,15 +356,15 @@ export function SignalCard({
       <dl className="grid">
         <div>
           <dt>Buy</dt>
-          <dd className="buy">{formatNumber(row.buy_trade)}</dd>
+          <dd className="buy"><CountUpNumber value={row.buy_trade} /></dd>
         </div>
         <div>
           <dt>Sell</dt>
-          <dd className="sell">{formatNumber(row.sell_trade)}</dd>
+          <dd className="sell"><CountUpNumber value={row.sell_trade} /></dd>
         </div>
         <div>
           <dt>Prev Close</dt>
-          <dd>{formatNumber(row.prev_close)}</dd>
+          <dd><CountUpNumber value={row.prev_close} /></dd>
         </div>
         <div>
           <dt>Range</dt>
@@ -360,7 +384,7 @@ export function SignalCard({
           zone={zone}
         />
         <div className="posbar-labels">
-          <span className="posbar-end buy">{formatNumber(row.buy_trade)}</span>
+          <span className="posbar-end buy"><CountUpNumber value={row.buy_trade} /></span>
           {zoneLabel ? (
             <span className={`zone-tag zone-${zone === 'near-buy' ? 'buy' : 'sell'}`}>
               {zoneLabel}
@@ -368,7 +392,7 @@ export function SignalCard({
           ) : (
             <span />
           )}
-          <span className="posbar-end sell">{formatNumber(row.sell_trade)}</span>
+          <span className="posbar-end sell"><CountUpNumber value={row.sell_trade} /></span>
         </div>
       </div>
 

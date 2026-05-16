@@ -9,6 +9,8 @@ import { parseMacroBullets } from '../lib/macroBullets'
 import { PerformanceSection } from './PerformanceSection'
 import { CallAllTimeView } from './CallAllTimeView'
 import { TickerFilter } from './TickerFilter'
+import { StatusChip } from './StatusChip'
+import { useCountUp } from '../lib/useCountUp'
 import {
   canonicalSector,
   normalizeSectorKey,
@@ -151,9 +153,20 @@ function BestIdeaBadge({ rationale }) {
   return <span className="badge-best-idea">★ BEST IDEA</span>
 }
 
+// Same chrome as ChangeStatusBadge's NEW TODAY / FLIPPED pills — uses
+// .status-badge for shape/padding/font/border, with .status-rank as the
+// per-state tint variant. Text is the only thing that differs visually.
 function RankBadge({ rank }) {
   if (rank == null) return null
-  return <span className="rank-badge">#{rank} MOST ACTIONABLE</span>
+  return <span className="status-badge status-rank">#{rank} MOST ACTIONABLE</span>
+}
+
+// Tween the live price between updates so the value visibly settles
+// instead of snap-changing. Empties out to em-dash when target is not
+// finite — useCountUp handles that internally.
+function CallPriceCountUp({ value }) {
+  const tweened = useCountUp(Number(value))
+  return <>{formatPrice(tweened)}</>
 }
 
 // Inline transient flash class on .cc-price when the displayed live
@@ -195,7 +208,9 @@ function LivePriceRow({ live }) {
     <div className="cc-price-row">
       <div className="cc-price-cell">
         <div className="label">Price</div>
-        <span className={`cc-price ${flash}`}>{formatPrice(priceVal)}</span>
+        <span className={`cc-price ${flash}`}>
+          <CallPriceCountUp value={priceVal} />
+        </span>
       </div>
       {hasChange && (
         <div className="cc-change-cell">
@@ -274,56 +289,15 @@ function cardActivationProps(row, onOpen) {
   }
 }
 
-function Top5Card({ row, live, rrCrossover, onOpen }) {
+// Single Call card component. Renders every Call row identically — Top5
+// ranks and ADDED/FLIPPED status share the same accent-row slot, the
+// same footer, the same chrome. There is no longer a Top5Card variant;
+// rank is just one more piece of badge content rendered through the
+// shared status-badge pill.
+function PositionCard({ row, live, rrCrossover, onOpen, highlight = false }) {
   const cls = [
     'call-card',
-    'call-card-top5',
-    `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
-    row.change_status === 'ADDED' ? 'glow-added' : '',
-    row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-  const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
-  const hasRank = row.top5_rank != null
-  const isBest = isBestIdea(row.rationale)
-  const hasAccent = hasRank || isBest
-
-  return (
-    <article className={cls} {...cardActivationProps(row, onOpen)}>
-      <header className="cc-head">
-        <div className={`cc-head-id ${directionClass}`}>
-          <div className="cc-ticker">{row.ticker}</div>
-          {row.company_name && <div className="cc-name">{row.company_name}</div>}
-        </div>
-        <PositionTypePill type={row.position_type} />
-      </header>
-      {hasAccent && (
-        <div className="cc-accent-row">
-          <RankBadge rank={row.top5_rank} />
-          <BestIdeaBadge rationale={row.rationale} />
-        </div>
-      )}
-      <LivePriceRow live={live} />
-      {row.rationale ? (
-        <div className="cc-rationale-block">
-          <div className="label">Rationale</div>
-          <Rationale text={row.rationale} />
-        </div>
-      ) : null}
-      <div className="cc-footer">
-        <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
-        {row.consecutive_days > 1 && (
-          <span className="cc-streak">{row.consecutive_days} days</span>
-        )}
-      </div>
-    </article>
-  )
-}
-
-function PositionCard({ row, live, rrCrossover, onOpen }) {
-  const cls = [
-    'call-card',
+    highlight ? 'call-card-highlight' : '',
     `border-${(row.position_type ?? 'neutral').toLowerCase()}`,
     row.change_status === 'ADDED' ? 'glow-added' : '',
     row.change_status === 'FLIPPED' ? 'glow-flipped' : '',
@@ -332,8 +306,9 @@ function PositionCard({ row, live, rrCrossover, onOpen }) {
     .join(' ')
   const directionClass = `direction-${(row.position_type ?? 'neutral').toLowerCase()}`
   const hasChangeStatus = row.change_status === 'ADDED' || row.change_status === 'FLIPPED'
+  const hasRank = row.top5_rank != null
   const isBest = isBestIdea(row.rationale)
-  const hasAccent = hasChangeStatus || isBest
+  const hasAccent = hasChangeStatus || hasRank || isBest
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
@@ -347,6 +322,7 @@ function PositionCard({ row, live, rrCrossover, onOpen }) {
       {hasAccent && (
         <div className="cc-accent-row">
           <ChangeStatusBadge row={row} />
+          <RankBadge rank={row.top5_rank} />
           <BestIdeaBadge rationale={row.rationale} />
         </div>
       )}
@@ -360,61 +336,38 @@ function PositionCard({ row, live, rrCrossover, onOpen }) {
 
 // --- Top 5 highlight section (horizontal scroll above the main grid) ---
 
-// One Top 5 "highlight" card. Differs from Top5Card above in that it's
-// driven by the hedgeye_call_top5 table (rank + rationale only) — the
-// position_type for the direction pill comes from the positions data via
-// `positionByTicker` lookup.
-function Top5HighlightCard({ entry, positionByTicker, onOpen }) {
+// Thin shim: assembles a row from the hedgeye_call_top5 entry +
+// today's position data, then renders PositionCard exactly like the
+// main grid. `highlight={true}` adds the .call-card-highlight class
+// for the fixed-width + scroll-snap sizing the strip needs — every
+// other piece of chrome (header, badges, price block, conviction
+// bar) is identical to the in-grid card.
+function Top5HighlightCard({ entry, positionByTicker, live, rrCrossover, onOpen }) {
   const position = positionByTicker.get(entry.ticker)
-  const positionType = position?.position_type ?? 'NEUTRAL'
-
-  function handleOpen() {
-    // Prefer the full position record (richer header for the modal) but
-    // fall back to a synthetic record if the ticker isn't in today's
-    // positions for any reason.
-    onOpen?.(position ?? {
-      ticker: entry.ticker,
-      company_name: entry.company_name,
-      position_type: positionType,
-      rationale: entry.rationale,
-      signal_date: position?.signal_date ?? null,
-      conviction_score: position?.conviction_score ?? 0,
-    })
-  }
-
-  const directionClass = `direction-${positionType.toLowerCase()}`
+  const row = position
+    ? { ...position, top5_rank: entry.rank }
+    : {
+        ticker: entry.ticker,
+        company_name: entry.company_name,
+        position_type: 'NEUTRAL',
+        rationale: entry.rationale,
+        top5_rank: entry.rank,
+        conviction_score: 0,
+      }
   return (
-    <article
-      className={`call-card call-card-highlight border-${positionType.toLowerCase()}`}
-      role="button"
-      tabIndex={0}
-      onClick={handleOpen}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          handleOpen()
-        }
-      }}
-    >
-      <header className="cc-head">
-        <div className={`cc-head-id ${directionClass}`}>
-          <div className="cc-ticker">{entry.ticker}</div>
-          {entry.company_name && <div className="cc-name">{entry.company_name}</div>}
-        </div>
-        <PositionTypePill type={positionType} />
-      </header>
-      <div className="cc-accent-row">
-        <span className="top5-rank-circle">#{entry.rank}</span>
-        <BestIdeaBadge rationale={entry.rationale} />
-      </div>
-      {entry.rationale ? <Rationale text={entry.rationale} maxLines={5} /> : null}
-    </article>
+    <PositionCard
+      row={row}
+      live={live}
+      rrCrossover={rrCrossover}
+      onOpen={onOpen}
+      highlight={true}
+    />
   )
 }
 
 // Collapsible TOP 5 MOST ACTIONABLE section. Empty top5 → quiet message
 // (instead of an empty section). Open by default.
-function Top5Section({ top5, positionByTicker, onOpen }) {
+function Top5Section({ top5, positionByTicker, livePrices, rrTickers, onOpen }) {
   const [open, setOpen] = useState(true)
   const isEmpty = top5.length === 0
 
@@ -439,6 +392,8 @@ function Top5Section({ top5, positionByTicker, onOpen }) {
                 key={`${entry.rank}-${entry.ticker}`}
                 entry={entry}
                 positionByTicker={positionByTicker}
+                live={livePrices?.get(entry.ticker)}
+                rrCrossover={rrTickers?.has(entry.ticker)}
                 onOpen={onOpen}
               />
             ))}
@@ -763,10 +718,18 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           <p className="call-subtitle">HEDGEYE DAILY POSITIONS</p>
         </div>
         <div className="call-header-right">
-          {callReceivedEt && (
-            <div className="call-meta">Call data as of {callReceivedEt}</div>
-          )}
-          <div className="call-date">{formatSignalDate(signalDate)}</div>
+          <div className="status-row">
+            {signalDate && (
+              <StatusChip label="Signal date" value={formatSignalDate(signalDate)} />
+            )}
+            {callReceivedEt && (
+              <StatusChip
+                label="Call data"
+                value={callReceivedEt}
+                tone={isToday ? 'live' : 'stale'}
+              />
+            )}
+          </div>
         </div>
       </header>
 
@@ -900,7 +863,13 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
         })}
       </nav>
 
-      <Top5Section top5={top5} positionByTicker={positionByTicker} onOpen={openModal} />
+      <Top5Section
+        top5={top5}
+        positionByTicker={positionByTicker}
+        livePrices={livePrices}
+        rrTickers={rrTickers}
+        onOpen={openModal}
+      />
       <MacroCommentarySection commentary={macroCommentary} />
 
       {visibleCount === 0 ? (
@@ -912,15 +881,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           {visibleCards.map((row) => {
             const live = livePrices.get(row.ticker)
             const rrCrossover = rrTickers.has(row.ticker)
-            return row.top5_rank != null ? (
-              <Top5Card
-                key={row.ticker}
-                row={row}
-                live={live}
-                rrCrossover={rrCrossover}
-                onOpen={openModal}
-              />
-            ) : (
+            return (
               <PositionCard
                 key={row.ticker}
                 row={row}

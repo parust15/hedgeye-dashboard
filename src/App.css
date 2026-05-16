@@ -518,19 +518,81 @@
 }
 
 .card {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  position: relative;
+  /* Glass base — same recipe as .call-card. State-tint corner radial,
+     top-light gloss, then the elevation base color at 65% alpha. */
+  background:
+    radial-gradient(
+      ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left-width: 3px;
   border-radius: var(--radius-card);
   padding: 12px 14px;
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Every RR card gets the flipped treatment: -2px parallax shelf and
+     a 4s ambient breathing glow tinted by --card-tint. */
+  --shelf-y: -2px;
+  animation: card-breathe 4s ease-in-out infinite;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   cursor: pointer;
   outline: none;
 }
 
-.card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+/* Soft state-tinted edge halo. Toned down so it underpaints the
+   rotating ring on ::before rather than competing with it — the
+   ring's 8s sweep already carries most of the motion energy. */
+@keyframes card-breathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(var(--card-tint), 0.10));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(var(--card-tint), 0.20));
+  }
+}
+
+/* Every RR card carries the larger 24px price tier that flipped cards
+   used to monopolise. */
+.card .price-value {
+  font-size: 24px;
+}
+
+/* Internal children with their own top-margins (set when .card was a
+   block element) would compose with the new flex gap and stack 22px
+   apart instead of 12. Zero them out so gap is the single source of
+   truth — same rhythm as .call-card. */
+.card > .price-block,
+.card > .badge-row,
+.card > .grid,
+.card > .posbar-section,
+.card > .btn-view-call,
+.card > .chart-panel {
+  margin-top: 0;
+}
+
+/* Selector bumped to .card[role='button']:hover (same specificity as
+   .call-card[role='button']:hover) so the per-trend .card.card-trend-*
+   border-left-color rules wash the same way Call cards do on hover. */
+.card[role='button']:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(calc(var(--shelf-y) - 4px));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .card:focus-visible {
@@ -542,17 +604,14 @@
   grid-column: 1 / -1;
 }
 
-.card.flipped {
-  border-color: var(--accent);
-}
-
-.card.has-setup.setup-long {
-  border-color: rgba(34, 197, 94, 0.6);
-}
-
-.card.has-setup.setup-short {
-  border-color: rgba(239, 68, 68, 0.6);
-}
+/* The flipped / setup state used to set the WHOLE card border to an
+   accent or state colour. With the .call-card-mirrored design, the
+   state signal lives in three places instead: (a) the 3px coloured
+   left stripe driven by .card-trend-*, (b) the rotating conic ring on
+   ::before (added by the cinematic-moments pass) for .card.flipped,
+   (c) the SetupBadge / TrendChangeBadge pills. The full-border tint
+   would now triple-paint the signal and compete with the stripe, so
+   it's been removed. */
 
 .badge-row {
   display: flex;
@@ -570,38 +629,88 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-badge);
   text-transform: uppercase;
+  border: none;
+  /* Soft inner gloss + base shadow shared across all variants — colour
+     comes from the per-state .flip-* / .setup-* rules below. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .flip-bull {
-  background: var(--bull-bg);
-  color: var(--bull);
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
+  color: #042417;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(34, 197, 94, 0.35);
 }
 
 .flip-bear {
-  background: var(--bear-bg);
-  color: var(--bear);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
+  color: #2a0707;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(239, 68, 68, 0.35);
 }
 
 .flip-neutral {
-  background: var(--neutral-bg);
-  color: var(--neutral);
-  border: 1px solid rgba(156, 163, 175, 0.4);
+  background: linear-gradient(180deg, #9ca3af 0%, #d1d5db 100%);
+  color: #1f2024;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(156, 163, 175, 0.35);
 }
 
 .setup.setup-long {
-  background: rgba(34, 197, 94, 0.18);
-  color: var(--bull);
-  border: 1px solid rgba(34, 197, 94, 0.55);
+  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
+  color: #042417;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(34, 197, 94, 0.45),
+    0 0 14px rgba(34, 197, 94, 0.25);
 }
 
 .setup.setup-short {
-  background: rgba(239, 68, 68, 0.18);
-  color: var(--bear);
-  border: 1px solid rgba(239, 68, 68, 0.55);
+  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
+  color: #2a0707;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(239, 68, 68, 0.45),
+    0 0 14px rgba(239, 68, 68, 0.25);
+}
+
+/* Lightning / down-triangle icon on setup badges — brief pulse on
+   mount, then a slow steady-state to draw the eye to actionable
+   setups. The icon span is wrapped in .setup-icon by SetupBadge. */
+@keyframes setup-icon-pulse {
+  0% { transform: scale(0.6); opacity: 0; }
+  40% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.setup-icon {
+  display: inline-block;
+  animation: setup-icon-pulse 600ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transform-origin: center;
+}
+
+/* Card-hover cascade — pills scale up gently + glow when their parent
+   card is hovered. Subtle, never showy. */
+.card:hover .trend,
+.card:hover .flip,
+.card:hover .setup,
+.call-card[role='button']:hover .position-pill {
+  transform: scale(1.05);
 }
 
 .posbar-section {
@@ -619,6 +728,23 @@
 .posbar {
   position: relative;
   height: 8px;
+}
+
+/* Subtle tick marks at 25/50/75% — provide a sense of position even
+   when the marker is absent (no live data) or hidden by zoom. The
+   50% tick is slightly brighter than the quarters so the eye reads
+   "middle" instantly. */
+.posbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, transparent calc(25% - 0.5px), rgba(255, 255, 255, 0.08) calc(25% - 0.5px), rgba(255, 255, 255, 0.08) calc(25% + 0.5px), transparent calc(25% + 0.5px)),
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(255, 255, 255, 0.12) calc(50% - 0.5px), rgba(255, 255, 255, 0.12) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(90deg, transparent calc(75% - 0.5px), rgba(255, 255, 255, 0.08) calc(75% - 0.5px), rgba(255, 255, 255, 0.08) calc(75% + 0.5px), transparent calc(75% + 0.5px));
+  z-index: 1;
 }
 
 /* Static three-zone gradient: long-setup band (0-20%), neutral (20-80%),
@@ -698,10 +824,71 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Pulse during live state only. The keyframes are shared with the header
-   price-block pulse-dot — same 2s opacity cycle, same visual rhythm. */
+/* Pulse during live state. Three flavours — mid zone gets a slow,
+   neutral glow ring; near-buy and near-sell pulse faster and tinted
+   so the eye is drawn to actionable zones. The marker dot itself
+   stays opaque; the glow ring is rendered via animated box-shadow. */
+@keyframes marker-glow-mid {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px var(--border-strong),
+      0 0 0 4px rgba(255, 255, 255, 0.05),
+      0 0 12px rgba(255, 255, 255, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--border-strong),
+      0 0 0 8px rgba(255, 255, 255, 0.10),
+      0 0 20px rgba(255, 255, 255, 0.25);
+  }
+}
+
+@keyframes marker-glow-buy {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(34, 197, 94, 0.4),
+      0 0 0 4px rgba(34, 197, 94, 0.15),
+      0 0 16px rgba(34, 197, 94, 0.40);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(34, 197, 94, 0.7),
+      0 0 0 10px rgba(34, 197, 94, 0.25),
+      0 0 28px rgba(34, 197, 94, 0.65);
+  }
+}
+
+@keyframes marker-glow-sell {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(239, 68, 68, 0.4),
+      0 0 0 4px rgba(239, 68, 68, 0.15),
+      0 0 16px rgba(239, 68, 68, 0.40);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(239, 68, 68, 0.7),
+      0 0 0 10px rgba(239, 68, 68, 0.25),
+      0 0 28px rgba(239, 68, 68, 0.65);
+  }
+}
+
+.posbar.mid .posbar-marker.live-pulse {
+  animation: marker-glow-mid 2s ease-in-out infinite;
+}
+
+.posbar.near-buy .posbar-marker.live-pulse {
+  animation: marker-glow-buy 1.1s ease-in-out infinite;
+}
+
+.posbar.near-sell .posbar-marker.live-pulse {
+  animation: marker-glow-sell 1.1s ease-in-out infinite;
+}
+
+/* Fallback when no zone class is present yet (mounting frame) — keeps
+   the dot visually consistent so it doesn't flicker on first paint. */
 .posbar-marker.live-pulse {
-  animation: price-pulse 2s ease-in-out infinite;
+  animation: marker-glow-mid 2s ease-in-out infinite;
 }
 
 .posbar-labels {
@@ -918,19 +1105,35 @@
   flex-shrink: 0;
 }
 
+.trend {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .trend.bullish {
-  background: var(--bull-bg);
-  color: var(--bull);
+  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
+  color: #042417;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(34, 197, 94, 0.35);
 }
 
 .trend.bearish {
-  background: var(--bear-bg);
-  color: var(--bear);
+  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
+  color: #2a0707;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(239, 68, 68, 0.35);
 }
 
 .trend.neutral {
-  background: var(--neutral-bg);
-  color: var(--neutral);
+  background: linear-gradient(180deg, #9ca3af 0%, #d1d5db 100%);
+  color: #1f2024;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(156, 163, 175, 0.35);
 }
 
 .grid {
@@ -1249,15 +1452,33 @@
 /* === Card === */
 .call-card {
   position: relative;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  /* Glass base — same recipe as .card. The 3px direction-coloured
+     left border stays on top of the glass so the state signal still
+     reads at a glance. */
+  background:
+    radial-gradient(
+      ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
   border-radius: var(--radius-card);
   padding: 12px 14px;
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .call-card.border-long { border-left-color: var(--bull); }
@@ -1273,10 +1494,10 @@
   animation: breathe-amber 3.5s ease-in-out infinite;
 }
 
-/* Top 5 cards get a touch more vertical breathing room for the rationale. */
-.call-card-top5 {
-  gap: 12px;
-}
+/* .call-card-top5 used to override .call-card's gap to 12px, but
+   .call-card itself is already at 12px since the rhythm-unification
+   pass, so the override is dead. Rule removed; Top5 and regular
+   Position cards now use the identical spacing rhythm. */
 
 /* New header anatomy — mirrors RR's .card-head / .card-id / .ticker / .name
    pattern. Big mono ticker top-left, position pill top-right, muted
@@ -1310,9 +1531,36 @@
   text-transform: uppercase;
 }
 
-.position-long { background: rgba(34, 197, 94, 0.18); color: var(--bull); }
-.position-short { background: rgba(239, 68, 68, 0.18); color: var(--bear); }
-.position-neutral { background: rgba(156, 163, 175, 0.18); color: var(--neutral); }
+.position-pill {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.position-long {
+  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
+  color: #042417;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(34, 197, 94, 0.35);
+}
+
+.position-short {
+  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
+  color: #2a0707;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(239, 68, 68, 0.35);
+}
+
+.position-neutral {
+  background: linear-gradient(180deg, #9ca3af 0%, #d1d5db 100%);
+  color: #1f2024;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1.5px rgba(156, 163, 175, 0.35);
+}
 
 .status-badge {
   font-size: 10px;
@@ -1325,6 +1573,10 @@
 
 .status-added { background: rgba(34, 197, 94, 0.18); color: var(--live); border: 1px solid rgba(34, 197, 94, 0.4); }
 .status-flipped { background: rgba(245, 158, 11, 0.18); color: var(--amber-light); border: 1px solid rgba(245, 158, 11, 0.4); }
+/* Rank pill — neutral tint variant. Same shape / padding / font as the
+   NEW TODAY and FLIPPED pills (inherited from .status-badge above), so
+   the rank reads as just another status pill, not a separate visual. */
+.status-rank { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); border: 1px solid rgba(255, 255, 255, 0.12); }
 
 /* "★ BEST IDEA" — Hedgeye's highest-conviction flag inferred from rationale. */
 .badge-best-idea {
@@ -1357,16 +1609,9 @@
   color: var(--neutral);
 }
 
-.rank-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 3px 8px;
-  border-radius: var(--radius-badge);
-  background: rgba(245, 158, 11, 0.18);
-  color: var(--amber-light);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-}
+/* .rank-badge rule removed — RankBadge now uses .status-badge.status-rank,
+   sharing the exact same chrome as NEW TODAY / FLIPPED pills. The neutral
+   tint variant lives next to .status-added / .status-flipped below. */
 
 /* Big mono ticker — mirrors RR's .ticker style. Sits top-left of the
    card head. Color overridden by .cc-head-id.direction-X above. */
@@ -1476,12 +1721,9 @@
   margin-top: 2px;
 }
 
-.cc-streak {
-  font-size: 11px;
-  color: var(--amber-light);
-  font-weight: 600;
-  flex-shrink: 0;
-}
+/* .cc-streak rule deleted — the "X days" streak only ever rendered
+   inside the now-deleted Top5Card. PositionCard's footer is just the
+   conviction bar. */
 
 /* Conviction bar: 4px tall amber fill on a dark track, score to the right. */
 .conviction-row {
@@ -1502,7 +1744,10 @@
 
 .conviction-bar-fill {
   height: 100%;
-  background: var(--amber-strong);
+  /* State-color fill so the bar reads as part of the card's chrome
+     instead of a separate amber strip — a high-conviction LONG card
+     gets a green fill, a high-conviction SHORT card gets red, etc. */
+  background: rgba(var(--card-tint), 0.85);
   border-radius: 2px;
 }
 
@@ -1622,28 +1867,12 @@
   cursor: pointer;
 }
 
-.top5-head-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+/* .top5-head-row removed — Top5HighlightCard now uses the shared
+   .cc-head + .cc-accent-row anatomy, same as every other Call card. */
 
-/* Rank circle: 22px filled amber pill with black digits. */
-.top5-rank-circle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--amber-strong);
-  color: #000;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--mono);
-  flex-shrink: 0;
-}
+/* .top5-rank-circle removed — Top5HighlightCard now renders through
+   PositionCard, which uses the standard .status-badge.status-rank
+   pill for the rank indicator (same chrome as NEW TODAY / FLIPPED). */
 
 /* === MACRO COMMENTARY === */
 
@@ -1694,9 +1923,11 @@
 }
 
 .call-card[role='button']:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .call-card[role='button']:focus-visible {
@@ -2152,17 +2383,32 @@
 /* === All Time card (compact: ~100px) === */
 
 .all-time-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  background:
+    radial-gradient(
+      ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
   border-radius: var(--radius-card);
   padding: 12px 14px;
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   gap: 8px;
   cursor: pointer;
   outline: none;
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   min-height: 100px;
 }
 
@@ -2171,9 +2417,11 @@
 .all-time-card.border-neutral { border-left-color: var(--neutral); }
 
 .all-time-card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .all-time-card:focus-visible {
@@ -2610,12 +2858,10 @@
 }
 
 /* RATIONALE label sits above the clamped rationale block on Top5 cards. */
-.cc-rationale-block {
-  display: flex;
-  flex-direction: column;
-}
+/* .cc-rationale-block and .cc-streak rules removed — the rationale label
+   wrapper and the "X days" streak only ever lived on the deleted Top5Card
+   variant. PositionCard's footer now contains only ConvictionBar. */
 
-/* Streak indicator right-aligned in the footer. */
 .cc-footer {
   display: flex;
   align-items: center;
@@ -2627,11 +2873,6 @@
   min-width: 0;
 }
 
-.cc-streak {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
 /* === PART B — Ambient background ===================================== */
 
 .ambient {
@@ -2641,6 +2882,9 @@
   pointer-events: none;
   background: var(--bg);
   overflow: hidden;
+  /* 4s sine-wave brightness ±2% — imperceptible until you stop
+     looking. Filter cascades to the gradient pseudos beneath. */
+  animation: ambient-breathe 4s ease-in-out infinite;
 }
 
 .ambient::before,
@@ -2656,14 +2900,27 @@
   background:
     radial-gradient(ellipse 60% 50% at 20% 30%, rgba(60, 100, 200, 0.18), transparent 60%),
     radial-gradient(ellipse 50% 60% at 80% 70%, rgba(140, 80, 200, 0.14), transparent 60%);
-  animation: ambient-a 38s ease-in-out infinite alternate;
+  animation: ambient-a 60s ease-in-out infinite alternate;
 }
 
 .ambient::after {
   background:
     radial-gradient(ellipse 50% 50% at 70% 20%, rgba(40, 180, 160, 0.12), transparent 60%),
     radial-gradient(ellipse 40% 40% at 30% 80%, rgba(245, 158, 11, 0.10), transparent 60%);
-  animation: ambient-b 52s ease-in-out infinite alternate;
+  animation: ambient-b 72s ease-in-out infinite alternate;
+}
+
+/* Grainy depth — fractal-noise tile inlined as SVG, mix-blend-mode
+   overlay so it integrates with whatever gradient is underneath
+   rather than reading as a flat film. ~600 bytes of data URI. */
+.ambient-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 240px 240px;
 }
 
 @keyframes ambient-a {
@@ -2678,9 +2935,45 @@
   100% { transform: translate(-6%, 8%) rotate(20deg); }
 }
 
+@keyframes ambient-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.02); }
+}
+
 body,
 #root {
   background: transparent !important;
+}
+
+/* Reduce-motion: freeze everything ambient + the per-card orbit +
+   the hover sheen + the chart-tooltip transitions. Cards still tint
+   and respond to hover via instant border-color/box-shadow changes;
+   only the long-running idle loops stop. */
+@media (prefers-reduced-motion: reduce) {
+  .ambient,
+  .ambient::before,
+  .ambient::after,
+  .ambient-noise,
+  .card::before,
+  .call-card::before,
+  .all-time-card::before,
+  .call-card.glow-added,
+  .call-card.glow-flipped,
+  .conviction-bar-fill::before,
+  .pulse-dot,
+  .pulse-dot-svg {
+    animation: none !important;
+  }
+  .card::after,
+  .call-card[role='button']::after,
+  .all-time-card::after {
+    transition: none !important;
+  }
+  .cards > *,
+  .call-grid > *,
+  .all-time-grid > * {
+    animation: none !important;
+  }
 }
 
 /* === PART C1 — Card hover sheen ====================================== */
@@ -2840,10 +3133,27 @@ body,
   isolation: isolate;
 }
 
-/* State-based tints — Risk Ranges */
-.card.flipped { --card-tint: 110, 168, 255; }
+/* State-based tints — Risk Ranges. Per-trend rules paint the same
+   green / red / neutral tint Call cards use via .border-long /
+   .border-short / .border-neutral. The trend tint also drives the
+   3px left stripe via .card.card-trend-* below. Setup overrides the
+   trend tint when both are present (LONG SETUP on a BEARISH trend
+   prioritises the actionable green). FLIPPED keeps the destination
+   trend tint so the conic ring colour matches "where this is going",
+   not "how it flipped". */
+.card.card-trend-bullish { --card-tint: 34, 197, 94; }
+.card.card-trend-bearish { --card-tint: 239, 68, 68; }
+.card.card-trend-neutral { --card-tint: 156, 163, 175; }
 .card.has-setup.setup-long { --card-tint: 34, 197, 94; }
 .card.has-setup.setup-short { --card-tint: 239, 68, 68; }
+
+/* Per-trend 3px left-edge stripe — matches .call-card.border-long /
+   .border-short / .border-neutral exactly. No top stripe (Call cards
+   don't have one); the rotating conic ring on ::before paints the
+   top edge dynamically. */
+.card.card-trend-bullish { border-left-color: var(--bull); }
+.card.card-trend-bearish { border-left-color: var(--bear); }
+.card.card-trend-neutral { border-left-color: var(--neutral); }
 
 /* State-based tints — The Call */
 .call-card.border-long,
@@ -2878,6 +3188,34 @@ body,
 
 @keyframes card-orbit {
   to { transform: rotate(360deg); }
+}
+
+/* RR cards use the EXACT recipe Call's .glow-added / .glow-flipped
+   cards use: an 8-second rotating conic-gradient clipped to a 2px
+   ring via mask-composite. The state-tinted arcs sweep around the
+   edges and read as diagonal ribbons at the corners — the visual
+   the user is asking RR to share with Call. */
+.card::before {
+  padding: 2px;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(var(--card-tint), 0.85) 60deg,
+      transparent 120deg,
+      transparent 240deg,
+      rgba(var(--card-tint), 0.55) 300deg,
+      transparent 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#fff, #fff) content-box,
+    linear-gradient(#fff, #fff);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff, #fff) content-box,
+    linear-gradient(#fff, #fff);
+  mask-composite: exclude;
+  animation: card-orbit 8s linear infinite;
 }
 
 /* Keep content above the ambient layer; hover sheen (::after) on top. */
@@ -2916,3 +3254,192 @@ body,
 .cards > :nth-child(6n)::before,
 .call-grid > :nth-child(6n)::before,
 .all-time-grid > :nth-child(6n)::before { animation-delay: -40s; }
+
+/* === System-state chrome ============================================
+   One construction reused for every metadata pill on the dashboard:
+   outline + status dot + weight-hierarchical label/value. Mirrors the
+   VIX header pill and MarketStatePill so the page reads as one chrome
+   language rather than ad-hoc text. */
+
+.status-row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: var(--text);
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.status-chip:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.status-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.status-chip-label {
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.status-chip-value {
+  color: var(--text-strong);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tones — only the dot color differentiates; the rest of the chrome
+   stays uniform so the row reads as a single object. */
+.status-chip-live .status-chip-dot {
+  background: var(--live);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+
+.status-chip-stale .status-chip-dot {
+  background: var(--amber-light);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+}
+
+.status-chip-closed .status-chip-dot {
+  background: var(--text-dim);
+  opacity: 0.6;
+}
+
+.status-chip-idle .status-chip-dot {
+  background: var(--text-dim);
+}
+
+/* === B2 — state-corner tint position ================================
+   Default corner-radial sits top-left for long/bullish/flipped/neutral
+   cards. Short/bearish flips it top-right so the eye reads the warning
+   color from the same side it would in an order book. */
+.card.has-setup.setup-short,
+.card.card-trend-bearish,
+.call-card.border-short,
+.all-time-card.border-short {
+  --tint-corner-x: 100%;
+}
+
+/* ====================================================================
+   B3 — Cinematic moments: flipped cards + Top 5 ranking
+   ==================================================================== */
+
+/* Parallax shelf — flipped / new-today cards sit 2px higher than their
+   peers via a CSS variable that hover transforms can compose against. */
+.card,
+.call-card,
+.all-time-card {
+  --shelf-y: 0px;
+  transform: translateY(var(--shelf-y));
+}
+
+/* .card already has --shelf-y: -2px in its base rule (every RR card now
+   uses the flipped treatment). Only the call-card glow states still need
+   the shelf bump here. */
+.call-card.glow-added,
+.call-card.glow-flipped {
+  --shelf-y: -2px;
+}
+
+/* Hover composes additively with the shelf so flipped cards lift even
+   higher when targeted — preserves the parallax relationship. */
+.card:hover,
+.call-card[role='button']:hover,
+.all-time-card:hover {
+  transform: translateY(calc(var(--shelf-y) - 4px));
+}
+
+/* Animated conic-gradient ring — still used by Call's ADDED / FLIPPED
+   glow cards. The RR .card.flipped variant was removed: every RR card
+   now uses the body-ribbons + top-stripe + breathing treatment via
+   the base .card rule, and flipped vs non-flipped is signaled solely
+   by the FLIPPED pill on the JSX side. */
+.call-card.glow-added::before,
+.call-card.glow-flipped::before {
+  padding: 2px;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(var(--card-tint), 0.85) 60deg,
+      transparent 120deg,
+      transparent 240deg,
+      rgba(var(--card-tint), 0.55) 300deg,
+      transparent 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#fff, #fff) content-box,
+    linear-gradient(#fff, #fff);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff, #fff) content-box,
+    linear-gradient(#fff, #fff);
+  mask-composite: exclude;
+  animation: card-orbit 8s linear infinite;
+}
+
+/* Larger price numeral on Call's ADDED / FLIPPED cards. The RR
+   .card.flipped variant was removed — every RR card already shows
+   the larger 24px price via the .card .price-value rule near the
+   top of the stylesheet. */
+.call-card.glow-added .cc-price,
+.call-card.glow-flipped .cc-price {
+  font-size: 24px;
+}
+
+/* === Pill mount animation — scale-and-glow flash on first render ===
+   .flip = RR trend-flip badge (FLIPPED BULLISH etc.)
+   .status-badge = Call panel ADDED / FLIPPED status pill (NEW TODAY etc.)
+   Glow uses drop-shadow so it doesn't fight the static box-shadow that
+   gives each pill its outer ring. */
+@keyframes pill-mount-scale {
+  0% { transform: scale(0.9); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pill-mount-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  40% { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.55)); }
+}
+
+.flip,
+.status-badge {
+  animation:
+    pill-mount-scale 400ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards,
+    pill-mount-glow 400ms ease-out backwards;
+}
+
+/* === Top 5 rank circle treatment ================================== */
+
+/* All .top5-rank-circle rules (base + [data-rank="1..5"] variants) and
+   the .call-card-highlight[data-rank="1"] shelf are gone — every Top5
+   card now renders through PositionCard, so rank is a single
+   .status-badge.status-rank pill, no separate circle, no per-rank
+   luminance dimming, no spotlight shelf. */

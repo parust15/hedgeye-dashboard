@@ -25,7 +25,7 @@
   --amber-light: #fbbf24;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --mono: 'Geist Mono Variable', ui-monospace, Consolas, monospace;
 
   font: 15px/1.45 var(--sans);
   color: var(--text);
@@ -33,6 +33,10 @@
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Tabular figures + Geist Mono stylistic set 1 (single-storey g/a, etc.).
+     'tnum' applies to any font that supports it (sans labels with inline
+     numbers benefit too); 'ss01' is harmless on fonts that don't define it. */
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
 }
 
 * {

@@ -17,6 +17,7 @@ import {
 import { SignalCard } from './SignalCard'
 import { TickerFilter } from './TickerFilter'
 import { MarketStatePill } from './MarketStatePill'
+import { StatusChip } from './StatusChip'
 
 const TICKER_STORAGE_KEY = 'dashboard.selectedTickers'
 const TREND_FILTER_KEY = 'dashboard.trendFilter'
@@ -302,12 +303,23 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
       <header className="topbar">
         <div className="topbar-left">
           <h1>Hedgeye Risk Ranges</h1>
-          <p className="sub">
-            {signalDate ? `Signal date: ${signalDate}` : 'Latest signals'} ·{' '}
-            {status === 'ready' ? `${rows.length} tickers` : status}
-            {status === 'ready' && Object.keys(changes).length > 0 ? ` · ${Object.keys(changes).length} flipped` : ''}
-            {updatedLabel ? ` · Updated ${updatedLabel}` : ''}
-          </p>
+          <div className="status-row">
+            {signalDate && <StatusChip label="Signal date" value={signalDate} />}
+            {status === 'ready' && (
+              <StatusChip label="Tickers" value={rows.length} dot={false} />
+            )}
+            {status === 'ready' && Object.keys(changes).length > 0 && (
+              <StatusChip
+                label="Flipped"
+                value={Object.keys(changes).length}
+                tone="live"
+              />
+            )}
+            {updatedLabel && (
+              <StatusChip label="Updated" value={updatedLabel} tone="live" />
+            )}
+            {status !== 'ready' && <StatusChip value={status} dot={false} />}
+          </div>
         </div>
         <MarketStatePill market={market} />
       </header>
