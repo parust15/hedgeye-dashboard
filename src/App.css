@@ -531,6 +531,7 @@
     rgba(20, 23, 31, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
+  border-left-color: rgb(var(--card-tint));
   border-radius: var(--radius-card);
   padding: 12px 14px;
   backdrop-filter: blur(20px) saturate(120%);
@@ -1452,9 +1453,10 @@
 /* === Card === */
 .call-card {
   position: relative;
-  /* Glass base — same recipe as .card. The 3px direction-coloured
-     left border stays on top of the glass so the state signal still
-     reads at a glance. */
+  /* Glass base — same recipe as .card. The 3px state-coloured left
+     stripe is fed by --card-tint so the state signal lives in ONE
+     place: change the tint variable, the stripe and the ribbons
+     update together. */
   background:
     radial-gradient(
       ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
@@ -1465,6 +1467,7 @@
     rgba(20, 23, 31, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
+  border-left-color: rgb(var(--card-tint));
   border-radius: var(--radius-card);
   padding: 12px 14px;
   backdrop-filter: blur(20px) saturate(120%);
@@ -1481,17 +1484,19 @@
     box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.call-card.border-long { border-left-color: var(--bull); }
-.call-card.border-short { border-left-color: var(--bear); }
-.call-card.border-neutral { border-left-color: var(--neutral); }
+/* .call-card.border-{long|short|neutral} border-left-color rules
+   removed — the base .call-card rule now reads
+   border-left-color: rgb(var(--card-tint)). State modifier classes
+   only set --card-tint (below); they do not declare any geometry. */
 
-/* ADDED / FLIPPED glow — slow breathing pulse instead of a flat ring,
-   so the eye is drawn to brand-new or flipped positions in a sector. */
-.call-card.glow-added {
-  animation: breathe-green 3.5s ease-in-out infinite;
-}
+/* ADDED / FLIPPED glow — state-tinted breathing halo. Both modifier
+   classes run the same keyframe; --card-tint carries the colour, so
+   a SHORT card with glow-added breathes red, a LONG card with
+   glow-flipped breathes green, etc. The eye is drawn to brand-new or
+   flipped positions without recoloring the state signal. */
+.call-card.glow-added,
 .call-card.glow-flipped {
-  animation: breathe-amber 3.5s ease-in-out infinite;
+  animation: breathe-tint 3.5s ease-in-out infinite;
 }
 
 /* .call-card-top5 used to override .call-card's gap to 12px, but
@@ -2393,6 +2398,7 @@
     rgba(20, 23, 31, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
+  border-left-color: rgb(var(--card-tint));
   border-radius: var(--radius-card);
   padding: 12px 14px;
   backdrop-filter: blur(20px) saturate(120%);
@@ -2412,9 +2418,9 @@
   min-height: 100px;
 }
 
-.all-time-card.border-long { border-left-color: var(--bull); }
-.all-time-card.border-short { border-left-color: var(--bear); }
-.all-time-card.border-neutral { border-left-color: var(--neutral); }
+/* .all-time-card.border-{long|short|neutral} border-left-color rules
+   removed — state modifier only sets --card-tint, base rule reads
+   border-left-color: rgb(var(--card-tint)). */
 
 .all-time-card:hover {
   border-color: rgba(255, 255, 255, 0.14);
@@ -3043,23 +3049,22 @@ body,
 .cards > :nth-child(20), .call-grid > :nth-child(20), .all-time-grid > :nth-child(20) { animation-delay: 600ms; }
 .cards > :nth-child(n+21), .call-grid > :nth-child(n+21), .all-time-grid > :nth-child(n+21) { animation-delay: 600ms; }
 
-/* === PART C3 — Breathing glow on added/flipped cards ================== */
-
-@keyframes breathe-green {
+/* === Breathing halo (glow modifier classes) ===========================
+   ONE keyframe, state-tinted. glow-added and glow-flipped both run the
+   same breathing magnitude — they used to run two separate keyframes
+   (one green, one amber) which inverted the state colour on SHORT or
+   BEARISH cards. Now both glow modifier classes pulse a state-tinted
+   halo via --card-tint, identical magnitude. */
+@keyframes breathe-tint {
   0%, 100% {
-    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3), 0 0 12px rgba(34, 197, 94, 0.15);
+    box-shadow:
+      0 0 0 1px rgba(var(--card-tint), 0.30),
+      0 0 12px rgba(var(--card-tint), 0.15);
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.55), 0 0 28px rgba(34, 197, 94, 0.35);
-  }
-}
-
-@keyframes breathe-amber {
-  0%, 100% {
-    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3), 0 0 12px rgba(245, 158, 11, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.55), 0 0 28px rgba(245, 158, 11, 0.35);
+    box-shadow:
+      0 0 0 1px rgba(var(--card-tint), 0.55),
+      0 0 28px rgba(var(--card-tint), 0.35);
   }
 }
 
@@ -3147,25 +3152,29 @@ body,
 .card.has-setup.setup-long { --card-tint: 34, 197, 94; }
 .card.has-setup.setup-short { --card-tint: 239, 68, 68; }
 
-/* Per-trend 3px left-edge stripe — matches .call-card.border-long /
-   .border-short / .border-neutral exactly. No top stripe (Call cards
-   don't have one); the rotating conic ring on ::before paints the
-   top edge dynamically. */
-.card.card-trend-bullish { border-left-color: var(--bull); }
-.card.card-trend-bearish { border-left-color: var(--bear); }
-.card.card-trend-neutral { border-left-color: var(--neutral); }
+/* .card.card-trend-{bullish|bearish|neutral} border-left-color rules
+   removed — base .card now reads border-left-color: rgb(var(--card-tint)),
+   so the trend classes only need to set --card-tint (above) and the
+   stripe + ribbons + breathing all follow. */
 
-/* State-based tints — The Call */
+/* State-based tints — The Call. Glow modifiers (glow-added / glow-flipped)
+   intentionally DO NOT override --card-tint here. The trend colour comes
+   from .border-long / .short / .neutral and stays consistent; the glow
+   class only adds the breathing halo. */
 .call-card.border-long,
 .all-time-card.border-long { --card-tint: 34, 197, 94; }
 .call-card.border-short,
 .all-time-card.border-short { --card-tint: 239, 68, 68; }
 .call-card.border-neutral,
 .all-time-card.border-neutral { --card-tint: 156, 163, 175; }
-.call-card.glow-flipped { --card-tint: 245, 158, 11; }
 
-/* Orbital ambient — radial glass highlight + slow conic sweep. Renders
-   as the card's ::before so it sits below content. */
+/* ONE rule, one geometry — every card type uses the same diagonal
+   ribbon pattern via a repeating-linear-gradient on ::before. State
+   colour is the only thing that differs, fed through --card-tint.
+   No rotation animation, no conic, no mask-composite — those
+   produced per-card variance depending on which modifier classes
+   were active. Now strictly state-tinted ribbons, identical across
+   every card in every grid. */
 .card::before,
 .call-card::before,
 .all-time-card::before {
@@ -3176,46 +3185,28 @@ body,
   pointer-events: none;
   z-index: 0;
   background:
+    /* Glass top-light highlight */
     radial-gradient(ellipse 80% 50% at 30% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
-    conic-gradient(from 0deg at 50% 50%,
-      transparent 0deg,
-      rgba(var(--card-tint), 0.14) 80deg,
-      transparent 180deg,
-      rgba(var(--card-tint), 0.09) 260deg,
-      transparent 360deg);
-  animation: card-orbit 55s linear infinite;
-}
-
-@keyframes card-orbit {
-  to { transform: rotate(360deg); }
-}
-
-/* RR cards use the EXACT recipe Call's .glow-added / .glow-flipped
-   cards use: an 8-second rotating conic-gradient clipped to a 2px
-   ring via mask-composite. The state-tinted arcs sweep around the
-   edges and read as diagonal ribbons at the corners — the visual
-   the user is asking RR to share with Call. */
-.card::before {
-  padding: 2px;
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg,
-      rgba(var(--card-tint), 0.85) 60deg,
-      transparent 120deg,
-      transparent 240deg,
-      rgba(var(--card-tint), 0.55) 300deg,
-      transparent 360deg
+    /* Diagonal ribbons — 135deg, 4px-wide stripes every 32px. Alpha
+       0.20 so motion is visible without leaning on opacity tricks. */
+    repeating-linear-gradient(
+      135deg,
+      transparent 0px,
+      transparent 28px,
+      rgba(var(--card-tint), 0.20) 28px,
+      rgba(var(--card-tint), 0.20) 32px
     );
-  -webkit-mask:
-    linear-gradient(#fff, #fff) content-box,
-    linear-gradient(#fff, #fff);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff, #fff) content-box,
-    linear-gradient(#fff, #fff);
-  mask-composite: exclude;
-  animation: card-orbit 8s linear infinite;
+  /* 32x32 tile gives drift-stripes a defined repeat unit. */
+  background-size: 100% 100%, 32px 32px;
+  /* Continuous diagonal drift, identical geometry on every card.
+     45px ≈ √2 × 32 so the slide is exactly one repeat-unit and the
+     loop has no visible "snap" at the boundary. Stagger via the
+     :nth-child(6n+N) rules below. */
+  animation: drift-stripes 6s linear infinite;
+}
+
+@keyframes drift-stripes {
+  to { background-position: 0 0, 45px 45px; }
 }
 
 /* Keep content above the ambient layer; hover sheen (::after) on top. */
@@ -3232,28 +3223,42 @@ body,
   z-index: 2;
 }
 
-/* Stagger the orbit starting points across each grid so cards don't
-   sweep in unison. Negative delays = pre-advanced start. Six-card
-   cycle: 0, -8s, -16s, -24s, -32s, -40s. Applies inside any of the
-   three card grids; lone cards default to 0s. */
+/* 6-cycle stagger across the 4 card grids — each card kicks off the
+   drift-stripes animation pre-advanced by a different multiple of 1s
+   so neighbouring cards aren't in lockstep. Negative delays = the
+   animation behaves as if it started in the past, so cards appear
+   already mid-cycle at first paint. .top5-scroll is included here
+   (it was previously excluded) so the horizontal strip animates
+   alongside the grids. */
 .cards > :nth-child(6n+1)::before,
 .call-grid > :nth-child(6n+1)::before,
-.all-time-grid > :nth-child(6n+1)::before { animation-delay: 0s; }
+.all-time-grid > :nth-child(6n+1)::before,
+.top5-scroll > :nth-child(6n+1)::before { animation-delay: 0s; }
+
 .cards > :nth-child(6n+2)::before,
 .call-grid > :nth-child(6n+2)::before,
-.all-time-grid > :nth-child(6n+2)::before { animation-delay: -8s; }
+.all-time-grid > :nth-child(6n+2)::before,
+.top5-scroll > :nth-child(6n+2)::before { animation-delay: -1s; }
+
 .cards > :nth-child(6n+3)::before,
 .call-grid > :nth-child(6n+3)::before,
-.all-time-grid > :nth-child(6n+3)::before { animation-delay: -16s; }
+.all-time-grid > :nth-child(6n+3)::before,
+.top5-scroll > :nth-child(6n+3)::before { animation-delay: -2s; }
+
 .cards > :nth-child(6n+4)::before,
 .call-grid > :nth-child(6n+4)::before,
-.all-time-grid > :nth-child(6n+4)::before { animation-delay: -24s; }
+.all-time-grid > :nth-child(6n+4)::before,
+.top5-scroll > :nth-child(6n+4)::before { animation-delay: -3s; }
+
 .cards > :nth-child(6n+5)::before,
 .call-grid > :nth-child(6n+5)::before,
-.all-time-grid > :nth-child(6n+5)::before { animation-delay: -32s; }
+.all-time-grid > :nth-child(6n+5)::before,
+.top5-scroll > :nth-child(6n+5)::before { animation-delay: -4s; }
+
 .cards > :nth-child(6n)::before,
 .call-grid > :nth-child(6n)::before,
-.all-time-grid > :nth-child(6n)::before { animation-delay: -40s; }
+.all-time-grid > :nth-child(6n)::before,
+.top5-scroll > :nth-child(6n)::before { animation-delay: -5s; }
 
 /* === System-state chrome ============================================
    One construction reused for every metadata pill on the dashboard:
@@ -3339,12 +3344,11 @@ body,
    Default corner-radial sits top-left for long/bullish/flipped/neutral
    cards. Short/bearish flips it top-right so the eye reads the warning
    color from the same side it would in an order book. */
-.card.has-setup.setup-short,
-.card.card-trend-bearish,
-.call-card.border-short,
-.all-time-card.border-short {
-  --tint-corner-x: 100%;
-}
+/* --tint-corner-x state override removed — under the unification rules
+   state modifier classes are restricted to setting --card-tint only.
+   Every card now keeps its corner radial at the default top-left
+   position; the state colour is communicated via the stripe + ribbon
+   + breathing, not by shifting the radial's anchor. */
 
 /* ====================================================================
    B3 — Cinematic moments: flipped cards + Top 5 ranking
@@ -3359,13 +3363,10 @@ body,
   transform: translateY(var(--shelf-y));
 }
 
-/* .card already has --shelf-y: -2px in its base rule (every RR card now
-   uses the flipped treatment). Only the call-card glow states still need
-   the shelf bump here. */
-.call-card.glow-added,
-.call-card.glow-flipped {
-  --shelf-y: -2px;
-}
+/* Glow modifier classes used to bump --shelf-y to -2px on glow cards.
+   Removed per the unification directive — glow modifiers ONLY drive
+   the breathing halo, not vertical position. Every .call-card sits at
+   the same baseline; only the breathing halo signals glow state. */
 
 /* Hover composes additively with the shelf so flipped cards lift even
    higher when targeted — preserves the parallax relationship. */
@@ -3375,34 +3376,13 @@ body,
   transform: translateY(calc(var(--shelf-y) - 4px));
 }
 
-/* Animated conic-gradient ring — still used by Call's ADDED / FLIPPED
-   glow cards. The RR .card.flipped variant was removed: every RR card
-   now uses the body-ribbons + top-stripe + breathing treatment via
-   the base .card rule, and flipped vs non-flipped is signaled solely
-   by the FLIPPED pill on the JSX side. */
-.call-card.glow-added::before,
-.call-card.glow-flipped::before {
-  padding: 2px;
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg,
-      rgba(var(--card-tint), 0.85) 60deg,
-      transparent 120deg,
-      transparent 240deg,
-      rgba(var(--card-tint), 0.55) 300deg,
-      transparent 360deg
-    );
-  -webkit-mask:
-    linear-gradient(#fff, #fff) content-box,
-    linear-gradient(#fff, #fff);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff, #fff) content-box,
-    linear-gradient(#fff, #fff);
-  mask-composite: exclude;
-  animation: card-orbit 8s linear infinite;
-}
+/* .call-card.glow-added::before / .glow-flipped::before mask-composite
+   ring removed. Those rules wrote a different geometry to the SAME
+   ::before pseudo that every other card uses, which was the root of
+   the per-card chrome inconsistency (VIK ring + BOOT ring + NVO no ring
+   + DAR no ring + MSFT ring all looking different). Glow modifier
+   classes now only drive the breathing halo via box-shadow animation
+   below; they don't touch ::before. */
 
 /* Larger price numeral on Call's ADDED / FLIPPED cards. The RR
    .card.flipped variant was removed — every RR card already shows
