@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { CosmosShader } from './CosmosShader'
 
 const STATE_TINTS = {
   'HH/HL':     { r: 34,  g: 197, b: 94  },
@@ -176,6 +177,53 @@ function AlertPulse({ tickers }) {
   )
 }
 
+function CosmicMeteors() {
+  const [meteors, setMeteors] = useState([])
+
+  useEffect(() => {
+    const spawn = () => {
+      const lane = 1 + Math.floor(Math.random() * 8)
+      const duration = 2.5 + Math.random() * 4
+      const sizeRoll = Math.random()
+      const size = sizeRoll < 0.15 ? 'large' : sizeRoll < 0.4 ? 'medium' : 'small'
+      const tintRoll = Math.random()
+      const tint = tintRoll < 0.7 ? 'cyan' : tintRoll < 0.9 ? 'blue' : 'warm'
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const meteor = { key, lane, duration, size, tint }
+      setMeteors(m => [...m, meteor])
+      setTimeout(() => {
+        setMeteors(m => m.filter(x => x.key !== key))
+      }, (duration + 0.3) * 1000)
+    }
+
+    const initialDelay = setTimeout(spawn, 800)
+    const interval = setInterval(() => {
+      spawn()
+      // Occasional burst — two meteors in quick succession
+      if (Math.random() < 0.15) {
+        setTimeout(spawn, 200 + Math.random() * 400)
+      }
+    }, 1600)
+
+    return () => {
+      clearTimeout(initialDelay)
+      clearInterval(interval)
+    }
+  }, [])
+
+  return (
+    <>
+      {meteors.map(m => (
+        <span
+          key={m.key}
+          className={`cosmic-meteor lane-${m.lane} size-${m.size} tint-${m.tint}`}
+          style={{ animationDuration: `${m.duration}s` }}
+        />
+      ))}
+    </>
+  )
+}
+
 // Supernova — periodic bright flash at a random position. Reads as a
 // catastrophic stellar event, not as an ambient drift. 25-second cycle
 // is short enough to be witnessable; long enough to feel rare.
@@ -288,19 +336,7 @@ export function AmbientBackground({ tickers }) {
 
   return (
     <div className="ambient" aria-hidden="true" style={cssVars}>
-      {/* SVG filter for nebula turbulence. Inlined here so no extra fetch. */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <defs>
-          <filter id="nebula-displace" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="3" seed="7" />
-            <feDisplacementMap in="SourceGraphic" scale="90" />
-          </filter>
-        </defs>
-      </svg>
-
-      <div className="ambient-dominant-pool" />
-      <div className="ambient-galaxy" />
-      <div className="ambient-nebula" />
+      <CosmosShader tint={tint} dominance={dominance} />
 
       <motion.div
         className="ambient-stars-far"
@@ -323,6 +359,8 @@ export function AmbientBackground({ tickers }) {
 
       <Starfield tickers={tickers} />
       <AlertPulse tickers={tickers} />
+
+      <CosmicMeteors />
 
       <div className="ambient-sweep" />
       <div className="ambient-noise" />
