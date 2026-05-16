@@ -3165,30 +3165,37 @@ body,
   100% { transform: translate(-50%, -50%) scale(110);  opacity: 0;    }
 }
 
-/* Mobile: drop the most expensive cosmic layers. Phone GPUs stutter on
-   SVG feDisplacementMap, the 800px-radius supernova shadow, the
-   blurred rotating galaxy, and 420 box-shadow stars. What survives is
-   navy gradient + dominant-pool nebula + 120 mid stars (with parallax)
-   + 8 static bright-star cores + ticker data layer + sweep + vignette.
-   Still reads as cosmic; runs smooth on mobile hardware. */
+/* Mobile: cut only the GPU-expensive ANIMATED layers. Phone GPUs
+   stutter on three specific things, none of which are about the count
+   of elements:
+     1. feDisplacementMap re-rasterizing every frame on .ambient-nebula
+     2. blur(50px) + 140s rotation on the 1400x1400 conic galaxy
+     3. box-shadow 0 0 800px 400px on .ambient-supernova at peak
+   Static elements with blur or drop-shadow paint ONCE into a compositor
+   layer and are essentially free after that. So we keep nebula color,
+   bright-star spikes, far stars, constellation lines, noise overlay —
+   we just kill their animations. */
 @media (max-width: 720px) {
-  .ambient-nebula,
   .ambient-galaxy,
-  .ambient-supernova,
-  .ambient-stars-far,
-  .ambient-constellation,
-  .ambient-noise {
+  .ambient-supernova {
     display: none;
   }
+  /* Keep the multi-color radial-gradient nebula palette, but drop the
+     feDisplacementMap filter (re-rasterizes per frame on mobile) and
+     the drift animation. Result: soft color blobs, no filaments — but
+     the color is back. */
+  .ambient-nebula {
+    filter: blur(25px);
+    animation: none;
+    opacity: 0.55;
+  }
+  /* Static diffraction spikes are fine; animating the drop-shadow on
+     scale change is what flickers. */
   .ambient-bright-star {
     animation: none;
   }
-  .ambient-bright-star::before,
-  .ambient-bright-star::after {
-    display: none;
-  }
   .ambient-dominant-pool {
-    filter: blur(40px);
+    filter: blur(50px);
     animation-duration: 18s;
   }
   .ambient-stars-mid {
