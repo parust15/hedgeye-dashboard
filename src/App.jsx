@@ -7,6 +7,7 @@ import { VixHeaderPill } from './components/VixBucketPill'
 import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
+import { supabase } from './lib/supabase'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
@@ -42,6 +43,32 @@ export default function App() {
   // same bucket label next to its trend pill.
   const { data: vixBucket } = useVixBucket()
 
+  // Range-state distribution for the Aurora Field ambient. One-shot
+  // fetch of (ticker, range_state) at the latest signal_date. Each row
+  // shape: { ticker, range_state } — exactly what AmbientBackground's
+  // dominantTint() weight-averages. Independent of RR's heavier
+  // useDashboardData fetch so the ambient hydrates as fast as possible.
+  const [signalTickers, setSignalTickers] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const latestRes = await supabase
+        .from('hedgeye_signals_v')
+        .select('signal_date')
+        .order('signal_date', { ascending: false })
+        .limit(1)
+      if (cancelled || latestRes.error || !latestRes.data?.[0]) return
+      const date = latestRes.data[0].signal_date
+      const rowsRes = await supabase
+        .from('hedgeye_signals_v')
+        .select('ticker, range_state')
+        .eq('signal_date', date)
+      if (cancelled || rowsRes.error) return
+      setSignalTickers(rowsRes.data ?? [])
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   useEffect(() => {
     try {
       localStorage.setItem(ACTIVE_TAB_KEY, activeTab)
@@ -63,7 +90,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <AmbientBackground />
+      <AmbientBackground tickers={signalTickers} />
       <div className="top-bar">
         <TopTabs active={activeTab} onChange={setActiveTab} />
         <VixHeaderPill data={vixBucket} />
