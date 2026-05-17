@@ -63,7 +63,7 @@ void main() {
   p.x *= u_resolution.x / u_resolution.y;
   float t = u_time * 0.12;
 
-  vec3 col = vec3(0.012, 0.018, 0.04);
+  vec3 col = vec3(0.020, 0.012, 0.028);  // slightly warmer base for pink palette
 
   // Density fields — drive HOW MUCH nebula appears
   float d1 = fbm(p * 1.2 + vec2(t * 0.3, t * 0.2));
@@ -83,40 +83,40 @@ void main() {
   float pulse1 = 0.85 + 0.15 * sin(u_time * 0.8);
   float pulse2 = 0.85 + 0.15 * sin(u_time * 0.6 + 1.5);
 
-  // Palette
-  vec3 electricBlue = vec3(0.20, 0.50, 1.00);
-  vec3 cyan         = vec3(0.30, 0.85, 0.95);
-  vec3 magenta      = vec3(1.00, 0.40, 0.85);
-  vec3 gold         = vec3(1.00, 0.70, 0.35);
-  vec3 darkDust     = vec3(0.55, 0.25, 0.15);
+  // Carina Nebula palette
+  vec3 rosePink     = vec3(0.95, 0.50, 0.60);  // dominant dusty rose
+  vec3 softLavender = vec3(0.55, 0.65, 0.95);  // soft blue secondary
+  vec3 brightCyan   = vec3(0.70, 0.90, 1.00);  // central cluster glow
+  vec3 warmOrange   = vec3(1.00, 0.55, 0.25);  // warm dust highlights
+  vec3 deepMagenta  = vec3(0.85, 0.30, 0.55);  // saturation pops
+  vec3 darkDust     = vec3(0.45, 0.20, 0.25);  // reddish-brown filaments
 
-  // Swirl through the palette — colors flow into each other organically
-  vec3 baseField = mix(electricBlue, cyan, smoothstep(-0.4, 0.6, cm1));
-  baseField = mix(baseField, gold * 0.75,    smoothstep(0.2, 0.9, cm2) * 0.45);
-  baseField = mix(baseField, magenta * 0.65, smoothstep(0.4, 1.0, cm1 + cm2 * 0.5) * 0.30);
+  // Swirl through palette — pink/blue split driven by cm1, warm accents by cm2
+  vec3 baseField = mix(rosePink, softLavender, smoothstep(-0.5, 0.5, cm1));
+  baseField = mix(baseField, warmOrange * 0.85, smoothstep(0.3, 0.9, cm2) * 0.35);
+  baseField = mix(baseField, deepMagenta,       smoothstep(0.5, 1.0, cm1 + cm2 * 0.4) * 0.30);
 
   float n1 = max(d1, 0.0);
   float n2 = max(d2, 0.0);
   float n3 = max(d3, 0.0);
 
-  // Density combines all noise scales — visibility, not color
   float density = n1 * n1 * 0.7 + n2 * 0.35 + n3 * n3 * 0.25;
 
   vec3 nebula = baseField * density * 1.2;
 
-  // Bright cores still pop as additive highlights
-  nebula += magenta * c1Glow * 1.30 * pulse1;
-  nebula += magenta * c2Glow * 0.95 * pulse2;
+  // Bright cluster cores — cyan halo + rose halo
+  nebula += brightCyan * c1Glow * 1.15 * pulse1;
+  nebula += rosePink   * c2Glow * 1.10 * pulse2;
 
-  // Gold sparkle only in densest blue regions — creates fine accent detail
-  nebula += gold * n3 * n3 * 0.25 * smoothstep(0.4, 0.8, n1);
+  // Warm orange sparkle only in densest swirl regions
+  nebula += warmOrange * n3 * n3 * 0.25 * smoothstep(0.4, 0.8, n1);
 
   // Dust lanes modulate everything
   float lanes = smoothstep(-0.3, 0.4, fbm(p * 1.8 + vec2(t * 0.1)));
   nebula *= mix(0.50, 1.0, lanes);
 
-  // Dark filament hints in shadowed regions
-  nebula += darkDust * (1.0 - lanes) * d2 * 0.15;
+  // Dark reddish-brown filament hints in shadowed regions
+  nebula += darkDust * (1.0 - lanes) * d2 * 0.20;
 
   col += nebula * 0.90;
 

@@ -248,63 +248,8 @@ function Supernova() {
   )
 }
 
-function useDebugMotionEnabled() {
-  const [enabled] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return new URLSearchParams(window.location.search).has('motion-debug')
-  })
-  return enabled
-}
-
-function extractTx(transformStr) {
-  if (!transformStr || transformStr === 'none') return '0px'
-  const m = /matrix\(\s*[^,]+,[^,]+,[^,]+,[^,]+,\s*([^,]+),/.exec(transformStr)
-  if (m) return parseFloat(m[1]).toFixed(0) + 'px'
-  const m3d = /matrix3d\([^)]*\)/.exec(transformStr)
-  if (m3d) {
-    const parts = transformStr.match(/-?\d+\.?\d*/g) || []
-    if (parts.length >= 13) return parseFloat(parts[12]).toFixed(0) + 'px'
-  }
-  return '–'
-}
-
-function MotionDebug() {
-  const [vals, setVals] = useState({ light1: '–', sweep: '–', frame: 0 })
-  useEffect(() => {
-    let raf, frame = 0
-    const tick = () => {
-      frame++
-      const l1 = document.querySelector('.ambient-stars-mid')
-      const sw = document.querySelector('.ambient-sweep')
-      setVals({
-        light1: l1 ? extractTx(getComputedStyle(l1).transform) : '–',
-        sweep:  sw ? extractTx(getComputedStyle(sw).transform) : '–',
-        frame,
-      })
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [])
-  return (
-    <div style={{
-      position: 'fixed', bottom: 8, right: 8,
-      background: 'rgba(0,0,0,0.78)', color: '#3fff7f',
-      padding: '6px 10px', borderRadius: 4,
-      fontFamily: 'ui-monospace, "Geist Mono", monospace', fontSize: 11,
-      zIndex: 9999, pointerEvents: 'none', lineHeight: 1.55,
-      border: '1px solid rgba(63, 255, 127, 0.3)',
-    }}>
-      <div>stars-mid tx: {vals.light1}</div>
-      <div>sweep tx:     {vals.sweep}</div>
-      <div>frame:        {vals.frame}</div>
-    </div>
-  )
-}
-
 export function AmbientBackground({ tickers }) {
   const { tint, dominance } = useMemo(() => dominantState(tickers), [tickers])
-  const debugOn = useDebugMotionEnabled()
 
   // Star fields are deterministic — generated once, never re-rendered.
   const farStars = useMemo(() => generateStarShadows(420, 7), [])
@@ -365,8 +310,6 @@ export function AmbientBackground({ tickers }) {
       <div className="ambient-sweep" />
       <div className="ambient-noise" />
       <div className="ambient-vignette" />
-
-      {debugOn && <MotionDebug />}
     </div>
   )
 }
