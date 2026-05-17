@@ -10,6 +10,7 @@ import { PerformanceSection } from './PerformanceSection'
 import { CallAllTimeView } from './CallAllTimeView'
 import { TickerFilter } from './TickerFilter'
 import { StatusChip } from './StatusChip'
+import { SortControl } from './SortControl'
 import { useCountUp } from '../lib/useCountUp'
 import {
   canonicalSector,
@@ -22,7 +23,61 @@ const MACRO_BULLETS_VISIBLE = 6
 const CALL_VIEW_KEY = 'dashboard.callView'
 const CALL_SECTOR_KEY = 'dashboard.callSector'
 const CALL_TICKERS_KEY = 'dashboard.selectedCallTickers'
+const CALL_SORT_FIELD_KEY = 'dashboard.callSortField'
+const CALL_SORT_DIR_KEY = 'dashboard.callSortDir'
 const VALID_CALL_VIEWS = ['today', 'all_time']
+
+// Sort fields for the Call panel dropdown. Same shape contract as RR: the
+// arrow button flips dir; picking a new field resets dir to its default.
+const CALL_SORT_FIELDS = [
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'position', label: 'Position type', defaultDir: 'desc' },
+  { value: 'sector', label: 'Sector', defaultDir: 'asc' },
+  { value: 'price', label: 'Current price', defaultDir: 'asc' },
+  // "Day's setup" on the Call panel has no LONG SETUP/SHORT SETUP analog
+  // (those are RR-only). Closest semantically meaningful flag is
+  // change_status: FLIPPED / ADDED rows are the cards Hedgeye acted on
+  // today. We surface them first via the existing changeTier helper.
+  { value: 'setup', label: "Day's setup", defaultDir: 'desc' },
+  // Days held uses `consecutive_days` (held_since isn't on the row). It's
+  // the same semantic value — number of consecutive trading days the
+  // position has been held without changing.
+  { value: 'days_held', label: 'Days held', defaultDir: 'desc' },
+]
+const CALL_SORT_VALUES = new Set(CALL_SORT_FIELDS.map((f) => f.value))
+
+// LONG > NEUTRAL > SHORT. Desc surfaces longs first.
+const POSITION_RANK = { LONG: 2, NEUTRAL: 1, SHORT: 0 }
+
+function loadInitialCallSortField() {
+  try {
+    const raw = localStorage.getItem(CALL_SORT_FIELD_KEY)
+    if (raw && CALL_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read callSortField from localStorage:', err)
+  }
+  return 'ticker'
+}
+
+function loadInitialCallSortDir() {
+  try {
+    const raw = localStorage.getItem(CALL_SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read callSortDir from localStorage:', err)
+  }
+  return 'asc'
+}
+
+// Numeric compare with nulls-last (regardless of direction).
+function numCmpNullsLast(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
+}
 
 function loadInitialCallView() {
   try {
@@ -462,6 +517,13 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   const [sectorFilter, setSectorFilter] = useState(loadInitialCallSector)
   const [search, setSearch] = useState('')
   const [callView, setCallView] = useState(loadInitialCallView)
+  const [sortField, setSortField] = useState(loadInitialCallSortField)
+  const [sortDir, setSortDir] = useState(loadInitialCallSortDir)
+
+  const handleSortChange = (nextField, nextDir) => {
+    setSortField(nextField)
+    setSortDir(nextDir)
+  }
 
   // Per-ticker visibility for the Call panel — Set<string> mirroring the
   // RR ticker filter shape. null while waiting for the first reconcile
@@ -485,6 +547,15 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       console.warn('Failed to persist callSector to localStorage:', err)
     }
   }, [sectorFilter])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALL_SORT_FIELD_KEY, sortField)
+      localStorage.setItem(CALL_SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist callSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
 
   // Reconcile selectedCallTickers against the all-tickers universe. The
   // universe IS the All Time set (~470 tickers); the Today subset is just
@@ -666,7 +737,65 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   }, [])
   const clearSectorChips = useCallback(() => setSectorFilter(new Set()), [])
 
-  const visibleCount = visibleCards.length
+  // Re-sort the filtered set by the dropdown. The tier/conviction order in
+  // visibleCards becomes a stable secondary order for ties (Array.sort is
+  // stable). Ticker is the final tiebreaker.
+  const sortedCards = useMemo(() => {
+    const list = visibleCards.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+
+    list.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'position': {
+          const ra = POSITION_RANK[a.position_type] ?? -1
+          const rb = POSITION_RANK[b.position_type] ?? -1
+          cmp = sortDir === 'asc' ? ra - rb : rb - ra
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'sector': {
+          const sa = (allTickersByTicker?.get(a.ticker)?.sector ?? '').toLowerCase()
+          const sb = (allTickersByTicker?.get(b.ticker)?.sector ?? '').toLowerCase()
+          // Empty/missing sectors sink in asc and rise in desc — treat as nulls.
+          if (!sa && !sb) return tieBreak(a, b)
+          if (!sa) return 1
+          if (!sb) return -1
+          cmp = sa.localeCompare(sb)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'price': {
+          const pa = Number(livePrices.get(a.ticker)?.current_price)
+          const pb = Number(livePrices.get(b.ticker)?.current_price)
+          cmp = numCmpNullsLast(pa, pb, sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'setup': {
+          // Lower changeTier = more notable (FLIPPED=0, RETURNING=1,
+          // ADDED=2, UNCHANGED=3). Desc = "most notable first" which is
+          // ascending tier; asc reverses to "unchanged first".
+          const ta = changeTier(a)
+          const tb = changeTier(b)
+          cmp = sortDir === 'desc' ? ta - tb : tb - ta
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'days_held': {
+          const da = Number(a.consecutive_days)
+          const db = Number(b.consecutive_days)
+          cmp = numCmpNullsLast(da, db, sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return list
+  }, [visibleCards, sortField, sortDir, allTickersByTicker, livePrices])
+
+  const visibleCount = sortedCards.length
 
   // Counts per position type for the chip badges.
   const counts = useMemo(() => {
@@ -874,13 +1003,25 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       />
       <MacroCommentarySection commentary={macroCommentary} />
 
+      {/* Sort row sits between the chip rows and the cards grid. Right-
+          aligned to match RR. */}
+      <div className="sort-row">
+        <SortControl
+          fields={CALL_SORT_FIELDS}
+          field={sortField}
+          dir={sortDir}
+          onChange={handleSortChange}
+          ariaLabel="The Call sort"
+        />
+      </div>
+
       {visibleCount === 0 ? (
         <div className="state">
           No positions match these filters{search.trim() ? ` for "${search.trim()}"` : ''}.
         </div>
       ) : (
         <div className="call-grid">
-          {visibleCards.map((row) => {
+          {sortedCards.map((row) => {
             const live = livePrices.get(row.ticker)
             const rrCrossover = rrTickers.has(row.ticker)
             return (

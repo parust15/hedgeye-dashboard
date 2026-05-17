@@ -15,13 +15,86 @@ import {
   getSetup,
 } from '../lib/range'
 import { SignalCard } from './SignalCard'
+import { SortControl } from './SortControl'
+import { CategoryFilter } from './CategoryFilter'
 import { TickerFilter } from './TickerFilter'
 import { MarketStatePill } from './MarketStatePill'
 import { StatusChip } from './StatusChip'
 
 const TICKER_STORAGE_KEY = 'dashboard.selectedTickers'
 const TREND_FILTER_KEY = 'dashboard.trendFilter'
+const SORT_FIELD_KEY = 'dashboard.rrSortField'
+const SORT_DIR_KEY = 'dashboard.rrSortDir'
 const VALID_TRENDS = ['ALL', 'BULLISH', 'BEARISH', 'NEUTRAL']
+
+// Sort fields rendered in the dropdown. `defaultDir` is the natural starting
+// direction for that field (e.g. wider ranges desc, alphabetical asc). Picking
+// a new field in the <select> resets direction to its default; the arrow button
+// flips it explicitly.
+const RR_SORT_FIELDS = [
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'trend', label: 'Trend', defaultDir: 'desc' },
+  { value: 'range_state', label: 'Range state', defaultDir: 'desc' },
+  { value: 'range_width', label: 'Range width %', defaultDir: 'desc' },
+  { value: 'buy', label: 'BUY level', defaultDir: 'asc' },
+  { value: 'sell', label: 'SELL level', defaultDir: 'asc' },
+  { value: 'prev_close', label: 'Prev close', defaultDir: 'asc' },
+  { value: 'dist_buy', label: 'Distance to BUY', defaultDir: 'asc' },
+  { value: 'dist_sell', label: 'Distance to SELL', defaultDir: 'asc' },
+  { value: 'flipped', label: 'Flipped today', defaultDir: 'desc' },
+]
+const RR_SORT_VALUES = new Set(RR_SORT_FIELDS.map((f) => f.value))
+
+// BULLISH > NEUTRAL > BEARISH. Higher = "more bullish" so desc shows
+// bullish first; asc reverses.
+const TREND_RANK = { BULLISH: 2, NEUTRAL: 1, BEARISH: 0 }
+
+// HH/HL = strongest, LH/LL = weakest. Anything else (incl. "unchanged") sinks.
+const RANGE_STATE_RANK = { 'HH/HL': 4, 'HH/LL': 3, 'LH/HL': 2, 'LH/LL': 1 }
+
+function loadInitialRrSortField() {
+  try {
+    const raw = localStorage.getItem(SORT_FIELD_KEY)
+    if (raw && RR_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read rrSortField from localStorage:', err)
+  }
+  return 'ticker'
+}
+
+function loadInitialRrSortDir() {
+  try {
+    const raw = localStorage.getItem(SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read rrSortDir from localStorage:', err)
+  }
+  return 'asc'
+}
+
+// Derive range width % from buy/sell/prev_close. Guarded the same way as
+// rangePct in lib/range.js to avoid the Number(null) === 0 footgun.
+function rangeWidthPct(row) {
+  if (row.buy_trade == null || row.sell_trade == null || row.prev_close == null) return null
+  const buy = Number(row.buy_trade)
+  const sell = Number(row.sell_trade)
+  const close = Number(row.prev_close)
+  if (!Number.isFinite(buy) || !Number.isFinite(sell) || !Number.isFinite(close) || close === 0) {
+    return null
+  }
+  return ((sell - buy) / close) * 100
+}
+
+// Generic numeric comparator with nulls-last. Direction is applied to the
+// number compare; nulls always go to the bottom regardless of dir.
+function numCmp(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
+}
 
 function loadInitialTrendFilter() {
   try {
@@ -54,6 +127,8 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [trendFilter, setTrendFilter] = useState(loadInitialTrendFilter)
+  const [sortField, setSortField] = useState(loadInitialRrSortField)
+  const [sortDir, setSortDir] = useState(loadInitialRrSortDir)
 
   useEffect(() => {
     try {
@@ -62,6 +137,20 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
       console.warn('Failed to persist trendFilter to localStorage:', err)
     }
   }, [trendFilter])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_FIELD_KEY, sortField)
+      localStorage.setItem(SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist rrSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
+
+  const handleSortChange = (nextField, nextDir) => {
+    setSortField(nextField)
+    setSortDir(nextDir)
+  }
 
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
@@ -187,19 +276,6 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
 
   const isAllActive = activeCategories.size === 0
 
-  function toggleChip(filter) {
-    if (filter.label === 'All') {
-      setActiveCategories(new Set())
-      return
-    }
-    setActiveCategories((prev) => {
-      const next = new Set(prev)
-      if (next.has(filter.label)) next.delete(filter.label)
-      else next.add(filter.label)
-      return next
-    })
-  }
-
   // Tickers excluded via the dropdown are filtered out of the setup count
   // too, since they're hidden everywhere on the dashboard.
   const setupCount = useMemo(
@@ -290,6 +366,74 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
     })
   }, [view, orderedSetups, orderedAll, search])
 
+  // Step 4: re-sort the filtered set by the dropdown. The tier sort baked
+  // into orderedAll/orderedSetups becomes a stable secondary order for
+  // ties (Array.prototype.sort is stable). Ticker is the ultimate
+  // tiebreaker for fields that don't naturally break ties.
+  const sortedCards = useMemo(() => {
+    const list = visibleCards.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+
+    list.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'trend': {
+          const ra = TREND_RANK[a.trend] ?? -1
+          const rb = TREND_RANK[b.trend] ?? -1
+          cmp = sortDir === 'asc' ? ra - rb : rb - ra
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'range_state': {
+          const ra = RANGE_STATE_RANK[a.range_state] ?? 0
+          const rb = RANGE_STATE_RANK[b.range_state] ?? 0
+          cmp = sortDir === 'asc' ? ra - rb : rb - ra
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'range_width':
+          cmp = numCmp(rangeWidthPct(a), rangeWidthPct(b), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'buy':
+          cmp = numCmp(Number(a.buy_trade), Number(b.buy_trade), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'sell':
+          cmp = numCmp(Number(a.sell_trade), Number(b.sell_trade), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'prev_close':
+          cmp = numCmp(Number(a.prev_close), Number(b.prev_close), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'dist_buy': {
+          // Distance to BUY = effective pct (0 = at BUY, 1 = at SELL).
+          // Smaller = closer to BUY.
+          const pa = effectivePct(a, displays.get(a.ticker))
+          const pb = effectivePct(b, displays.get(b.ticker))
+          cmp = numCmp(pa, pb, sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'dist_sell': {
+          // Mirror: 1 - effectivePct so smaller = closer to SELL.
+          const pa = effectivePct(a, displays.get(a.ticker))
+          const pb = effectivePct(b, displays.get(b.ticker))
+          const da = pa == null ? null : 1 - pa
+          const db = pb == null ? null : 1 - pb
+          cmp = numCmp(da, db, sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'flipped': {
+          const fa = changes[a.ticker] ? 1 : 0
+          const fb = changes[b.ticker] ? 1 : 0
+          cmp = sortDir === 'asc' ? fa - fb : fb - fa
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return list
+  }, [visibleCards, sortField, sortDir, displays, changes])
+
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))
   }
@@ -347,24 +491,13 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
 
       <div className="filter-row">
         {view === 'all' ? (
-          <nav className="chips" aria-label="Category filters">
-            {visibleFilters.map((f) => {
-              const isActive =
-                f.label === 'All' ? isAllActive : activeCategories.has(f.label)
-              return (
-                <button
-                  key={f.label}
-                  type="button"
-                  aria-pressed={isActive}
-                  className={`chip${isActive ? ' active' : ''}`}
-                  onClick={() => toggleChip(f)}
-                >
-                  {f.label}
-                  <span className="chip-count">{counts[f.label] ?? 0}</span>
-                </button>
-              )
-            })}
-          </nav>
+          <CategoryFilter
+            options={visibleFilters
+              .filter((f) => f.value !== null)
+              .map((f) => ({ label: f.label, count: counts[f.label] ?? 0 }))}
+            activeLabels={activeCategories}
+            onChange={setActiveCategories}
+          />
         ) : (
           <div />
         )}
@@ -420,9 +553,23 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
         </nav>
       )}
 
+      {/* Sort row sits just above the cards grid. Right-aligned so it
+          doesn't compete visually with the chip rows above. */}
+      {status === 'ready' && (
+        <div className="sort-row">
+          <SortControl
+            fields={RR_SORT_FIELDS}
+            field={sortField}
+            dir={sortDir}
+            onChange={handleSortChange}
+            ariaLabel="Risk Ranges sort"
+          />
+        </div>
+      )}
+
       {status === 'loading' && <div className="state">Loading…</div>}
       {status === 'error' && <div className="state error">Could not load dashboard data.</div>}
-      {status === 'ready' && visibleCards.length === 0 && (
+      {status === 'ready' && sortedCards.length === 0 && (
         search.trim() ? (
           <div className="state">No tickers match “{search.trim()}”.</div>
         ) : view === 'setups' ? (
@@ -432,9 +579,9 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
         )
       )}
 
-      {status === 'ready' && visibleCards.length > 0 && (
+      {status === 'ready' && sortedCards.length > 0 && (
         <section className="cards">
-          {visibleCards.map((r) => {
+          {sortedCards.map((r) => {
             // VIEW CALL button shows only when the ticker has a call
             // history record. The handler opens the modal IN PLACE — the
             // user stays on the RR tab. `source: 'risk-ranges'` tells

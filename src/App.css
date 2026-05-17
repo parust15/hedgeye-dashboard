@@ -456,6 +456,45 @@
   min-width: 0;
 }
 
+/* Category dropdown sits on the LEFT of the filter row (where the chip
+   strip used to be), so flip the popover anchor from the inherited
+   right: 0 to left: 0 — otherwise it overflows off-screen. */
+.category-popover {
+  right: auto;
+  left: 0;
+}
+
+/* Category-filter dropdown: count badge sits at the far right of each row,
+   visually parallel to the chip-count badge the old chip row had. */
+.category-list .ticker-row label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-row-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Single-row action bar in the category popover head — no search field
+   above it, so the actions sit on their own without a top margin. */
+.ticker-popover-actions-only {
+  margin-top: 0;
+}
+
+.ticker-popover-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 @media (max-width: 640px) {
   .ticker-popover {
     width: min(320px, calc(100vw - 32px));
@@ -2181,6 +2220,79 @@
 /* .trend-chip family collapsed into the unified .filter-chip earlier
    in this file. RiskRangesPanel.jsx now maps BULLISH→filter-chip-long,
    BEARISH→filter-chip-short, NEUTRAL→filter-chip-neutral, ALL→filter-chip-all. */
+
+/* === Sort control (shared by RR + The Call) === */
+
+.sort-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.sort-select {
+  padding: 6px 28px 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  /* Custom caret so the dropdown looks consistent across platforms. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.sort-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+.sort-dir-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.sort-dir-btn:hover {
+  border-color: var(--accent);
+}
+
+.sort-dir-btn:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
 
 /* === "↗ VIEW CALL INFO" cross-panel button on RR cards === */
 
