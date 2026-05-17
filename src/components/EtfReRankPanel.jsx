@@ -1,9 +1,30 @@
 import { useMemo } from 'react'
 import { useEtfReRank } from '../lib/useEtfReRank'
+import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { StatusChip } from './StatusChip'
 
 const MOVERS_LIMIT = 5
 const SKELETON_ROWS = 20
+
+// Parses an ISO YYYY-MM-DD into the two display values the row needs:
+// the formatted date ("Mar 6, 2025") and the integer day count since
+// then. Returns nulls when input is missing/malformed so the cells can
+// render the muted "—" placeholder.
+function parseAdded(isoDate) {
+  if (!isoDate) return { dateLabel: null, days: null }
+  const [y, m, d] = isoDate.split('-').map(Number)
+  if (!y || !m || !d) return { dateLabel: null, days: null }
+  const then = new Date(y, m - 1, d)
+  const now = new Date()
+  const dayMs = 24 * 60 * 60 * 1000
+  const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / dayMs))
+  const dateLabel = then.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+  return { dateLabel, days }
+}
 
 // Single delta chip used by both the main list and the movers strip.
 // Variants:
@@ -78,7 +99,12 @@ function MoversStrip({ rows }) {
 
   return (
     <section className="rerank-movers" aria-label="Top and bottom movers this week">
+      {/* Both cards mount a .card-bg sibling so the dark-glass chrome
+          (backdrop-filter blur + 0.7 opacity + state-tinted radial
+          gradient) matches the rerank rows below and the ticker cards
+          on the other tabs. Content children stay at 1.0 opacity. */}
       <div className="rerank-movers-card rerank-movers-top">
+        <div className="card-bg" aria-hidden="true" />
         <h2 className="rerank-movers-title">TOP MOVERS (1W)</h2>
         {top.length === 0 ? (
           <div className="rerank-movers-empty">No upward movers this week.</div>
@@ -96,6 +122,7 @@ function MoversStrip({ rows }) {
       </div>
 
       <div className="rerank-movers-card rerank-movers-bottom">
+        <div className="card-bg" aria-hidden="true" />
         <h2 className="rerank-movers-title">BOTTOM MOVERS (1W)</h2>
         {bottom.length === 0 ? (
           <div className="rerank-movers-empty">No downward movers this week.</div>
@@ -115,13 +142,43 @@ function MoversStrip({ rows }) {
   )
 }
 
-// Single row in the main ranked list. CSS handles the 4-column grid;
-// this just paints the cells.
-function RerankRow({ row }) {
+// Single row in the main ranked list. Wraps content in the same
+// .card-bg chrome layer the ticker cards on the other tabs use, so
+// the dark-glass backdrop-filter + opacity + state-tinted border are
+// visually consistent across the dashboard. The four-cell grid lives
+// on .rerank-row itself; .card-bg sits behind everything at z-index 0
+// (content cells get z-index: 1 via the .rerank-row > * CSS rule).
+//
+// Tint variant comes from 1W delta sign — the closest analog to the
+// other tabs' bullish/bearish/neutral state:
+//   positive 1W delta → bullish-green border
+//   negative 1W delta → bearish-red border
+//   zero or null       → neutral grey border
+function rerankTintClass(delta) {
+  if (delta == null) return 'rerank-row-neutral'
+  const n = Number(delta)
+  if (!Number.isFinite(n) || n === 0) return 'rerank-row-neutral'
+  return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
+}
+
+function RerankRow({ row, proInfo }) {
+  const tintClass = rerankTintClass(row.delta_1w)
+  const assetClass = proInfo?.asset_class ?? null
+  const { dateLabel, days } = parseAdded(proInfo?.date_added)
   return (
-    <li className="rerank-row">
+    <li className={`rerank-row ${tintClass}`}>
+      <div className="card-bg" aria-hidden="true" />
       <span className="rerank-rank">{row.rank}</span>
       <span className="rerank-ticker">{row.ticker}</span>
+      <span className="rerank-asset" title={assetClass ?? ''}>
+        {assetClass ?? <span className="rerank-cell-missing">—</span>}
+      </span>
+      <span className="rerank-added">
+        {dateLabel ?? <span className="rerank-cell-missing">—</span>}
+      </span>
+      <span className="rerank-days">
+        {days != null ? `${days}d` : <span className="rerank-cell-missing">—</span>}
+      </span>
       <DeltaChip delta={row.delta_1w} ariaPrefix={`${row.ticker} 1W`} />
       <DeltaChip delta={row.delta_1m} ariaPrefix={`${row.ticker} 1M`} />
     </li>
@@ -140,6 +197,19 @@ function RerankSkeleton() {
 
 export function EtfReRankPanel() {
   const { rows, snapshotDate, status } = useEtfReRank()
+  // ETF Pro Plus carries asset_class + date_added; the re-rank view
+  // doesn't. We join client-side on ticker so the rows can surface
+  // those columns without a server-side view change. Pro Plus rows
+  // that don't match a re-rank ticker are ignored; re-rank tickers
+  // not in the Pro Plus book render "—" in the new cells.
+  const { rows: proRows } = useEtfProPlus()
+  const proLookup = useMemo(() => {
+    const m = new Map()
+    for (const r of proRows) {
+      if (r.ticker) m.set(r.ticker, { asset_class: r.asset_class, date_added: r.date_added })
+    }
+    return m
+  }, [proRows])
 
   return (
     <div className="panel rerank-panel">
@@ -183,19 +253,23 @@ export function EtfReRankPanel() {
         <>
           <MoversStrip rows={rows} />
 
-          {/* Column header — visually anchors the four-cell grid so the
-              user knows what each chip means. Same grid template the
-              rows use, so cells line up perfectly. */}
+          {/* Column header — visually anchors the six-cell grid so the
+              user knows what each cell means. Same grid template the
+              rows use, so cells line up perfectly. The two middle
+              cells (asset class + added) collapse on mobile. */}
           <div className="rerank-list-head" aria-hidden="true">
             <span className="rerank-rank">RANK</span>
             <span className="rerank-ticker">TICKER</span>
+            <span className="rerank-asset">ASSET CLASS</span>
+            <span className="rerank-added">ADDED</span>
+            <span className="rerank-days">DAYS</span>
             <span className="rerank-delta-head">1W Δ</span>
             <span className="rerank-delta-head">1M Δ</span>
           </div>
 
           <ol className="rerank-list">
             {rows.map((r) => (
-              <RerankRow key={r.ticker} row={r} />
+              <RerankRow key={r.ticker} row={r} proInfo={proLookup.get(r.ticker)} />
             ))}
           </ol>
         </>

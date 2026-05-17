@@ -3731,22 +3731,58 @@ body,
   margin: 16px 0 20px;
 }
 
+/* The card is now a positioning shell — its visual chrome lives on the
+   .card-bg sibling so the surface can be translucent (opacity 0.7) while
+   the title + list content stay fully opaque, matching the ticker-box
+   pattern used everywhere else on the dashboard. */
 .rerank-movers-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  position: relative;
   border-radius: var(--radius-card);
   padding: 14px 16px;
+  /* Default tint = neutral so .card-bg has a usable --card-tint even
+     before the direction modifier class hits. */
+  --card-tint: 156, 163, 175;
+}
+
+/* Content sits ABOVE the .card-bg chrome layer. */
+.rerank-movers-card > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Tint modifier classes — only set --card-tint. The .card-bg recipe
+   uses it for both the radial gradient AND the top-border accent so
+   the colour is coherent edge-to-center. */
+.rerank-movers-top    { --card-tint: 34, 197, 94; }
+.rerank-movers-bottom { --card-tint: 239, 68, 68; }
+
+/* The .card-bg recipe inside movers cards mirrors the rerank-row /
+   ticker-card chrome (translucent dark surface + backdrop blur + inset
+   highlight + box shadow), but the accent border lives on the TOP edge
+   instead of the LEFT — visually anchors the card title above. */
+.rerank-movers-card .card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 0% 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-width: 2px;
+  border-top-color: rgb(var(--card-tint));
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 4px 14px rgba(0, 0, 0, 0.2);
-}
-
-.rerank-movers-top {
-  border-top: 2px solid var(--bull);
-}
-
-.rerank-movers-bottom {
-  border-top: 2px solid var(--bear);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0.7;
 }
 
 .rerank-movers-title {
@@ -3800,27 +3836,38 @@ body,
 
 /* --- Main ranked list ------------------------------------------------ */
 
-/* The list head + each row share the same grid template so the four
-   cells line up vertically. Rank cell stays tight; ticker takes the
-   remaining space; deltas are fixed-width pills. */
+/* The list head + each row share the same grid template so the seven
+   cells line up vertically:
+     rank | ticker | asset class | added (date) | days | 1W Δ | 1M Δ
+   Asset class takes the flexible column so long names ellipsis-truncate;
+   the rest are fixed widths for clean alignment. Asset + added + days
+   collapse on mobile via the media query below so phone rows stay
+   readable with just rank / ticker / 1W Δ / 1M Δ. */
 .rerank-list-head,
 .rerank-row {
   display: grid;
-  grid-template-columns: 56px minmax(80px, 1fr) 110px 110px;
+  grid-template-columns:
+    64px                  /* rank        */
+    minmax(86px, auto)    /* ticker      */
+    minmax(140px, 1fr)    /* asset class — flexible */
+    118px                 /* added date  */
+    64px                  /* days        */
+    104px                 /* 1W Δ        */
+    104px;                /* 1M Δ        */
   align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 12px 16px;
 }
 
 .rerank-list-head {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-dim);
   border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .rerank-list-head .rerank-rank,
@@ -3843,25 +3890,69 @@ body,
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
+/* Rows wear the same ticker-box chrome the other tabs use: a sibling
+   .card-bg div carries the dark-glass backdrop-filter, the opacity
+   knob, the radial-gradient tint, the inset highlight, and the
+   state-tinted left border. The row itself stays as a CSS grid so the
+   four content cells (rank / ticker / 1W / 1M) line up — only the
+   visual chrome moves to the .card-bg layer. */
 .rerank-row {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  position: relative;
   border-radius: var(--radius-card);
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Default tint = neutral so .card-bg has a valid --card-tint even
+     before the row-level modifier class hits. */
+  --card-tint: 156, 163, 175;
 }
+
+/* Content cells sit ABOVE the .card-bg chrome layer (same pattern as
+   .call-card / .all-time-card use elsewhere in this stylesheet). */
+.rerank-row > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Tint modifier classes — only set --card-tint. Geometry is owned by
+   the base .rerank-row + .card-bg rules so all rows render identical
+   chrome regardless of direction. */
+.rerank-row-up      { --card-tint: 34, 197, 94; }
+.rerank-row-down    { --card-tint: 239, 68, 68; }
+.rerank-row-neutral { --card-tint: 156, 163, 175; }
 
 .rerank-row:hover {
-  background: var(--bg-elev-2);
-  border-color: var(--border-strong);
   transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(var(--card-tint), 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.35);
 }
+
+/* Entrance stagger — same idiom as .cards / .call-grid / .all-time-grid
+   children, just retargeted at the rerank list. card-enter is defined
+   once near the bottom of this file and plays a 0.4s slide-up fade.
+   The cascade of nth-child delays gives the list a top-down reveal. */
+.rerank-list > * {
+  animation: card-enter 0.4s ease-out backwards;
+}
+.rerank-list > :nth-child(1)  { animation-delay: 20ms; }
+.rerank-list > :nth-child(2)  { animation-delay: 40ms; }
+.rerank-list > :nth-child(3)  { animation-delay: 60ms; }
+.rerank-list > :nth-child(4)  { animation-delay: 80ms; }
+.rerank-list > :nth-child(5)  { animation-delay: 100ms; }
+.rerank-list > :nth-child(6)  { animation-delay: 120ms; }
+.rerank-list > :nth-child(7)  { animation-delay: 140ms; }
+.rerank-list > :nth-child(8)  { animation-delay: 160ms; }
+.rerank-list > :nth-child(9)  { animation-delay: 180ms; }
+.rerank-list > :nth-child(10) { animation-delay: 200ms; }
+.rerank-list > :nth-child(n+11) { animation-delay: 220ms; }
 
 .rerank-rank {
   font-family: var(--mono);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-strong);
   text-align: right;
@@ -3870,11 +3961,77 @@ body,
 
 .rerank-ticker {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-strong);
   letter-spacing: 0.4px;
   text-transform: uppercase;
+}
+
+/* Asset class cell — sans, near-full text contrast, truncated with
+   ellipsis when names are long (the source can return "Macro, Housing,
+   Digital Assets & Financials" which would overflow). The header
+   version uses the same class to inherit grid placement; .rerank-list-head
+   overrides color + weight via the parent rule below. */
+.rerank-asset {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Added cell — full date (e.g. "Mar 6, 2025") in the mono font for
+   tight column alignment. Right-aligned so it pairs visually with
+   the days cell + delta chips that follow it. */
+.rerank-added {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Days cell — compact "Nd" number derived from date_added. Same mono
+   font as the date; muted so the date reads as the primary fact and
+   days reads as the at-a-glance derived metric. Right-aligned to keep
+   the column edges crisp. */
+.rerank-days {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: right;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+/* Placeholder shown when the ticker isn't in the ETF Pro Plus book
+   (re-rank universe is broader). Very muted so the cell reads as
+   "no data" without competing with the populated rows. */
+.rerank-cell-missing {
+  color: var(--text-dim);
+  opacity: 0.4;
+}
+
+/* Header overrides for the label cells — match the same muted
+   uppercase typography used for RANK/TICKER above. Slightly larger
+   than before to harmonize with the bumped row font sizes. */
+.rerank-list-head .rerank-asset,
+.rerank-list-head .rerank-added,
+.rerank-list-head .rerank-days {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: left;
+}
+.rerank-list-head .rerank-added,
+.rerank-list-head .rerank-days {
+  text-align: right;
 }
 
 /* --- Delta chip ------------------------------------------------------- */
@@ -3882,11 +4039,11 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
-  padding: 4px 10px;
+  min-width: 72px;
+  padding: 5px 12px;
   border-radius: var(--radius-pill);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.3px;
   border: 1px solid transparent;
@@ -3966,9 +4123,21 @@ body,
 
   .rerank-list-head,
   .rerank-row {
+    /* Collapse to 4 visible columns on mobile (asset class + added
+       are hidden via display: none below) so each row stays scannable
+       and the delta chips don't get crammed. */
     grid-template-columns: 38px minmax(70px, 1fr) 78px 78px;
     gap: 10px;
     padding: 10px 12px;
+  }
+
+  .rerank-row .rerank-asset,
+  .rerank-row .rerank-added,
+  .rerank-row .rerank-days,
+  .rerank-list-head .rerank-asset,
+  .rerank-list-head .rerank-added,
+  .rerank-list-head .rerank-days {
+    display: none;
   }
 
   .rerank-rank {
@@ -4029,8 +4198,13 @@ body,
    =================================================================== */
 
 @media (max-width: 640px) {
-  /* 1. Kill backdrop-filter — biggest single mobile paint cost. */
+  /* 1. Kill backdrop-filter — biggest single mobile paint cost.
+     Includes every .card-bg variant the dashboard uses (ticker cards
+     + rerank rows + rerank movers cards) so all surfaces get the
+     same mobile treatment. */
   .call-card .card-bg,
+  .rerank-row .card-bg,
+  .rerank-movers-card .card-bg,
   .all-time-card {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -4040,12 +4214,19 @@ body,
   }
 
   /* 2. Skip rendering off-screen cards. Estimated intrinsic size matches
-     the rendered card height so the scrollbar stays accurate. */
+     the rendered card height so the scrollbar stays accurate. Rerank
+     rows are much shorter than card-grid items so they get their own
+     smaller intrinsic size. */
   .cards > *,
   .call-grid > *,
   .all-time-grid > * {
     content-visibility: auto;
     contain-intrinsic-size: 320px;
+  }
+
+  .rerank-list > * {
+    content-visibility: auto;
+    contain-intrinsic-size: 56px;
   }
 
   /* 3. Drop the always-running conic chrome + hover sheen on touch. */
