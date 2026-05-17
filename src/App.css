@@ -3806,26 +3806,45 @@ body,
   gap: 6px;
 }
 
+/* 4-column grid: ticker | asset class (flexes) | rank | delta chip.
+   Asset class takes the leftover space and ellipsis-truncates so long
+   names ("Macro, Housing, Digital Assets & Financials") don't wrap and
+   push the rank/delta off-row. */
 .rerank-movers-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 4px 0;
+  gap: 12px;
+  padding: 6px 0;
 }
 
 .rerank-movers-ticker {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-strong);
   letter-spacing: 0.3px;
 }
 
+/* Asset class — sans, near-full contrast, ellipsis-truncated so the
+   row stays a single line at any card width. Centered within its
+   flexible grid cell to match the main list's asset column. */
+.rerank-movers-asset {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  text-align: center;
+}
+
 .rerank-movers-rank {
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.3px;
 }
 
 .rerank-movers-empty {
@@ -3980,6 +3999,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  text-align: center;
 }
 
 /* Added cell — full date (e.g. "Mar 6, 2025") in the mono font for
@@ -4027,7 +4047,11 @@ body,
   letter-spacing: 1px;
   color: var(--text-dim);
   text-transform: uppercase;
-  text-align: left;
+}
+/* ASSET CLASS header centers to match the row cells. ADDED + DAYS
+   stay right-aligned to pair with the right-aligned row values. */
+.rerank-list-head .rerank-asset {
+  text-align: center;
 }
 .rerank-list-head .rerank-added,
 .rerank-list-head .rerank-days {

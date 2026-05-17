@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useEtfReRank } from '../lib/useEtfReRank'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
+import { shortenAssetClass } from '../lib/assetClass'
 import { StatusChip } from './StatusChip'
 
 const MOVERS_LIMIT = 5
@@ -75,7 +76,9 @@ function DeltaChip({ delta, ariaPrefix = 'Delta' }) {
 // Top/Bottom movers strip — two side-by-side mini-cards above the main
 // list. Each lists 5 tickers with their 1W delta, sorted to surface
 // the biggest moves first (positive for "top", negative for "bottom").
-function MoversStrip({ rows }) {
+// proLookup is the same Map<ticker, {asset_class, date_added}> the main
+// list uses; here we only need asset_class for the inline label.
+function MoversStrip({ rows, proLookup }) {
   const { top, bottom } = useMemo(() => {
     // Only rows with a finite 1W delta participate. The first iteration
     // after a fresh seed will have nulls (no prior snapshot exists yet);
@@ -113,6 +116,9 @@ function MoversStrip({ rows }) {
             {top.map((r) => (
               <li key={r.ticker} className="rerank-movers-row">
                 <span className="rerank-movers-ticker">{r.ticker}</span>
+                <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
+                  {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
+                </span>
                 <span className="rerank-movers-rank">#{r.rank}</span>
                 <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
               </li>
@@ -131,6 +137,9 @@ function MoversStrip({ rows }) {
             {bottom.map((r) => (
               <li key={r.ticker} className="rerank-movers-row">
                 <span className="rerank-movers-ticker">{r.ticker}</span>
+                <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
+                  {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
+                </span>
                 <span className="rerank-movers-rank">#{r.rank}</span>
                 <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
               </li>
@@ -163,7 +172,7 @@ function rerankTintClass(delta) {
 
 function RerankRow({ row, proInfo }) {
   const tintClass = rerankTintClass(row.delta_1w)
-  const assetClass = proInfo?.asset_class ?? null
+  const assetClass = shortenAssetClass(proInfo?.asset_class) ?? null
   const { dateLabel, days } = parseAdded(proInfo?.date_added)
   return (
     <li className={`rerank-row ${tintClass}`}>
@@ -251,7 +260,7 @@ export function EtfReRankPanel() {
 
       {status === 'ready' && (
         <>
-          <MoversStrip rows={rows} />
+          <MoversStrip rows={rows} proLookup={proLookup} />
 
           {/* Column header — visually anchors the six-cell grid so the
               user knows what each cell means. Same grid template the

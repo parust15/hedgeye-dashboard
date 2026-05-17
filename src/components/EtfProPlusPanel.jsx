@@ -4,6 +4,7 @@ import { SignalCard } from './SignalCard'
 import { SortControl } from './SortControl'
 import { CategoryFilter } from './CategoryFilter'
 import { StatusChip } from './StatusChip'
+import { shortenAssetClass } from '../lib/assetClass'
 
 // --- localStorage keys (per CLAUDE.md: dashboard.<feature>) ----------------
 const SEARCH_KEY = 'dashboard.etfSearch'
@@ -119,7 +120,11 @@ function toSignalRow(etf) {
     sell_trade: etf.trend_range_high,
     prev_close: etf.recent_price,
     range_state: null,
-    category: etf.asset_class || null,
+    // Shorten at the boundary so the filter chips, category lookup,
+    // and sort comparator all see the same label the user sees.
+    // "Emerging Market Equities" → "Emerging Markets",
+    // "International Equities" → "International".
+    category: etf.asset_class ? shortenAssetClass(etf.asset_class) : null,
     signal_date: etf.snapshot_date,
     _etf: etf,
   }
