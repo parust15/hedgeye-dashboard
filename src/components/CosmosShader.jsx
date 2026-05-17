@@ -61,7 +61,11 @@ void main() {
   vec2 uv = gl_FragCoord.xy / u_resolution.xy;
   vec2 p  = uv * 2.0 - 1.0;
   p.x *= u_resolution.x / u_resolution.y;
-  float t = u_time * 0.12;
+  // Master time scale for cloud motion. Drives all density-field drift,
+  // color-mix evolution, cluster-core orbit, and dust-lane animation.
+  // Bumped 0.12 -> 0.18 (+50%) per request — cloud movement is now ~1.5x
+  // faster. Cluster pulses use raw u_time and aren't affected.
+  float t = u_time * 0.18;
 
   // Deeper space base — closer to true black so lit nebula pops against it
   vec3 col = vec3(0.010, 0.006, 0.018);
@@ -78,15 +82,22 @@ void main() {
   vec2 core1 = vec2(sin(t*0.4)*0.45 - 0.35, cos(t*0.3)*0.30 - 0.25);
   vec2 core2 = vec2(cos(t*0.5)*0.45 + 0.45, sin(t*0.6)*0.30 + 0.35);
 
-  float c1Glow = pow(smoothstep(1.0, 0.0, length(p - core1)), 2.5);
-  float c2Glow = pow(smoothstep(0.9, 0.0, length(p - core2)), 2.5);
+  // Cluster cores — tighter falloff (0.70/0.60 vs 1.0/0.9) with higher
+  // power (4.0 vs 2.5) so the bright glow stays contained near the core
+  // center rather than dominating the middle third of the viewport.
+  float c1Glow = pow(smoothstep(0.70, 0.0, length(p - core1)), 4.0);
+  float c2Glow = pow(smoothstep(0.60, 0.0, length(p - core2)), 4.0);
 
   float pulse1 = 0.85 + 0.15 * sin(u_time * 0.8);
   float pulse2 = 0.85 + 0.15 * sin(u_time * 0.6 + 1.5);
 
   // Carina Nebula palette
   vec3 rosePink     = vec3(0.95, 0.50, 0.60);  // dominant dusty rose
-  vec3 softLavender = vec3(0.55, 0.65, 0.95);  // soft blue secondary
+  // Blue secondary brightened + saturated — was (0.55, 0.65, 0.95)
+  // soft lavender, now a vivid mid-blue with stronger green/blue
+  // channels and lower red so the blue regions read distinctly blue
+  // instead of bleeding into rose.
+  vec3 softLavender = vec3(0.30, 0.55, 1.00);
   vec3 brightCyan   = vec3(0.70, 0.90, 1.00);  // central cluster glow
   vec3 warmOrange   = vec3(1.00, 0.55, 0.25);  // warm dust highlights
   vec3 deepMagenta  = vec3(0.85, 0.30, 0.55);  // saturation pops
@@ -102,33 +113,39 @@ void main() {
   float n3 = max(d3, 0.0);
 
   // Density with contrast curve — pow() pushes low values toward
-  // black, high values stay bright. Multiplier bumped to compensate.
+  // black, high values stay bright. Curve bumped 1.25 -> 1.40 (deeper
+  // shadows); multiplier 1.5 -> 1.7 to keep lit zones vivid.
   float density = n1 * n1 * 0.7 + n2 * 0.35 + n3 * n3 * 0.25;
-  density = pow(density, 1.25);
+  density = pow(density, 1.40);
 
-  vec3 nebula = baseField * density * 1.5;
+  vec3 nebula = baseField * density * 1.7;
 
-  // Bright cluster cores — cyan halo + rose halo
-  nebula += brightCyan * c1Glow * 1.15 * pulse1;
-  nebula += rosePink   * c2Glow * 1.10 * pulse2;
+  // Cluster cores — reduced 1.15/1.10 -> 0.45/0.40 so the centers blend
+  // with the surrounding nebula density rather than dominating the
+  // middle of the viewport. Combined with the tighter smoothstep above,
+  // this keeps the cores readable as bright spots without spilling
+  // brightness across the central third.
+  nebula += brightCyan * c1Glow * 0.45 * pulse1;
+  nebula += rosePink   * c2Glow * 0.40 * pulse2;
 
   // Warm orange sparkle only in densest swirl regions
   nebula += warmOrange * n3 * n3 * 0.25 * smoothstep(0.4, 0.8, n1);
 
-  // Dust lanes modulate everything — wider range (was 0.50→1.0,
-  // now 0.20→1.20) so shadow channels go deeper black and lit regions
-  // glow more brightly. Main driver of nebula-vs-void contrast.
+  // Dust lanes modulate everything — wider range (now 0.12→1.35)
+  // pushes shadow channels deeper toward black and lit regions
+  // glow brighter. Main driver of nebula-vs-void contrast.
   float lanes = smoothstep(-0.3, 0.4, fbm(p * 1.8 + vec2(t * 0.1)));
-  nebula *= mix(0.20, 1.20, lanes);
+  nebula *= mix(0.12, 1.35, lanes);
 
   // Dark reddish-brown filament hints in shadowed regions (strengthened)
   nebula += darkDust * (1.0 - lanes) * d2 * 0.28;
 
   col += nebula;
 
-  // Saturation boost — pull colors away from gray toward their hue
+  // Saturation boost — pull colors away from gray. Strengthened
+  // 1.25 -> 1.40 so the blue/rose/orange zones read more vividly.
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(lum), col, 1.25);
+  col = mix(vec3(lum), col, 1.40);
 
   float domStrength = 0.06 + u_dominance * 0.10;
   col += u_dominant * smoothstep(1.4, 0.0, length(p)) * domStrength;
