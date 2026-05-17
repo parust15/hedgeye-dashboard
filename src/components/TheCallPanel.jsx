@@ -312,6 +312,8 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false }) {
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
+      {/* Background chrome layer — see SignalCard for shape. */}
+      <div className="card-bg" aria-hidden="true" />
       <header className="cc-head">
         <div className={`cc-head-id ${directionClass}`}>
           <div className="cc-ticker">{row.ticker}</div>

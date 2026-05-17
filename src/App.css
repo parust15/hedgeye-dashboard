@@ -1323,12 +1323,43 @@
 }
 
 /* === Card === */
+/* === .call-card = layout wrapper only ===
+   All visual chrome (background, border, backdrop-filter, box-shadow,
+   conic swirl ::before, hover sheen ::after) lives on the .card-bg
+   sibling layer below. That way background opacity / blur / tint can
+   be tuned independently of card content opacity. JSX renders:
+     <article class="call-card border-X ...">
+       <div class="card-bg" aria-hidden="true" />   ← visual chrome
+       …content…                                   ← always opacity 1
+     </article>
+*/
 .call-card {
   position: relative;
-  /* Glass base — same recipe as .card. The 3px state-coloured left
-     stripe is fed by --card-tint so the state signal lives in ONE
-     place: change the tint variable, the stripe and the ribbons
-     update together. */
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  --shelf-y: -2px;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* === .card-bg — the visual chrome layer ===
+   Absolute-positioned sibling sitting BEHIND the card's content
+   (z-index: 0; content children get z-index: 1 via the .call-card > *
+   rule further down). Carries the background recipe, border, backdrop-
+   filter, and the inset/drop box-shadow that were previously on
+   .call-card directly. opacity here is the user-tunable knob —
+   change it without affecting text/pills/slider/chart legibility. */
+.card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
   background:
     radial-gradient(
       ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
@@ -1340,28 +1371,13 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left-width: 3px;
   border-left-color: rgb(var(--card-tint));
-  border-radius: var(--radius-card);
-  padding: 12px 14px;
   backdrop-filter: blur(20px) saturate(120%);
   -webkit-backdrop-filter: blur(20px) saturate(120%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 4px 16px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  --shelf-y: -2px;
-  /* Single source of truth for ticker-card transparency. Both RR and
-     Call cards render at this opacity so the cosmos backdrop shows
-     through equally on both tabs. Previously only Call cards got this
-     dim (via .panel-dim ancestor) on stale-data days, which made the
-     two tabs look different. Now applied at the card level, unconditional. */
+  /* Background-only transparency knob. Card content above stays at 1.0. */
   opacity: 0.7;
-  /* Animation set by the grid override below, identical to .card. */
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* .call-card.border-{long|short|neutral} border-left-color rules
@@ -3089,7 +3105,7 @@ body,
   .ambient-sweep,
   .ambient-ticker-star,
   .ambient-alert-pulse,
-  .call-card::before,
+  .call-card .card-bg::before,
   .all-time-card::before,
   .conviction-bar-fill::before,
   .pulse-dot,
@@ -3125,7 +3141,10 @@ body,
   overflow: hidden;
 }
 
-.call-card[role='button']::after,
+/* Hover sheen — moved to .card-bg::after on .call-card so it composites
+   with the rest of the chrome layer (and rides the chrome's opacity).
+   .all-time-card has no .card-bg yet, so its ::after stays inline. */
+.call-card[role='button'] .card-bg::after,
 .all-time-card::after {
   content: "";
   position: absolute;
@@ -3141,7 +3160,7 @@ body,
   transition: transform 0.7s ease;
 }
 
-.call-card[role='button']:hover::after,
+.call-card[role='button']:hover .card-bg::after,
 .all-time-card:hover::after {
   transform: translateX(100%);
 }
@@ -3289,7 +3308,9 @@ body,
    produced per-card variance depending on which modifier classes
    were active. Now strictly state-tinted ribbons, identical across
    every card in every grid. */
-.call-card::before,
+/* Swirl now lives on .card-bg::before (the chrome layer) for .call-card,
+   and .all-time-card::before (which has no .card-bg yet — kept inline). */
+.call-card .card-bg::before,
 .all-time-card::before {
   content: "";
   position: absolute;
@@ -3322,14 +3343,18 @@ body,
   to   { transform: rotate(360deg); }
 }
 
-/* Keep content above the ambient layer; hover sheen (::after) on top. */
-.call-card > *,
+/* Keep content above the .card-bg chrome layer. .card-bg itself is
+   absolute-positioned at z-index 0; content sits at z-index 1.
+   :not(.card-bg) ensures the chrome layer keeps its bottom position. */
+.call-card > *:not(.card-bg),
 .all-time-card > * {
   position: relative;
   z-index: 1;
 }
 
-.call-card[role='button']::after,
+/* Hover sheen ::after on .card-bg sits on top of the chrome but below
+   the content; .all-time-card's still on .all-time-card directly. */
+.call-card[role='button'] .card-bg::after,
 .all-time-card::after {
   z-index: 2;
 }
@@ -3341,35 +3366,38 @@ body,
    already mid-cycle at first paint. .top5-scroll is included here
    (it was previously excluded) so the horizontal strip animates
    alongside the grids. */
-.cards > :nth-child(6n+1)::before,
-.call-grid > :nth-child(6n+1)::before,
+/* Swirl stagger — now targets .card-bg::before inside .call-card.
+   .all-time-card swirl still lives on .all-time-card::before directly
+   (no card-bg refactor on All-Time yet). */
+.cards > :nth-child(6n+1) .card-bg::before,
+.call-grid > :nth-child(6n+1) .card-bg::before,
 .all-time-grid > :nth-child(6n+1)::before,
-.top5-scroll > :nth-child(6n+1)::before { animation-delay: 0s; }
+.top5-scroll > :nth-child(6n+1) .card-bg::before { animation-delay: 0s; }
 
-.cards > :nth-child(6n+2)::before,
-.call-grid > :nth-child(6n+2)::before,
+.cards > :nth-child(6n+2) .card-bg::before,
+.call-grid > :nth-child(6n+2) .card-bg::before,
 .all-time-grid > :nth-child(6n+2)::before,
-.top5-scroll > :nth-child(6n+2)::before { animation-delay: -1s; }
+.top5-scroll > :nth-child(6n+2) .card-bg::before { animation-delay: -1s; }
 
-.cards > :nth-child(6n+3)::before,
-.call-grid > :nth-child(6n+3)::before,
+.cards > :nth-child(6n+3) .card-bg::before,
+.call-grid > :nth-child(6n+3) .card-bg::before,
 .all-time-grid > :nth-child(6n+3)::before,
-.top5-scroll > :nth-child(6n+3)::before { animation-delay: -2s; }
+.top5-scroll > :nth-child(6n+3) .card-bg::before { animation-delay: -2s; }
 
-.cards > :nth-child(6n+4)::before,
-.call-grid > :nth-child(6n+4)::before,
+.cards > :nth-child(6n+4) .card-bg::before,
+.call-grid > :nth-child(6n+4) .card-bg::before,
 .all-time-grid > :nth-child(6n+4)::before,
-.top5-scroll > :nth-child(6n+4)::before { animation-delay: -3s; }
+.top5-scroll > :nth-child(6n+4) .card-bg::before { animation-delay: -3s; }
 
-.cards > :nth-child(6n+5)::before,
-.call-grid > :nth-child(6n+5)::before,
+.cards > :nth-child(6n+5) .card-bg::before,
+.call-grid > :nth-child(6n+5) .card-bg::before,
 .all-time-grid > :nth-child(6n+5)::before,
-.top5-scroll > :nth-child(6n+5)::before { animation-delay: -4s; }
+.top5-scroll > :nth-child(6n+5) .card-bg::before { animation-delay: -4s; }
 
-.cards > :nth-child(6n)::before,
-.call-grid > :nth-child(6n)::before,
+.cards > :nth-child(6n) .card-bg::before,
+.call-grid > :nth-child(6n) .card-bg::before,
 .all-time-grid > :nth-child(6n)::before,
-.top5-scroll > :nth-child(6n)::before { animation-delay: -5s; }
+.top5-scroll > :nth-child(6n) .card-bg::before { animation-delay: -5s; }
 
 /* === System-state chrome ============================================
    One construction reused for every metadata pill on the dashboard:

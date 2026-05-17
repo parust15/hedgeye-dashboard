@@ -357,6 +357,10 @@ export function SignalCard({
         }
       }}
     >
+      {/* Background chrome layer — absolute-positioned sibling carrying
+          bg, border, backdrop-filter, swirl, sheen, and its own opacity
+          knob. Content sits above this via z-index. */}
+      <div className="card-bg" aria-hidden="true" />
       <header className="cc-head">
         <div className={`cc-head-id direction-${trendDirection(row.trend)}`}>
           <div className="cc-ticker">{row.ticker}</div>
