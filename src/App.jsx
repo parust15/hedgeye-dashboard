@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopTabs } from './components/TopTabs'
 import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
+import { EtfProPlusPanel } from './components/EtfProPlusPanel'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
 import { AmbientBackground } from './components/AmbientBackground'
@@ -11,7 +12,7 @@ import { supabase } from './lib/supabase'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
-const VALID_TABS = ['risk-ranges', 'the-call']
+const VALID_TABS = ['risk-ranges', 'the-call', 'etf-pro-plus']
 
 function loadInitialTab() {
   try {
@@ -109,6 +110,7 @@ export default function App() {
           onOpenModal={setModalPosition}
         />
       )}
+      {activeTab === 'etf-pro-plus' && <EtfProPlusPanel />}
       {modalPosition && (
         <TickerDetailModal position={modalPosition} onClose={closeModal} />
       )}
