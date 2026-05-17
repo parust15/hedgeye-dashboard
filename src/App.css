@@ -1520,6 +1520,15 @@
    NEW TODAY and FLIPPED pills (inherited from .status-badge above), so
    the rank reads as just another status pill, not a separate visual. */
 .status-rank { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); border: 1px solid rgba(255, 255, 255, 0.12); }
+/* Weekly Top 5 appearance badge — "×N THIS WEEK". Same shape as the
+   other status pills; uses the amber/orange tint so it visually
+   signals "across multiple days" without competing with the green
+   NEW TODAY badge. */
+.status-weekly {
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--amber-light);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
 
 /* "★ BEST IDEA" — Hedgeye's highest-conviction flag inferred from rationale. */
 .badge-best-idea {
@@ -1796,11 +1805,30 @@
   min-width: 0;
 }
 
+/* Small count chip rendered next to the weekly section title so the
+   user can see "N picks this week" without expanding the strip. */
+.call-section-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
 .call-section-empty {
   padding: 0 14px 14px;
   color: var(--text-dim);
   font-size: 12px;
   font-style: italic;
+}
+
+/* Tighter top margin between the daily and weekly Top 5 strips so they
+   read as a pair of related rollups rather than fully independent
+   sections. The daily strip handles its own bottom margin. */
+.call-section-weekly-top5 {
+  margin-top: -4px;
 }
 
 /* === TOP 5 horizontal scroll row === */

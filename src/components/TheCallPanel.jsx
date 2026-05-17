@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
+import { useWeeklyTop5 } from '../lib/useWeeklyTop5'
 import { useLivePrices } from '../lib/livePrices'
 import { useMarketState } from '../lib/marketState'
 import { formatPrice, formatNumber } from '../lib/format'
@@ -134,8 +135,6 @@ const POSITION_FILTERS = [
   { id: 'SHORT', label: 'SHORT' },
   { id: 'NEUTRAL', label: 'NEUTRAL' },
 ]
-
-const MAX_CONVICTION = 75
 
 // Tier sort: FLIPPED first → RETURNING → ADDED (new, not returning) →
 // UNCHANGED. Within tier, callers add a secondary conviction sort.
@@ -294,16 +293,16 @@ function LivePriceRow({ live }) {
   )
 }
 
-function ConvictionBar({ score, rrCrossover }) {
-  const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0
-  const pct = Math.max(0, Math.min(1, safeScore / MAX_CONVICTION)) * 100
+// Card footer is now just the crossover breadcrumb. The conviction bar
+// + numeric score were removed — viewers don't differentiate cards by
+// the 0-75 score in the visible card chrome, and the bar's running
+// gradient sweep was a per-card paint cost. The full conviction bar
+// still lives in TickerDetailModal for the click-into view.
+function RrCrossoverBadge({ show }) {
+  if (!show) return null
   return (
     <div className="conviction-row">
-      <div className="conviction-bar" aria-label={`Conviction ${safeScore} of ${MAX_CONVICTION}`}>
-        <div className="conviction-bar-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="conviction-score">{safeScore}</span>
-      {rrCrossover && <span className="badge-rr-crossover">↗ In Risk Ranges</span>}
+      <span className="badge-rr-crossover">↗ In Risk Ranges</span>
     </div>
   )
 }
@@ -353,7 +352,7 @@ function cardActivationProps(row, onOpen) {
 // same footer, the same chrome. There is no longer a Top5Card variant;
 // rank is just one more piece of badge content rendered through the
 // shared status-badge pill.
-function PositionCard({ row, live, rrCrossover, onOpen, highlight = false }) {
+function PositionCard({ row, live, rrCrossover, onOpen, highlight = false, extraAccent = null }) {
   const cls = [
     'call-card',
     highlight ? 'call-card-highlight' : '',
@@ -367,7 +366,10 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false }) {
   const hasChangeStatus = row.change_status === 'ADDED' || row.change_status === 'FLIPPED'
   const hasRank = row.top5_rank != null
   const isBest = isBestIdea(row.rationale)
-  const hasAccent = hasChangeStatus || hasRank || isBest
+  // `extraAccent` is an optional badge slot used by the weekly Top 5
+  // section to surface "×N THIS WEEK" without coupling that concept into
+  // the row shape. When non-null it forces the accent row to render.
+  const hasAccent = hasChangeStatus || hasRank || isBest || extraAccent != null
 
   return (
     <article className={cls} {...cardActivationProps(row, onOpen)}>
@@ -385,11 +387,12 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false }) {
           <ChangeStatusBadge row={row} />
           <RankBadge rank={row.top5_rank} />
           <BestIdeaBadge rationale={row.rationale} />
+          {extraAccent}
         </div>
       )}
       <LivePriceRow live={live} />
       <div className="cc-footer">
-        <ConvictionBar score={row.conviction_score} rrCrossover={rrCrossover} />
+        <RrCrossoverBadge show={rrCrossover} />
       </div>
     </article>
   )
@@ -465,6 +468,89 @@ function Top5Section({ top5, positionByTicker, livePrices, rrTickers, onOpen }) 
   )
 }
 
+// === Weekly Top 5 rollup =================================================
+//
+// A second strip rendered directly under the daily Top 5. Surfaces every
+// unique ticker that appeared in any day's Top 5 over the trailing 5
+// trading days (see useWeeklyTop5). Tickers picked on multiple days bubble
+// to the front with a "×N THIS WEEK" badge; single-day picks follow in
+// most-recent-first order.
+
+function WeeklyAppearanceBadge({ appearances }) {
+  if (appearances < 2) return null
+  return <span className="status-badge status-weekly">×{appearances} THIS WEEK</span>
+}
+
+function WeeklyTop5HighlightCard({ entry, positionByTicker, live, rrCrossover, onOpen }) {
+  // Reuse the live position record when available (same trick the daily
+  // Top5HighlightCard uses) so direction pill + change_status badges
+  // reflect today's state. Fall back to a synthetic row when the ticker
+  // isn't in today's positions.
+  const position = positionByTicker.get(entry.ticker)
+  const row = position
+    ? { ...position }
+    : {
+        ticker: entry.ticker,
+        company_name: entry.company_name,
+        position_type: 'NEUTRAL',
+        rationale: entry.mostRecentRationale,
+        conviction_score: 0,
+      }
+  return (
+    <PositionCard
+      row={row}
+      live={live}
+      rrCrossover={rrCrossover}
+      onOpen={onOpen}
+      highlight={true}
+      extraAccent={<WeeklyAppearanceBadge appearances={entry.appearances} />}
+    />
+  )
+}
+
+// Collapsible TOP 5 — THIS WEEK section. Same chrome as the daily strip,
+// open by default. Empty state lands when no Top 5 has been named in the
+// trailing 5 trading days (rare — usually only on fresh deploys).
+function WeeklyTop5Section({ entries, positionByTicker, livePrices, rrTickers, onOpen }) {
+  const [open, setOpen] = useState(true)
+  const isEmpty = entries.length === 0
+
+  return (
+    <section className="call-section call-section-top5 call-section-weekly-top5">
+      <button
+        type="button"
+        className="call-section-head"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className={`caret${open ? ' open' : ''}`} aria-hidden="true">▸</span>
+        <span className="call-section-title">TOP 5 MOST ACTIONABLE — THIS WEEK</span>
+        {entries.length > 0 && (
+          <span className="call-section-count">{entries.length}</span>
+        )}
+      </button>
+      {open && (
+        isEmpty ? (
+          <div className="call-section-empty">No Top 5 picks named yet this week</div>
+        ) : (
+          <div className="top5-scroll" role="list">
+            {entries.map((entry) => (
+              <WeeklyTop5HighlightCard
+                key={entry.ticker}
+                entry={entry}
+                positionByTicker={positionByTicker}
+                live={livePrices?.get(entry.ticker)}
+                rrCrossover={rrTickers?.has(entry.ticker)}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
+        )
+      )}
+    </section>
+  )
+}
+
 // Collapsible MACRO COMMENTARY section. Collapsed by default per spec.
 // Bullets >6 are hidden behind "Show more". Empty commentary → render nothing.
 function MacroCommentarySection({ commentary }) {
@@ -515,6 +601,7 @@ function MacroCommentarySection({ commentary }) {
 export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
   const { rows, signalDate, isToday, status } = useCallPositions()
   const { top5, macroCommentary } = useCallExtras(signalDate)
+  const { weeklyTop5 } = useWeeklyTop5()
   const market = useMarketState()
   const livePrices = useLivePrices(market.isOpen)
   const [filter, setFilter] = useState('ALL')
@@ -1000,6 +1087,13 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
 
       <Top5Section
         top5={top5}
+        positionByTicker={positionByTicker}
+        livePrices={livePrices}
+        rrTickers={rrTickers}
+        onOpen={openModal}
+      />
+      <WeeklyTop5Section
+        entries={weeklyTop5}
         positionByTicker={positionByTicker}
         livePrices={livePrices}
         rrTickers={rrTickers}
