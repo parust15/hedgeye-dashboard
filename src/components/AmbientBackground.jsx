@@ -36,16 +36,49 @@ function mulberry32(seed) {
   }
 }
 
-// Build a comma-separated box-shadow string with N white star dots.
+// Build a comma-separated box-shadow string with N stars distributed
+// across the stellar classification spectrum (O/B blue-white through
+// M-type red), with a power-curve brightness distribution and 3-tier
+// size variety so the field reads as natural sky instead of uniform
+// white pixels.
 function generateStarShadows(count, seed) {
   const rng = mulberry32(seed)
   const shadows = []
   for (let i = 0; i < count; i++) {
     const x = (rng() * 100).toFixed(2)
     const y = (rng() * 100).toFixed(2)
-    const alpha = (0.25 + rng() * 0.65).toFixed(2)
-    const size = rng() < 0.06 ? '1px' : '0.5px'
-    shadows.push(`${x}vw ${y}vh 0 ${size} rgba(255,255,255,${alpha})`)
+
+    // Brightness — power curve biases toward dim, rare brights stand out
+    const brightRoll = rng()
+    const alpha = (0.20 + Math.pow(brightRoll, 2.5) * 0.78).toFixed(2)
+
+    // Size — six tiers from 0.5px tiny dots up to rare 2.5px giants,
+    // distributed so the field reads as "most pinpricks, a noticeable
+    // minority larger, the very largest stars are striking standouts".
+    const sizeRoll = rng()
+    const size =
+      sizeRoll < 0.003 ? '2.5px' :
+      sizeRoll < 0.015 ? '2px' :
+      sizeRoll < 0.045 ? '1.5px' :
+      sizeRoll < 0.120 ? '1px' :
+      sizeRoll < 0.280 ? '0.75px' :
+      '0.5px'
+
+    // Stellar color — main-sequence classification distribution
+    const colorRoll = rng()
+    let r = 255, g = 255, b = 255
+    if (colorRoll < 0.18) {
+      r = 200; g = 220; b = 255       // O/B-type blue-white (hot)
+    } else if (colorRoll < 0.36) {
+      r = 255; g = 245; b = 220       // F/G-type yellow-white (sun-like)
+    } else if (colorRoll < 0.46) {
+      r = 255; g = 210; b = 170       // K-type orange
+    } else if (colorRoll < 0.52) {
+      r = 255; g = 170; b = 130       // M-type red giant
+    }
+    // Remaining ~48% stay pure white
+
+    shadows.push(`${x}vw ${y}vh 0 ${size} rgba(${r},${g},${b},${alpha})`)
   }
   return shadows.join(', ')
 }
@@ -252,8 +285,8 @@ export function AmbientBackground({ tickers }) {
   const { tint, dominance } = useMemo(() => dominantState(tickers), [tickers])
 
   // Star fields are deterministic — generated once, never re-rendered.
-  const farStars = useMemo(() => generateStarShadows(420, 7), [])
-  const midStars = useMemo(() => generateStarShadows(120, 23), [])
+  const farStars = useMemo(() => generateStarShadows(600, 7), [])
+  const midStars = useMemo(() => generateStarShadows(180, 23), [])
 
   // Mouse parallax — far stars drift less than mid (depth cue).
   const mx = useMotionValue(0)

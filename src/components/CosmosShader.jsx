@@ -63,7 +63,8 @@ void main() {
   p.x *= u_resolution.x / u_resolution.y;
   float t = u_time * 0.12;
 
-  vec3 col = vec3(0.020, 0.012, 0.028);  // slightly warmer base for pink palette
+  // Deeper space base — closer to true black so lit nebula pops against it
+  vec3 col = vec3(0.010, 0.006, 0.018);
 
   // Density fields — drive HOW MUCH nebula appears
   float d1 = fbm(p * 1.2 + vec2(t * 0.3, t * 0.2));
@@ -100,9 +101,12 @@ void main() {
   float n2 = max(d2, 0.0);
   float n3 = max(d3, 0.0);
 
+  // Density with contrast curve — pow() pushes low values toward
+  // black, high values stay bright. Multiplier bumped to compensate.
   float density = n1 * n1 * 0.7 + n2 * 0.35 + n3 * n3 * 0.25;
+  density = pow(density, 1.25);
 
-  vec3 nebula = baseField * density * 1.2;
+  vec3 nebula = baseField * density * 1.5;
 
   // Bright cluster cores — cyan halo + rose halo
   nebula += brightCyan * c1Glow * 1.15 * pulse1;
@@ -111,14 +115,20 @@ void main() {
   // Warm orange sparkle only in densest swirl regions
   nebula += warmOrange * n3 * n3 * 0.25 * smoothstep(0.4, 0.8, n1);
 
-  // Dust lanes modulate everything
+  // Dust lanes modulate everything — wider range (was 0.50→1.0,
+  // now 0.20→1.20) so shadow channels go deeper black and lit regions
+  // glow more brightly. Main driver of nebula-vs-void contrast.
   float lanes = smoothstep(-0.3, 0.4, fbm(p * 1.8 + vec2(t * 0.1)));
-  nebula *= mix(0.50, 1.0, lanes);
+  nebula *= mix(0.20, 1.20, lanes);
 
-  // Dark reddish-brown filament hints in shadowed regions
-  nebula += darkDust * (1.0 - lanes) * d2 * 0.20;
+  // Dark reddish-brown filament hints in shadowed regions (strengthened)
+  nebula += darkDust * (1.0 - lanes) * d2 * 0.28;
 
-  col += nebula * 0.90;
+  col += nebula;
+
+  // Saturation boost — pull colors away from gray toward their hue
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(lum), col, 1.25);
 
   float domStrength = 0.06 + u_dominance * 0.10;
   col += u_dominant * smoothstep(1.4, 0.0, length(p)) * domStrength;
