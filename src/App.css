@@ -4419,3 +4419,234 @@ body,
       rgba(18, 22, 32, 0.92) !important;
   }
 }
+
+/* ===================================================================
+   ETF INFO MODAL
+   Opened from ticker cards on the ETF Pro Plus tab and ticker rows
+   on the ETF Re-Rank tab. Reuses the existing .modal-backdrop /
+   .modal-panel / .modal-close chrome and overrides max-width plus
+   adds ETF-specific content styles.
+   =================================================================== */
+
+.etf-info-modal {
+  max-width: 520px;
+  padding: 28px 28px 24px;
+}
+
+/* Header — large ticker; close button sits at top-right (inherited
+   .modal-close already positions absolutely). */
+.etf-info-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.etf-info-ticker {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.etf-info-name {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.35;
+  margin: 0 0 14px;
+}
+
+/* Chip row — category chip color-coded by category, geography chip
+   always muted-neutral. */
+.etf-info-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.etf-info-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Category color variants. Tinted backgrounds + borders so each
+   category reads as its own pill without needing icons. */
+.etf-info-cat-equity {
+  background: rgba(110, 168, 255, 0.14);
+  color: var(--accent);
+  border-color: rgba(110, 168, 255, 0.35);
+}
+.etf-info-cat-fixed-income {
+  background: var(--bull-bg);
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.etf-info-cat-commodity {
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--amber-light);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.etf-info-cat-currency {
+  background: rgba(167, 139, 250, 0.16);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.4);
+}
+.etf-info-cat-multi-asset {
+  background: rgba(45, 212, 191, 0.14);
+  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.35);
+}
+.etf-info-cat-real-estate {
+  background: rgba(251, 146, 60, 0.16);
+  color: #fdba74;
+  border-color: rgba(251, 146, 60, 0.4);
+}
+.etf-info-cat-money-market {
+  background: rgba(156, 163, 175, 0.14);
+  color: #d1d5db;
+  border-color: rgba(156, 163, 175, 0.32);
+}
+.etf-info-cat-unknown {
+  background: rgba(156, 163, 175, 0.08);
+  color: var(--text-dim);
+  border-color: rgba(156, 163, 175, 0.22);
+}
+
+/* Geography chip — always muted to keep the category chip the lead. */
+.etf-info-geo {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Bullets — clean readable list with subtle markers. */
+.etf-info-bullets {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.etf-info-bullets li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.etf-info-bullets li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+/* Typical-use footer — italic, slightly smaller, muted. */
+.etf-info-typical-use {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.etf-info-typical-label {
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text);
+  text-transform: uppercase;
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* Attribution — very small, very muted. Sits under typical use. */
+.etf-info-attribution {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.7;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* "No info yet" placeholder for tickers the LLM hasn't covered yet. */
+.etf-info-missing {
+  padding: 20px 0 8px;
+  text-align: center;
+}
+
+.etf-info-missing-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 6px;
+}
+
+.etf-info-missing-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Loading skeleton — shimmering placeholder bars that roughly match
+   the final layout shape (name line, chips, four bullet lines). */
+.etf-info-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etf-info-skel {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-badge);
+  animation: etf-info-shimmer 1.4s ease-in-out infinite;
+}
+
+.etf-info-skel-line {
+  height: 14px;
+  width: 100%;
+}
+
+.etf-info-skel-chips {
+  display: flex;
+  gap: 8px;
+  background: transparent !important;
+  animation: none !important;
+}
+
+.etf-info-skel-chip {
+  display: inline-block;
+  height: 18px;
+  width: 80px;
+  border-radius: var(--radius-pill);
+}
+
+@keyframes etf-info-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

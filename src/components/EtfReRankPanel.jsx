@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useEtfReRank } from '../lib/useEtfReRank'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { shortenAssetClass } from '../lib/assetClass'
 import { StatusChip } from './StatusChip'
+import { EtfInfoModal } from './EtfInfoModal'
 
 const MOVERS_LIMIT = 5
 const SKELETON_ROWS = 20
@@ -78,7 +79,7 @@ function DeltaChip({ delta, ariaPrefix = 'Delta' }) {
 // the biggest moves first (positive for "top", negative for "bottom").
 // proLookup is the same Map<ticker, {asset_class, date_added}> the main
 // list uses; here we only need asset_class for the inline label.
-function MoversStrip({ rows, proLookup }) {
+function MoversStrip({ rows, proLookup, onSelect }) {
   const { top, bottom } = useMemo(() => {
     // Only rows with a finite 1W delta participate. The first iteration
     // after a fresh seed will have nulls (no prior snapshot exists yet);
@@ -114,7 +115,19 @@ function MoversStrip({ rows, proLookup }) {
         ) : (
           <ul className="rerank-movers-list">
             {top.map((r) => (
-              <li key={r.ticker} className="rerank-movers-row">
+              <li
+                key={r.ticker}
+                className="rerank-movers-row"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect?.(r.ticker)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onSelect?.(r.ticker)
+                  }
+                }}
+              >
                 <span className="rerank-movers-ticker">{r.ticker}</span>
                 <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
                   {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
@@ -135,7 +148,19 @@ function MoversStrip({ rows, proLookup }) {
         ) : (
           <ul className="rerank-movers-list">
             {bottom.map((r) => (
-              <li key={r.ticker} className="rerank-movers-row">
+              <li
+                key={r.ticker}
+                className="rerank-movers-row"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect?.(r.ticker)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onSelect?.(r.ticker)
+                  }
+                }}
+              >
                 <span className="rerank-movers-ticker">{r.ticker}</span>
                 <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
                   {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
@@ -170,12 +195,24 @@ function rerankTintClass(delta) {
   return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
 }
 
-function RerankRow({ row, proInfo }) {
+function RerankRow({ row, proInfo, onSelect }) {
   const tintClass = rerankTintClass(row.delta_1w)
   const assetClass = shortenAssetClass(proInfo?.asset_class) ?? null
   const { dateLabel, days } = parseAdded(proInfo?.date_added)
+  const handleKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect?.(row.ticker)
+    }
+  }
   return (
-    <li className={`rerank-row ${tintClass}`}>
+    <li
+      className={`rerank-row ${tintClass}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(row.ticker)}
+      onKeyDown={handleKey}
+    >
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-rank">{row.rank}</span>
       <span className="rerank-ticker">{row.ticker}</span>
@@ -220,6 +257,11 @@ export function EtfReRankPanel() {
     return m
   }, [proRows])
 
+  // Click any rank row or movers row to open the EtfInfoModal.
+  const [selectedTicker, setSelectedTicker] = useState(null)
+  const openInfoModal = (ticker) => setSelectedTicker(ticker)
+  const closeInfoModal = () => setSelectedTicker(null)
+
   return (
     <div className="panel rerank-panel">
       <header className="topbar">
@@ -260,7 +302,7 @@ export function EtfReRankPanel() {
 
       {status === 'ready' && (
         <>
-          <MoversStrip rows={rows} proLookup={proLookup} />
+          <MoversStrip rows={rows} proLookup={proLookup} onSelect={openInfoModal} />
 
           {/* Column header — visually anchors the six-cell grid so the
               user knows what each cell means. Same grid template the
@@ -278,10 +320,19 @@ export function EtfReRankPanel() {
 
           <ol className="rerank-list">
             {rows.map((r) => (
-              <RerankRow key={r.ticker} row={r} proInfo={proLookup.get(r.ticker)} />
+              <RerankRow
+                key={r.ticker}
+                row={r}
+                proInfo={proLookup.get(r.ticker)}
+                onSelect={openInfoModal}
+              />
             ))}
           </ol>
         </>
+      )}
+
+      {selectedTicker && (
+        <EtfInfoModal ticker={selectedTicker} onClose={closeInfoModal} />
       )}
     </div>
   )

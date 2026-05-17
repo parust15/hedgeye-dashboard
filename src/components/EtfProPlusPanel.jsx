@@ -4,6 +4,7 @@ import { SignalCard } from './SignalCard'
 import { SortControl } from './SortControl'
 import { CategoryFilter } from './CategoryFilter'
 import { StatusChip } from './StatusChip'
+import { EtfInfoModal } from './EtfInfoModal'
 import { shortenAssetClass } from '../lib/assetClass'
 
 // --- localStorage keys (per CLAUDE.md: dashboard.<feature>) ----------------
@@ -177,7 +178,10 @@ export function EtfProPlusPanel() {
   const [search, setSearch] = useState(loadInitialSearch)
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
-  const [expanded, setExpanded] = useState(null)
+  // ETF cards open a detail modal instead of expanding inline — ETF
+  // tickers don't share the hedgeye_signals_v shape ExpandedChart was
+  // built for. selectedTicker drives the EtfInfoModal mounted below.
+  const [selectedTicker, setSelectedTicker] = useState(null)
 
   // Persist each filter independently so the user's view sticks between
   // sessions, same pattern as the RR + Call panels.
@@ -214,11 +218,10 @@ export function EtfProPlusPanel() {
     }
   }, [sortField, sortDir])
 
-  // Reuse the panel-level expand pattern from RR — only one card open
-  // at a time; clicking the same one again collapses.
-  function toggleExpand(ticker) {
-    setExpanded((cur) => (cur === ticker ? null : ticker))
-  }
+  // SignalCard's onToggle fires on card click. For ETF cards we route
+  // it to the EtfInfoModal instead of toggling an inline ExpandedChart.
+  const openInfoModal = (ticker) => setSelectedTicker(ticker)
+  const closeInfoModal = () => setSelectedTicker(null)
 
   const handleSortChange = (nextField, nextDir) => {
     setSortField(nextField)
@@ -475,13 +478,17 @@ export function EtfProPlusPanel() {
               change={null}
               setup={null}
               display={null}
-              expanded={expanded === r.ticker}
-              onToggle={toggleExpand}
+              expanded={false}
+              onToggle={openInfoModal}
               onViewCall={null}
               vixBucket={null}
             />
           ))}
         </section>
+      )}
+
+      {selectedTicker && (
+        <EtfInfoModal ticker={selectedTicker} onClose={closeInfoModal} />
       )}
     </div>
   )
