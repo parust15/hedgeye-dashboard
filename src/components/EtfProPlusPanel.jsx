@@ -6,6 +6,7 @@ import { CategoryFilter } from './CategoryFilter'
 import { StatusChip } from './StatusChip'
 import { EtfInfoModal } from './EtfInfoModal'
 import { shortenAssetClass } from '../lib/assetClass'
+import { getSetup } from '../lib/range'
 
 // --- localStorage keys (per CLAUDE.md: dashboard.<feature>) ----------------
 const SEARCH_KEY = 'dashboard.etfSearch'
@@ -13,6 +14,9 @@ const DIRECTION_FILTER_KEY = 'dashboard.etfDirectionFilter'
 const ASSET_CLASS_KEY = 'dashboard.etfAssetClasses'
 const SORT_FIELD_KEY = 'dashboard.etfSortField'
 const SORT_DIR_KEY = 'dashboard.etfSortDir'
+const VIEW_KEY = 'dashboard.etfView'
+
+const VALID_VIEWS = ['all', 'setups']
 
 const VALID_DIRECTIONS = ['ALL', 'BULLISH', 'BEARISH']
 
@@ -90,6 +94,16 @@ function loadInitialSortDir() {
     console.warn('Failed to read etfSortDir from localStorage:', err)
   }
   return 'asc'
+}
+
+function loadInitialView() {
+  try {
+    const raw = localStorage.getItem(VIEW_KEY)
+    if (raw && VALID_VIEWS.includes(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read etfView from localStorage:', err)
+  }
+  return 'all'
 }
 
 // --- Row transformation ---------------------------------------------------
@@ -178,6 +192,10 @@ export function EtfProPlusPanel() {
   const [search, setSearch] = useState(loadInitialSearch)
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
+  // View toggle: 'all' = every ETF in the snapshot, 'setups' = only
+  // tickers where getSetup returns LONG/SHORT (BULLISH near LRR or
+  // BEARISH near TRR — the actionable edge of the trend range).
+  const [view, setView] = useState(loadInitialView)
   // ETF cards open a detail modal instead of expanding inline — ETF
   // tickers don't share the hedgeye_signals_v shape ExpandedChart was
   // built for. selectedTicker drives the EtfInfoModal mounted below.
@@ -217,6 +235,14 @@ export function EtfProPlusPanel() {
       console.warn('Failed to persist etfSort:', err)
     }
   }, [sortField, sortDir])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view)
+    } catch (err) {
+      console.warn('Failed to persist etfView:', err)
+    }
+  }, [view])
 
   // SignalCard's onToggle fires on card click. For ETF cards we route
   // it to the EtfInfoModal instead of toggling an inline ExpandedChart.
@@ -278,8 +304,23 @@ export function EtfProPlusPanel() {
     return c
   }, [transformedRows])
 
+  // Active-setup count — runs over the FULL transformed set (independent
+  // of chip/direction/search filters) so the tab badge reflects the
+  // total actionable count, matching RR's setupCount behavior.
+  const setupCount = useMemo(
+    () => transformedRows.reduce((n, r) => (getSetup(r, null) ? n + 1 : n), 0),
+    [transformedRows]
+  )
+
   const filteredRows = useMemo(() => {
     let list = transformedRows
+    // Setups view comes first in the pipeline — narrows to actionable
+    // tickers before the user's chip/direction/search filters refine
+    // further. getSetup uses buy_trade/sell_trade/prev_close which are
+    // populated correctly by toSignalRow.
+    if (view === 'setups') {
+      list = list.filter((r) => getSetup(r, null) !== null)
+    }
     if (activeAssetClasses.size > 0) {
       list = list.filter((r) => r.category && activeAssetClasses.has(r.category))
     }
@@ -295,7 +336,7 @@ export function EtfProPlusPanel() {
       })
     }
     return list
-  }, [transformedRows, activeAssetClasses, directionFilter, search])
+  }, [transformedRows, view, activeAssetClasses, directionFilter, search])
 
   // --- Sort on top of the filtered set ------------------------------------
   const sortedRows = useMemo(() => {
@@ -387,52 +428,86 @@ export function EtfProPlusPanel() {
 
       {status === 'ready' && (
         <>
-          <div className="filter-row">
-            <CategoryFilter
-              options={visibleAssetClassOptions}
-              activeLabels={activeAssetClasses}
-              onChange={setActiveAssetClasses}
-            />
-            <div className="search-wrap">
-              <input
-                type="search"
-                className="search-input"
-                placeholder="Search ticker or description..."
-                aria-label="Search ETF ticker or description"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.preventDefault()
-                    setSearch('')
-                    e.currentTarget.blur()
-                  }
-                }}
+          {/* View tabs mirror RR: "All ETFs" + "⚡ Active Setups" with
+              total + setup counts as badges. Setup tab narrows the
+              card grid to BULLISH ETFs near LRR / BEARISH near TRR. */}
+          <nav className="view-tabs" role="tablist" aria-label="ETF view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'all'}
+              className={`view-tab${view === 'all' ? ' active' : ''}`}
+              onClick={() => setView('all')}
+            >
+              All ETFs
+              <span className="view-tab-count">{transformedRows.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'setups'}
+              className={`view-tab${view === 'setups' ? ' active' : ''}`}
+              onClick={() => setView('setups')}
+            >
+              ⚡ Active Setups
+              <span className="view-tab-count">{setupCount}</span>
+            </button>
+          </nav>
+
+          {/* Category + search row. Hidden in setups view to keep the
+              focus on the actionable list — same as RR. */}
+          {view === 'all' && (
+            <div className="filter-row">
+              <CategoryFilter
+                options={visibleAssetClassOptions}
+                activeLabels={activeAssetClasses}
+                onChange={setActiveAssetClasses}
               />
+              <div className="search-wrap">
+                <input
+                  type="search"
+                  className="search-input"
+                  placeholder="Search ticker or description..."
+                  aria-label="Search ETF ticker or description"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      setSearch('')
+                      e.currentTarget.blur()
+                    }
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Direction filter row — same chrome as RR's trend filter
-              (.filter-chip family). BULLISH→long color, BEARISH→short. */}
-          <nav className="trend-filters" aria-label="Direction filter">
-            {DIRECTION_FILTERS.map((d) => {
-              const suffix =
-                d.id === 'BULLISH' ? 'long' :
-                d.id === 'BEARISH' ? 'short' : 'all'
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  aria-pressed={directionFilter === d.id}
-                  className={`filter-chip filter-chip-${suffix}${directionFilter === d.id ? ' active' : ''}`}
-                  onClick={() => setDirectionFilter(d.id)}
-                >
-                  {d.label}
-                  <span className="filter-chip-count">{directionCounts[d.id] ?? 0}</span>
-                </button>
-              )
-            })}
-          </nav>
+              (.filter-chip family). BULLISH→long color, BEARISH→short.
+              Hidden in setups view since the LONG/SHORT split is the
+              whole point of that view. */}
+          {view === 'all' && (
+            <nav className="trend-filters" aria-label="Direction filter">
+              {DIRECTION_FILTERS.map((d) => {
+                const suffix =
+                  d.id === 'BULLISH' ? 'long' :
+                  d.id === 'BEARISH' ? 'short' : 'all'
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    aria-pressed={directionFilter === d.id}
+                    className={`filter-chip filter-chip-${suffix}${directionFilter === d.id ? ' active' : ''}`}
+                    onClick={() => setDirectionFilter(d.id)}
+                  >
+                    {d.label}
+                    <span className="filter-chip-count">{directionCounts[d.id] ?? 0}</span>
+                  </button>
+                )
+              })}
+            </nav>
+          )}
 
           <div className="sort-row">
             <SortControl
@@ -464,6 +539,8 @@ export function EtfProPlusPanel() {
       {status === 'ready' && sortedRows.length === 0 && (
         search.trim() ? (
           <div className="state">No ETFs match “{search.trim()}”.</div>
+        ) : view === 'setups' ? (
+          <div className="state state-center">No active setups right now</div>
         ) : (
           <div className="state">No ETFs match these filters.</div>
         )
