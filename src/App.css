@@ -3214,32 +3214,10 @@ body,
   100% { opacity: 0; transform: translate(-25vw,  30vh) rotate(195deg); }
 }
 
-/* Mobile: cut only the GPU-expensive ANIMATED layers. Phone GPUs
-   stutter on three specific things, none of which are about the count
-   of elements:
-     1. feDisplacementMap re-rasterizing every frame on .ambient-nebula
-     2. blur(50px) + 140s rotation on the 1400x1400 conic galaxy
-     3. box-shadow 0 0 800px 400px on .ambient-supernova at peak
-   Static elements with blur or drop-shadow paint ONCE into a compositor
-   layer and are essentially free after that. So we keep nebula color,
-   bright-star spikes, far stars, constellation lines, noise overlay —
-   we just kill their animations. */
-@media (max-width: 720px) {
-  .ambient-supernova {
-    display: none;
-  }
-  .cosmos-shader-canvas {
-    display: none;
-  }
-  /* Static diffraction spikes are fine; animating the drop-shadow on
-     scale change is what flickers. */
-  .ambient-bright-star {
-    animation: none;
-  }
-  .ambient-stars-mid {
-    filter: none;
-  }
-}
+/* Mobile: no longer cuts cosmic layers. Phone gets the full experience —
+   WebGL shader, supernova, bright-star twinkle, mid-star drop-shadow,
+   meteors, the lot. If a specific layer turns out to overheat or stutter
+   on the user's device, restrict it here. */
 
 /* Reduce-motion: freeze the cosmic motion + the per-card orbit +
    the hover sheen + chart-tooltip transitions. Static cards still
