@@ -59,9 +59,12 @@ function AllTimeCard({ row, maxAppearances, onOpen }) {
         }
       }}
     >
-      <div className={`atc-row-id direction-${type}`}>
-        <span className="atc-ticker">{row.ticker}</span>
-        <span className="atc-company">{row.company_name ?? ''}</span>
+      {/* Unified ticker-card head: same .cc-head-id / .cc-ticker /
+          .cc-name classes RR and Call ticker boxes use. The .atc-*
+          family was a third name for the same concept. */}
+      <div className={`cc-head-id direction-${type}`}>
+        <span className="cc-ticker">{row.ticker}</span>
+        <span className="cc-name">{row.company_name ?? ''}</span>
       </div>
       <div className="atc-row-pill">
         <PositionTypePill type={row.last_position_type} />
@@ -229,11 +232,11 @@ export function CallAllTimeView({
               key={p.id}
               type="button"
               aria-pressed={positionFilter === p.id}
-              className={`call-chip call-chip-${p.id.toLowerCase()}${positionFilter === p.id ? ' active' : ''}`}
+              className={`filter-chip filter-chip-${p.id.toLowerCase()}${positionFilter === p.id ? ' active' : ''}`}
               onClick={() => setPositionFilter(p.id)}
             >
               {p.label}
-              <span className="call-chip-count">{positionCounts[p.id] ?? 0}</span>
+              <span className="filter-chip-count">{positionCounts[p.id] ?? 0}</span>
             </button>
           ))}
         </nav>

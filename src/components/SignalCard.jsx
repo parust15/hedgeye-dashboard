@@ -26,10 +26,22 @@ function CountUpNumber({ value, format = formatNumber }) {
   return <>{format(tweened)}</>
 }
 
-function trendClass(trend) {
-  if (trend === 'BULLISH') return 'trend bullish'
-  if (trend === 'BEARISH') return 'trend bearish'
-  return 'trend neutral'
+// Map trend to Call's .position-pill chrome so the RR pill uses the same
+// CSS rules as Call's PositionTypePill. The label text stays BULLISH/
+// BEARISH/NEUTRAL (it's trend data, not portfolio direction) — only the
+// chrome unifies.
+function trendPillClass(trend) {
+  if (trend === 'BULLISH') return 'position-pill position-long'
+  if (trend === 'BEARISH') return 'position-pill position-short'
+  return 'position-pill position-neutral'
+}
+
+// Direction modifier on .cc-head-id wrapper drives the ticker text tint
+// via the existing .cc-head-id.direction-X .cc-ticker rule.
+function trendDirection(trend) {
+  if (trend === 'BULLISH') return 'long'
+  if (trend === 'BEARISH') return 'short'
+  return 'neutral'
 }
 
 // Minimum visible width for the prev_close→live_price connector. Below
@@ -218,10 +230,13 @@ function PositionBarWithTooltip({ row, display, markerPct, ghostPct, zone }) {
 function TrendChangeBadge({ change }) {
   if (!change) return null
   const to = change.to_trend
-  if (to === 'BULLISH') return <span className="flip flip-bull">↑ FLIPPED BULLISH</span>
-  if (to === 'BEARISH') return <span className="flip flip-bear">↓ FLIPPED BEARISH</span>
-  if (to === 'NEUTRAL') return <span className="flip flip-neutral">◆ WENT NEUTRAL</span>
-  return <span className="flip flip-neutral">◆ {to}</span>
+  // FLIPPED badges use the unified .position-pill chrome. Colors match
+  // 1-for-1 with the old .flip-* family (the gradients/box-shadows were
+  // byte-identical) so this is purely a rename.
+  if (to === 'BULLISH') return <span className="position-pill position-long">↑ FLIPPED BULLISH</span>
+  if (to === 'BEARISH') return <span className="position-pill position-short">↓ FLIPPED BEARISH</span>
+  if (to === 'NEUTRAL') return <span className="position-pill position-neutral">◆ WENT NEUTRAL</span>
+  return <span className="position-pill position-neutral">◆ {to}</span>
 }
 
 function SetupBadge({ setup }) {
@@ -266,15 +281,17 @@ function LivePriceBlock({ display }) {
     Number.isFinite(priceVal) ? priceVal : null
   )
   if (!display || display.state === 'none') return null
-  const cls = `price-block price-${display.state}`
+  // Use Call's .cc-price-row / .cc-price classes so the price element
+  // on RR is styled by the same CSS rules as Call's LivePriceRow.
+  const cls = `cc-price-row cc-price-${display.state}`
   return (
     <div className={cls} aria-label={`Price ${display.timeLabel}`}>
       {display.state === 'live' && <span className="pulse-dot" aria-hidden="true" />}
-      <span className={`price-value ${flash}`}>
+      <span className={`cc-price ${flash}`}>
         <CountUpNumber value={priceVal} format={formatPrice} />
       </span>
-      <span className="price-sep">·</span>
-      <span className="price-time">{display.timeLabel}</span>
+      <span className="cc-price-sep">·</span>
+      <span className="cc-price-time">{display.timeLabel}</span>
     </div>
   )
 }
@@ -308,12 +325,21 @@ export function SignalCard({
 }) {
   const { markerPct, ghostPct, zone, zoneLabel } = positionBarFor(row, display)
 
+  // Unified ticker-box class set. Risk Range cards use the same
+  // .call-card wrapper as Call tab cards so chrome flows through one
+  // CSS path. State direction maps to .border-long/short/neutral
+  // (setup direction takes priority over raw trend); flipped status
+  // maps to .glow-flipped; new-today maps to .glow-added.
+  const directionRaw = (setup || row.trend || '').toLowerCase()
+  const borderClass =
+    directionRaw === 'long' || directionRaw === 'bullish' ? 'border-long' :
+    directionRaw === 'short' || directionRaw === 'bearish' ? 'border-short' :
+    'border-neutral'
   const cardClasses = [
-    'card',
-    `card-trend-${(row.trend ?? 'neutral').toLowerCase()}`,
+    'call-card',
+    borderClass,
     expanded ? 'expanded' : '',
-    change ? 'flipped' : '',
-    setup ? `has-setup setup-${setup.toLowerCase()}` : '',
+    change ? 'glow-flipped' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -331,23 +357,24 @@ export function SignalCard({
         }
       }}
     >
-      <header className="card-head">
-        <div className="card-id">
-          <div className="ticker">{row.ticker}</div>
+      <header className="cc-head">
+        <div className={`cc-head-id direction-${trendDirection(row.trend)}`}>
+          <div className="cc-ticker">{row.ticker}</div>
           {row.display_name || row.name ? (
-            <div className="name">{row.display_name || row.name}</div>
+            <div className="cc-name">{row.display_name || row.name}</div>
           ) : null}
         </div>
-        <div className="card-head-badges">
-          <span className={trendClass(row.trend)}>{row.trend ?? '—'}</span>
-          {vixBucket && <VixBucketBadge data={vixBucket} />}
-        </div>
+        {/* Pill + optional VixBucketBadge sit as direct children of
+            .cc-head — matches PositionCard's shape so .cc-head's flex
+            row aligns pills identically across both tabs. */}
+        <span className={trendPillClass(row.trend)}>{row.trend ?? '—'}</span>
+        {vixBucket && <VixBucketBadge data={vixBucket} />}
       </header>
 
       <LivePriceBlock display={display} />
 
       {(setup || change) && (
-        <div className="badge-row">
+        <div className="cc-accent-row">
           <SetupBadge setup={setup} />
           <TrendChangeBadge change={change} />
         </div>

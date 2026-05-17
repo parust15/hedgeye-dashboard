@@ -788,11 +788,11 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
               type="button"
               role="tab"
               aria-selected={filter === f.id}
-              className={`call-chip call-chip-${f.id.toLowerCase()}${filter === f.id ? ' active' : ''}`}
+              className={`filter-chip filter-chip-${f.id.toLowerCase()}${filter === f.id ? ' active' : ''}`}
               onClick={() => setFilter(f.id)}
             >
               {f.label}
-              <span className="call-chip-count">{counts[f.id] ?? 0}</span>
+              <span className="filter-chip-count">{counts[f.id] ?? 0}</span>
             </button>
           ))}
         </nav>

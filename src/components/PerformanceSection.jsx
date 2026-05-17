@@ -131,7 +131,7 @@ export function PerformanceSection({ positionRows }) {
               type="button"
               role="tab"
               aria-selected={activeTab === t.id}
-              className={`call-chip call-chip-all${activeTab === t.id ? ' active' : ''}`}
+              className={`filter-chip filter-chip-all${activeTab === t.id ? ' active' : ''}`}
               onClick={() => setActiveTab(t.id)}
             >
               {t.label}

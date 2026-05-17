@@ -393,21 +393,30 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
       </div>
 
       {/* Trend filter row sits just below the category-chips row. The two
-          filter rows AND together — a card must match both to render. */}
+          filter rows AND together — a card must match both to render.
+          Uses the unified .filter-chip class (same as Call tab filters).
+          BULLISH→long, BEARISH→short, NEUTRAL→neutral, ALL→all maps
+          trend semantics to color-direction semantics. */}
       {view === 'all' && (
         <nav className="trend-filters" aria-label="Trend filter">
-          {TREND_FILTERS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={trendFilter === t.id}
-              className={`trend-chip trend-chip-${t.id.toLowerCase()}${trendFilter === t.id ? ' active' : ''}`}
-              onClick={() => setTrendFilter(t.id)}
-            >
-              {t.label}
-              <span className="chip-count">{trendCounts[t.id] ?? 0}</span>
-            </button>
-          ))}
+          {TREND_FILTERS.map((t) => {
+            const suffix =
+              t.id === 'BULLISH' ? 'long' :
+              t.id === 'BEARISH' ? 'short' :
+              t.id === 'NEUTRAL' ? 'neutral' : 'all'
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={trendFilter === t.id}
+                className={`filter-chip filter-chip-${suffix}${trendFilter === t.id ? ' active' : ''}`}
+                onClick={() => setTrendFilter(t.id)}
+              >
+                {t.label}
+                <span className="filter-chip-count">{trendCounts[t.id] ?? 0}</span>
+              </button>
+            )
+          })}
         </nav>
       )}
 

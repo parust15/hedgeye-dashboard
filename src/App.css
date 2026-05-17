@@ -517,91 +517,34 @@
   gap: 12px;
 }
 
-.card {
-  position: relative;
-  /* Glass base — same recipe as .call-card. State-tint corner radial,
-     top-light gloss, then the elevation base color at 65% alpha. */
-  background:
-    radial-gradient(
-      ellipse 70% 60% at var(--tint-corner-x, 0%) 0%,
-      rgba(var(--card-tint), 0.10),
-      transparent 55%
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
-    rgba(20, 23, 31, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left-width: 3px;
-  border-left-color: rgb(var(--card-tint));
-  border-radius: var(--radius-card);
-  padding: 12px 14px;
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 4px 16px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* Every RR card gets the flipped treatment: -2px parallax shelf and
-     a 4s ambient breathing glow tinted by --card-tint. */
-  --shelf-y: -2px;
-  animation: card-breathe 4s ease-in-out infinite;
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  cursor: pointer;
-  outline: none;
-}
+/* The .card root rule was deleted. SignalCard now renders with the
+   .call-card wrapper class so RR and Call ticker boxes share ONE chrome
+   path. State direction is mapped to .border-long/short/neutral inside
+   SignalCard.jsx; flipped status maps to .glow-flipped. The descendant
+   rules below (formerly .card .X) target the same SignalCard children
+   under the unified .call-card wrapper. */
 
-/* Soft state-tinted edge halo. Toned down so it underpaints the
-   rotating ring on ::before rather than competing with it — the
-   ring's 8s sweep already carries most of the motion energy. */
-@keyframes card-breathe {
-  0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(var(--card-tint), 0.10));
-  }
-  50% {
-    filter: drop-shadow(0 0 10px rgba(var(--card-tint), 0.20));
-  }
-}
+/* SignalCard's LivePriceBlock now uses .cc-price (Call's class) — the
+   bridge rule .call-card .price-value { font-size: 24px } was deleted.
+   RR cards now follow Call's price-size logic exactly: base 20px via
+   .cc-price, lifted to 24px only on .glow-flipped via the existing
+   .call-card.glow-flipped .cc-price rule. */
 
-/* Every RR card carries the larger 24px price tier that flipped cards
-   used to monopolise. */
-.card .price-value {
-  font-size: 24px;
-}
-
-/* Internal children with their own top-margins (set when .card was a
-   block element) would compose with the new flex gap and stack 22px
-   apart instead of 12. Zero them out so gap is the single source of
-   truth — same rhythm as .call-card. */
-.card > .price-block,
-.card > .badge-row,
-.card > .grid,
-.card > .posbar-section,
-.card > .btn-view-call,
-.card > .chart-panel {
+/* SignalCard inner children — zero top-margins so flex gap is the
+   single source of vertical rhythm. Updated to the unified .cc-*
+   class names after the RR-card rename. */
+.call-card > .cc-price-row,
+.call-card > .cc-accent-row,
+.call-card > .grid,
+.call-card > .posbar-section,
+.call-card > .btn-view-call,
+.call-card > .chart-panel {
   margin-top: 0;
 }
 
-/* Selector bumped to .card[role='button']:hover (same specificity as
-   .call-card[role='button']:hover) so the per-trend .card.card-trend-*
-   border-left-color rules wash the same way Call cards do on hover. */
-.card[role='button']:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  transform: translateY(calc(var(--shelf-y) - 4px));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 12px 32px rgba(0, 0, 0, 0.45);
-}
-
-.card:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
-}
-
-.card.expanded {
+/* SignalCard cards land in .cards grid (RR tab) — give them the
+   expanded-row treatment via .expanded class on .call-card. */
+.call-card.expanded {
   grid-column: 1 / -1;
 }
 
@@ -614,14 +557,15 @@
    would now triple-paint the signal and compete with the stripe, so
    it's been removed. */
 
-.badge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
+/* .badge-row deleted — SignalCard now renders its setup/flip pills
+   inside .cc-accent-row, sharing the rule with Call's PositionCard. */
 
-.flip,
+/* .flip family collapsed into .position-pill / .position-long /
+   .position-short / .position-neutral. SignalCard.jsx now renders
+   <span className="position-pill position-X"> for FLIPPED badges,
+   sharing chrome with Call's PositionTypePill. The .setup family
+   stays here because SignalCard's SetupBadge has a distinct shape
+   (slightly bigger pill with an icon). */
 .setup {
   display: inline-flex;
   align-items: center;
@@ -633,41 +577,15 @@
   border-radius: var(--radius-badge);
   text-transform: uppercase;
   border: none;
-  /* Soft inner gloss + base shadow shared across all variants — colour
-     comes from the per-state .flip-* / .setup-* rules below. */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 0 rgba(0, 0, 0, 0.18);
   transition:
     transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.flip-bull {
-  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
-  color: #042417;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.30),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(34, 197, 94, 0.35);
-}
-
-.flip-bear {
-  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
-  color: #2a0707;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(239, 68, 68, 0.35);
-}
-
-.flip-neutral {
-  background: linear-gradient(180deg, #9ca3af 0%, #d1d5db 100%);
-  color: #1f2024;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.30),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(156, 163, 175, 0.35);
+  animation:
+    pill-mount-scale 400ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards,
+    pill-mount-glow 400ms ease-out backwards;
 }
 
 .setup.setup-long {
@@ -707,9 +625,10 @@
 
 /* Card-hover cascade — pills scale up gently + glow when their parent
    card is hovered. Subtle, never showy. */
-.card:hover .trend,
-.card:hover .flip,
-.card:hover .setup,
+/* Card-hover cascade — pills scale up gently when the parent card is
+   hovered. .flip dropped from the selector after RR's FLIPPED badges
+   became .position-pill (sharing the rule with Call's PositionTypePill). */
+.call-card:hover .setup,
 .call-card[role='button']:hover .position-pill {
   transform: scale(1.05);
 }
@@ -1005,17 +924,21 @@
   letter-spacing: 0.3px;
 }
 
-.card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
+/* .card-head deleted — SignalCard now renders .cc-head which has the
+   same flex/space-between/gap recipe further down in this file. */
 
-.card-id {
-  min-width: 0;
-  flex-shrink: 0;
-}
+/* The RR-only ticker-box child classes (.card-id, .price-block, .price-value,
+   .ticker, .name, .trend, .trend.bullish/.bearish/.neutral) were deleted in
+   the unification pass. SignalCard.jsx now emits .cc-head-id, .cc-price-row,
+   .cc-price, .cc-ticker, .cc-name, .position-pill.position-long/.short/
+   .neutral instead — same classes Call uses. Each concept now has ONE CSS
+   rule, applied to both tabs.
+
+   .pulse-dot / .pulse-dot-svg are intentionally unscoped — both tabs use
+   them. The state-class behavior that lived on .price-block.price-live /
+   .price-stale moved to .cc-price-row.cc-price-live / .cc-price-stale
+   below; .price-sep / .price-time renamed to .cc-price-sep / .cc-price-time.
+   See cc-* definitions further down in this file. */
 
 @keyframes price-pulse {
   0%, 100% { opacity: 0.4; }
@@ -1038,103 +961,34 @@
   transform-origin: center;
 }
 
-.price-block {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 10px 0 0;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  min-width: 0;
+/* RR's LivePriceBlock state classes — port of the old .price-block.price-X
+   rules to the unified .cc-price-row.cc-price-X selector. PositionCard's
+   LivePriceRow doesn't use state classes on the wrapper so these rules
+   only fire on SignalCard cards in practice. */
+.cc-price-row.cc-price-live .pulse-dot {
+  align-self: center;
 }
 
-.price-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-strong);
-  white-space: nowrap;
-  line-height: 1.15;
+.cc-price-row.cc-price-stale {
+  opacity: 0.5;
 }
 
-.price-sep {
+.cc-price-row.cc-price-stale .cc-price-time {
+  color: var(--amber-light);
+}
+
+/* Inline price-row helpers used by SignalCard's LivePriceBlock. Call's
+   LivePriceRow doesn't render a separator or inline time, so these
+   rules only style RR's price-row contents. */
+.cc-price-sep {
   color: var(--text-dim);
   font-size: 13px;
 }
 
-.price-time {
+.cc-price-time {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
-}
-
-.price-block.price-live .pulse-dot {
-  align-self: center;
-}
-
-.price-block.price-stale {
-  opacity: 0.5;
-}
-
-.price-block.price-stale .price-time {
-  color: var(--amber-light); /* amber-400 */
-}
-
-.ticker {
-  font-family: var(--mono);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-strong);
-  letter-spacing: 0.3px;
-}
-
-.name {
-  color: var(--text-dim);
-  font-size: 12px;
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.trend {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.trend {
-  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.trend.bullish {
-  background: linear-gradient(180deg, #22c55e 0%, #4ade80 100%);
-  color: #042417;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.30),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(34, 197, 94, 0.35);
-}
-
-.trend.bearish {
-  background: linear-gradient(180deg, #ef4444 0%, #f87171 100%);
-  color: #2a0707;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(239, 68, 68, 0.35);
-}
-
-.trend.neutral {
-  background: linear-gradient(180deg, #9ca3af 0%, #d1d5db 100%);
-  color: #1f2024;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.30),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 0 0 1.5px rgba(156, 163, 175, 0.35);
 }
 
 .grid {
@@ -1319,9 +1173,19 @@
 
 /* === The Call panel === */
 
+/* .call-panel.panel-dim used to dim the entire Call panel at opacity 0.7
+   on stale-data days. That ancestor-level opacity multiplied every
+   descendant's effective alpha — including the cards, their backdrop-
+   filter, their conic swirl, their breathe-tint halo — making every
+   card on the Call tab look ~30% washed-out compared to RR cards even
+   though the card-level CSS is byte-identical.
+
+   The stale-day signal is preserved via the "Today's call hasn't arrived
+   yet. Last call: …" banner (TheCallPanel.jsx:775) and the stale tone
+   on the call-date status chip. The panel-wide opacity dim is removed
+   so ticker cards render at the same effective alpha as RR. */
 .call-panel.panel-dim {
-  /* Stale-day data — dim everything except the banner. */
-  opacity: 0.7;
+  /* intentionally empty — opacity dim removed */
 }
 
 .call-header {
@@ -1385,7 +1249,15 @@
   margin-bottom: 18px;
 }
 
-.call-chip {
+/* Unified .filter-chip — the single chip class used by every filter row
+   on the dashboard (RR trend filter, Call position filter, All-Time
+   position filter, Performance tab toggle). The old .call-chip and
+   .trend-chip families collapsed into this one. Color suffixes use
+   the same color-direction vocabulary as ticker-card .border-X /
+   .position-X classes: long (green) / short (red) / neutral (gray) /
+   all (accent). RR's BULLISH→long, BEARISH→short mapping happens
+   in RiskRangesPanel.jsx. */
+.filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1403,24 +1275,24 @@
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.call-chip:hover {
+.filter-chip:hover {
   color: var(--text-strong);
 }
 
-/* Inactive: outlined. Active: filled with type-color background. */
-.call-chip.call-chip-all { border-color: var(--border-strong); color: var(--text); }
-.call-chip.call-chip-all.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+/* Inactive: outlined in the suffix tint. Active: filled. */
+.filter-chip.filter-chip-all { border-color: var(--border-strong); color: var(--text); }
+.filter-chip.filter-chip-all.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 
-.call-chip.call-chip-long { border-color: rgba(34, 197, 94, 0.45); color: var(--bull); }
-.call-chip.call-chip-long.active { background: rgba(34, 197, 94, 0.85); border-color: rgba(34, 197, 94, 0.85); color: #08120c; }
+.filter-chip.filter-chip-long { border-color: rgba(34, 197, 94, 0.45); color: var(--bull); }
+.filter-chip.filter-chip-long.active { background: rgba(34, 197, 94, 0.85); border-color: rgba(34, 197, 94, 0.85); color: #08120c; }
 
-.call-chip.call-chip-short { border-color: rgba(239, 68, 68, 0.45); color: var(--bear); }
-.call-chip.call-chip-short.active { background: rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 0.85); color: #1a0707; }
+.filter-chip.filter-chip-short { border-color: rgba(239, 68, 68, 0.45); color: var(--bear); }
+.filter-chip.filter-chip-short.active { background: rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 0.85); color: #1a0707; }
 
-.call-chip.call-chip-neutral { border-color: rgba(156, 163, 175, 0.45); color: var(--neutral); }
-.call-chip.call-chip-neutral.active { background: rgba(156, 163, 175, 0.85); border-color: rgba(156, 163, 175, 0.85); color: var(--bg); }
+.filter-chip.filter-chip-neutral { border-color: rgba(156, 163, 175, 0.45); color: var(--neutral); }
+.filter-chip.filter-chip-neutral.active { background: rgba(156, 163, 175, 0.85); border-color: rgba(156, 163, 175, 0.85); color: var(--bg); }
 
-.call-chip-count {
+.filter-chip-count {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -1478,6 +1350,14 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  --shelf-y: -2px;
+  /* Single source of truth for ticker-card transparency. Both RR and
+     Call cards render at this opacity so the cosmos backdrop shows
+     through equally on both tabs. Previously only Call cards got this
+     dim (via .panel-dim ancestor) on stale-data days, which made the
+     two tabs look different. Now applied at the card level, unconditional. */
+  opacity: 0.7;
+  /* Animation set by the grid override below, identical to .card. */
   transition:
     transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -1494,10 +1374,11 @@
    a SHORT card with glow-added breathes red, a LONG card with
    glow-flipped breathes green, etc. The eye is drawn to brand-new or
    flipped positions without recoloring the state signal. */
-.call-card.glow-added,
-.call-card.glow-flipped {
-  animation: breathe-tint 3.5s ease-in-out infinite;
-}
+/* breathe-tint is now applied by the grid rule (.cards > *, .call-grid > *,
+   etc.) so every ticker card pulses the same outline regardless of which
+   state modifier it carries. The old modifier-specific trigger was
+   removed — leaving it would override the grid rule and strip the
+   card-enter entrance stagger from flipped/added cards only. */
 
 /* .call-card-top5 used to override .call-card's gap to 12px, but
    .call-card itself is already at 12px since the rhythm-unification
@@ -1534,9 +1415,6 @@
   padding: 3px 8px;
   border-radius: var(--radius-badge);
   text-transform: uppercase;
-}
-
-.position-pill {
   transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -1574,6 +1452,11 @@
   padding: 3px 8px;
   border-radius: var(--radius-badge);
   text-transform: uppercase;
+  /* Mount animation merged in from the previously-separate
+     ".flip, .status-badge { animation: ... }" block. */
+  animation:
+    pill-mount-scale 400ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards,
+    pill-mount-glow 400ms ease-out backwards;
 }
 
 .status-added { background: rgba(34, 197, 94, 0.18); color: var(--live); border: 1px solid rgba(34, 197, 94, 0.4); }
@@ -1595,22 +1478,18 @@
   text-transform: uppercase;
 }
 
-/* Direction-tinted ticker text on position cards. Reads .direction-X
-   on the new .cc-head-id wrapper (Call cards) or .atc-row-id (All Time).
-   Mirrors the RR card's ticker color signaling. The muted .cc-name /
-   .atc-company stay grey so the ticker is the dominant visual anchor. */
-.cc-head-id.direction-long .cc-ticker,
-.atc-row-id.direction-long .atc-ticker {
+/* Direction-tinted ticker text. The .atc-row-id / .atc-ticker family
+   was folded into .cc-head-id / .cc-ticker — All-Time view now uses
+   the same head-id chrome as RR and Call ticker boxes. */
+.cc-head-id.direction-long .cc-ticker {
   color: var(--bull);
 }
 
-.cc-head-id.direction-short .cc-ticker,
-.atc-row-id.direction-short .atc-ticker {
+.cc-head-id.direction-short .cc-ticker {
   color: var(--bear);
 }
 
-.cc-head-id.direction-neutral .cc-ticker,
-.atc-row-id.direction-neutral .atc-ticker {
+.cc-head-id.direction-neutral .cc-ticker {
   color: var(--neutral);
 }
 
@@ -1639,19 +1518,31 @@
   white-space: nowrap;
 }
 
+/* Unified price-row: baseline alignment so RR's inline pulse-dot / price /
+   separator / time render cleanly, AND so Call's price-cell / change-cell
+   align by their label baseline. 14px gap as a compromise between RR's
+   12px and Call's prior 16px. ONE rule for both tabs. */
 .cc-price-row {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 
 .cc-price {
+  /* Canonical .cc-price rule. Merged the typography block (originally
+     here) with the flash-animation block (originally near PART D — Live
+     price flash) so .cc-price has ONE rule covering both static and
+     animated behavior. */
   font-size: 20px;
   font-weight: 600;
   color: var(--text-strong);
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
 }
 
 .cc-price.cc-price-none {
@@ -1719,11 +1610,19 @@
 }
 
 .cc-footer {
+  /* Canonical .cc-footer rule. The duplicate at the bottom of this file
+     (around line 2754) was merged into this one; the only effective
+     property the duplicate added was gap: 8px which won via source
+     order over this block's 12px. Keeping the smaller 8px gap. */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-top: 2px;
+}
+.cc-footer .conviction-row {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* .cc-streak rule deleted — the "X days" streak only ever rendered
@@ -1748,12 +1647,15 @@
 }
 
 .conviction-bar-fill {
+  /* Canonical .conviction-bar-fill rule. Merged the geometry/fill block
+     (originally here) with the shimmer block (originally in PART C4)
+     so .conviction-bar-fill has ONE rule covering both fill and shimmer
+     setup. The shimmer keyframe lives on ::before below. */
   height: 100%;
-  /* State-color fill so the bar reads as part of the card's chrome
-     instead of a separate amber strip — a high-conviction LONG card
-     gets a green fill, a high-conviction SHORT card gets red, etc. */
   background: rgba(var(--card-tint), 0.85);
   border-radius: 2px;
+  position: relative;
+  overflow: hidden;
 }
 
 .conviction-score {
@@ -2260,39 +2162,9 @@
   margin-bottom: 18px;
 }
 
-.trend-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-
-.trend-chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-
-/* Inactive variants — outlined in the trend's tint. */
-.trend-chip.trend-chip-bullish { border-color: rgba(34, 197, 94, 0.4); color: var(--bull); }
-.trend-chip.trend-chip-bearish { border-color: rgba(239, 68, 68, 0.4); color: var(--bear); }
-.trend-chip.trend-chip-neutral { border-color: rgba(156, 163, 175, 0.4); color: var(--neutral); }
-
-/* Active variants — filled fill matching the trend. */
-.trend-chip.trend-chip-all.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-.trend-chip.trend-chip-bullish.active { background: rgba(34, 197, 94, 0.85); border-color: rgba(34, 197, 94, 0.85); color: #08120c; }
-.trend-chip.trend-chip-bearish.active { background: rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 0.85); color: #1a0707; }
-.trend-chip.trend-chip-neutral.active { background: rgba(156, 163, 175, 0.85); border-color: rgba(156, 163, 175, 0.85); color: var(--bg); }
+/* .trend-chip family collapsed into the unified .filter-chip earlier
+   in this file. RiskRangesPanel.jsx now maps BULLISH→filter-chip-long,
+   BEARISH→filter-chip-short, NEUTRAL→filter-chip-neutral, ALL→filter-chip-all. */
 
 /* === "↗ VIEW CALL INFO" cross-panel button on RR cards === */
 
@@ -2411,6 +2283,8 @@
   gap: 8px;
   cursor: pointer;
   outline: none;
+  --shelf-y: -2px;
+  /* Animation set by the grid override below, identical to .card. */
   transition:
     transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -2435,28 +2309,23 @@
   box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
 }
 
-.atc-row-id {
+/* All-Time row uses .cc-head-id / .cc-ticker / .cc-name (unified with
+   RR + Call ticker boxes). Two All-Time-specific context overrides:
+   (a) lay ticker + name horizontally (Call cards stack them vertically
+       inside .cc-head; All-Time renders side-by-side on a single row),
+   (b) restore the ellipsis-truncated company name with flex:1 so long
+       names don't push the pill off the row.
+   Typography (16px ticker, 12px name, mono font, weight 600/dim) flows
+   from the unified .cc-ticker / .cc-name rules — no per-context font. */
+.all-time-card .cc-head-id {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  min-width: 0;
 }
-
-.atc-ticker {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.atc-company {
-  font-size: 12px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.all-time-card .cc-name {
   flex: 1;
   min-width: 0;
+  margin-top: 0;
 }
 
 .atc-row-pill,
@@ -2826,22 +2695,14 @@
 /* SignalCard head: stack the trend pill above the VIX bucket badge when
    both are present. When only the trend pill is there, the column
    collapses to a single element with no layout cost. */
-.card-head-badges {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
+/* .cc-head-badges wrapper deleted — SignalCard now renders the position
+   pill + optional VixBucketBadge as direct children of .cc-head,
+   matching PositionCard. .cc-head's flex-row + space-between aligns
+   them identically across both tabs. */
 
 /* === Call card label-grammar overrides ===============================
-   Two-column PRICE | CHANGE layout in .cc-price-row. Mirrors the
-   Risk Ranges .grid pattern of label-above-value. */
-.cc-price-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+   .cc-price-row consolidated to ONE rule earlier in this file (see
+   "Unified price-row" comment) — RR and Call both use it now. */
 
 .cc-price-cell {
   display: flex;
@@ -2868,16 +2729,8 @@
    wrapper and the "X days" streak only ever lived on the deleted Top5Card
    variant. PositionCard's footer now contains only ConvictionBar. */
 
-.cc-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cc-footer .conviction-row {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+/* .cc-footer duplicate merged into the canonical rule earlier in this
+   file (search "Canonical .cc-footer rule"). */
 
 /* === PART B — Ambient background — "Deep Cosmos" =================== */
 /* James Webb / Hubble aesthetic. Layer stack (back-to-front):
@@ -2913,8 +2766,7 @@
 }
 
 /* === Deep star field === */
-.ambient-stars-far,
-.ambient-stars-mid {
+.ambient-stars-far {
   position: absolute;
   top: 0; left: 0;
   width: 1px; height: 1px;
@@ -2923,7 +2775,16 @@
   pointer-events: none;
   will-change: transform;
 }
+/* .ambient-stars-mid mirrors .ambient-stars-far with one extra property
+   (drop-shadow halo). One canonical rule, no duplicate selector. */
 .ambient-stars-mid {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px; height: 1px;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: none;
+  will-change: transform;
   filter: drop-shadow(0 0 1px rgba(255,255,255,0.55));
 }
 
@@ -3228,11 +3089,8 @@ body,
   .ambient-sweep,
   .ambient-ticker-star,
   .ambient-alert-pulse,
-  .card::before,
   .call-card::before,
   .all-time-card::before,
-  .call-card.glow-added,
-  .call-card.glow-flipped,
   .conviction-bar-fill::before,
   .pulse-dot,
   .pulse-dot-svg {
@@ -3243,14 +3101,14 @@ body,
   .ambient-stars-mid {
     transform: none !important;
   }
-  .card::after,
   .call-card[role='button']::after,
   .all-time-card::after {
     transition: none !important;
   }
   .cards > *,
   .call-grid > *,
-  .all-time-grid > * {
+  .all-time-grid > *,
+  .top5-scroll > * {
     animation: none !important;
   }
   .cosmic-meteor {
@@ -3261,14 +3119,12 @@ body,
 
 /* === PART C1 — Card hover sheen ====================================== */
 
-.card,
-.call-card[role='button'],
+.call-card,
 .all-time-card {
   position: relative;
   overflow: hidden;
 }
 
-.card::after,
 .call-card[role='button']::after,
 .all-time-card::after {
   content: "";
@@ -3285,7 +3141,6 @@ body,
   transition: transform 0.7s ease;
 }
 
-.card:hover::after,
 .call-card[role='button']:hover::after,
 .all-time-card:hover::after {
   transform: translateX(100%);
@@ -3300,8 +3155,16 @@ body,
 
 .cards > *,
 .call-grid > *,
-.all-time-grid > * {
-  animation: card-enter 0.4s ease-out backwards;
+.all-time-grid > *,
+.top5-scroll > * {
+  /* SINGLE source of truth for ticker-card animation across every tab.
+     card-enter plays once on mount (entrance stagger). breathe-tint
+     runs forever, drawing the state-tinted 1px outline + 28px outer
+     halo via box-shadow. Every ticker box in every container shares
+     this rule — no modifier-class drift, no per-tab variance. */
+  animation:
+    card-enter 0.4s ease-out backwards,
+    breathe-tint 3.5s ease-in-out infinite;
 }
 
 .cards > :nth-child(1), .call-grid > :nth-child(1), .all-time-grid > :nth-child(1) { animation-delay: 30ms; }
@@ -3347,10 +3210,8 @@ body,
 
 /* === PART C4 — Conviction bar shimmer ================================= */
 
-.conviction-bar-fill {
-  position: relative;
-  overflow: hidden;
-}
+/* .conviction-bar-fill position/overflow merged into the canonical rule
+   earlier in this file. Only the shimmer pseudo-element lives here now. */
 
 .conviction-bar-fill::before {
   content: "";
@@ -3372,13 +3233,10 @@ body,
 
 /* === PART D — Live price flash ======================================== */
 
-.price-value,
-.cc-price {
-  display: inline-block;
-  padding: 0 4px;
-  border-radius: 4px;
-  transition: background 0.2s ease;
-}
+/* .cc-price typography + flash properties merged into the canonical
+   .cc-price rule earlier in this file (search "Canonical .cc-price rule").
+   Only the flash keyframes and .flash-up/.flash-down state selectors
+   live here now. */
 
 @keyframes flash-up {
   0% { background: rgba(34, 197, 94, 0); }
@@ -3392,12 +3250,10 @@ body,
   100% { background: rgba(239, 68, 68, 0); }
 }
 
-.price-value.flash-up,
 .cc-price.flash-up {
   animation: flash-up 0.35s ease-out;
 }
 
-.price-value.flash-down,
 .cc-price.flash-down {
   animation: flash-down 0.35s ease-out;
 }
@@ -3408,36 +3264,17 @@ body,
    custom property. isolation: isolate gives every card its own stacking
    context so the layer never bleeds onto the page ambient. */
 
-.card,
 .call-card,
 .all-time-card {
   --card-tint: 110, 168, 255;
   isolation: isolate;
 }
 
-/* State-based tints — Risk Ranges. Per-trend rules paint the same
-   green / red / neutral tint Call cards use via .border-long /
-   .border-short / .border-neutral. The trend tint also drives the
-   3px left stripe via .card.card-trend-* below. Setup overrides the
-   trend tint when both are present (LONG SETUP on a BEARISH trend
-   prioritises the actionable green). FLIPPED keeps the destination
-   trend tint so the conic ring colour matches "where this is going",
-   not "how it flipped". */
-.card.card-trend-bullish { --card-tint: 34, 197, 94; }
-.card.card-trend-bearish { --card-tint: 239, 68, 68; }
-.card.card-trend-neutral { --card-tint: 156, 163, 175; }
-.card.has-setup.setup-long { --card-tint: 34, 197, 94; }
-.card.has-setup.setup-short { --card-tint: 239, 68, 68; }
-
-/* .card.card-trend-{bullish|bearish|neutral} border-left-color rules
-   removed — base .card now reads border-left-color: rgb(var(--card-tint)),
-   so the trend classes only need to set --card-tint (above) and the
-   stripe + ribbons + breathing all follow. */
-
-/* State-based tints — The Call. Glow modifiers (glow-added / glow-flipped)
-   intentionally DO NOT override --card-tint here. The trend colour comes
-   from .border-long / .short / .neutral and stays consistent; the glow
-   class only adds the breathing halo. */
+/* State-based tints — single source. Every ticker box (RR or Call)
+   reads its tint from --card-tint, which the .border-long / .border-short
+   / .border-neutral class sets. SignalCard.jsx maps trend / setup
+   direction to those three classes; PositionCard.jsx maps position_type.
+   Same input → same output. */
 .call-card.border-long,
 .all-time-card.border-long { --card-tint: 34, 197, 94; }
 .call-card.border-short,
@@ -3452,49 +3289,46 @@ body,
    produced per-card variance depending on which modifier classes
    were active. Now strictly state-tinted ribbons, identical across
    every card in every grid. */
-.card::before,
 .call-card::before,
 .all-time-card::before {
   content: "";
   position: absolute;
-  inset: 0;
+  /* Oversize beyond card bounds so rotation never reveals corner gaps.
+     Parent's overflow:hidden clips the excess. */
+  inset: -30%;
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  background:
-    /* Glass top-light highlight */
-    radial-gradient(ellipse 80% 50% at 30% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
-    /* Diagonal ribbons — 135deg, 4px-wide stripes every 32px. Alpha
-       0.20 so motion is visible without leaning on opacity tricks. */
-    repeating-linear-gradient(
-      135deg,
-      transparent 0px,
-      transparent 28px,
-      rgba(var(--card-tint), 0.20) 28px,
-      rgba(var(--card-tint), 0.20) 32px
-    );
-  /* 32x32 tile gives drift-stripes a defined repeat unit. */
-  background-size: 100% 100%, 32px 32px;
-  /* Continuous diagonal drift, identical geometry on every card.
-     45px ≈ √2 × 32 so the slide is exactly one repeat-unit and the
-     loop has no visible "snap" at the boundary. Stagger via the
-     :nth-child(6n+N) rules below. */
-  animation: drift-stripes 6s linear infinite;
+  /* Soft two-armed conic swirl in the card's accent tint.
+     Two color stops at 22% and 72% create the rotating "galactic"
+     bands; blur smooths the transition so no hard arc edges appear. */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    rgba(var(--card-tint), 0.16) 22%,
+    transparent 48%,
+    rgba(var(--card-tint), 0.11) 72%,
+    transparent 100%
+  );
+  filter: blur(14px);
+  mix-blend-mode: screen;
+  /* Full 360° rotation per cycle — perfect loop with no seam.
+     Stagger via the :nth-child(6n+N) rules below. */
+  animation: ticker-swirl 28s linear infinite;
 }
 
-@keyframes drift-stripes {
-  to { background-position: 0 0, 45px 45px; }
+@keyframes ticker-swirl {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 
 /* Keep content above the ambient layer; hover sheen (::after) on top. */
-.card > *,
 .call-card > *,
 .all-time-card > * {
   position: relative;
   z-index: 1;
 }
 
-.card::after,
 .call-card[role='button']::after,
 .all-time-card::after {
   z-index: 2;
@@ -3633,21 +3467,14 @@ body,
 
 /* Parallax shelf — flipped / new-today cards sit 2px higher than their
    peers via a CSS variable that hover transforms can compose against. */
-.card,
 .call-card,
 .all-time-card {
   --shelf-y: 0px;
   transform: translateY(var(--shelf-y));
 }
 
-/* Glow modifier classes used to bump --shelf-y to -2px on glow cards.
-   Removed per the unification directive — glow modifiers ONLY drive
-   the breathing halo, not vertical position. Every .call-card sits at
-   the same baseline; only the breathing halo signals glow state. */
-
 /* Hover composes additively with the shelf so flipped cards lift even
    higher when targeted — preserves the parallax relationship. */
-.card:hover,
 .call-card[role='button']:hover,
 .all-time-card:hover {
   transform: translateY(calc(var(--shelf-y) - 4px));
@@ -3686,12 +3513,10 @@ body,
   40% { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.55)); }
 }
 
-.flip,
-.status-badge {
-  animation:
-    pill-mount-scale 400ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards,
-    pill-mount-glow 400ms ease-out backwards;
-}
+/* .flip, .status-badge mount animation merged into the canonical rules
+   for each selector earlier in this file (.flip with .setup at the top
+   of Part B; .status-badge in the badge section). No more duplicate
+   selectors for these classes. */
 
 /* === Top 5 rank circle treatment ================================== */
 
