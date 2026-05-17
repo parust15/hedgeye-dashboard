@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isMobileNow } from './useIsMobile'
 
 // Eases t in [0,1] with a cubic ease-out — no bounce, settles cleanly.
 // Matches the "(0.2, 0.8, 0.2, 1)" feel the brief calls for without
@@ -10,6 +11,13 @@ function easeOutCubic(t) {
 function prefersReducedMotion() {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+// Mobile is treated the same as reduced-motion for tween purposes —
+// running an RAF per visible price every tick is the single biggest
+// JS-side lag source on mobile during live polling.
+function shouldSkipTween() {
+  return prefersReducedMotion() || isMobileNow()
 }
 
 /**
@@ -30,8 +38,8 @@ export function useCountUp(target, { duration = 600 } = {}) {
   useEffect(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
-    // Non-numeric or reduce-motion → instant.
-    if (!Number.isFinite(target) || prefersReducedMotion()) {
+    // Non-numeric, reduce-motion, or mobile → instant (no RAF tween).
+    if (!Number.isFinite(target) || shouldSkipTween()) {
       setDisplay(target)
       fromRef.current = target
       return undefined

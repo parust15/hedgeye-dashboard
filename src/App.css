@@ -3665,3 +3665,206 @@ body,
    card now renders through PositionCard, so rank is a single
    .status-badge.status-rank pill, no separate circle, no per-rank
    luminance dimming, no spotlight shelf. */
+
+/* ===================================================================
+   MOBILE PERF — keep this block last so it overrides everything above.
+   Cuts the most expensive desktop chrome on small screens:
+     1. backdrop-filter: blur(20px) — extremely costly on mobile GPUs;
+        replace with a flat translucent background that reads similarly.
+     2. content-visibility: auto on card-grid children — lets the browser
+        skip layout + paint for off-screen cards during scroll, which is
+        the single biggest scroll-perf lever on long grids.
+     3. Static .card-bg::before/::after — desktop runs a conic gradient
+        + hover sheen on a transparent overlay; both are wasted work on
+        touch devices (no hover) and burn paint time.
+     4. Hard-disable any leftover ambient animations the JS layer can't
+        switch off (e.g. CSS keyframes targeting the smaller mobile-only
+        ambient DOM).
+   =================================================================== */
+
+@media (max-width: 640px) {
+  /* 1. Kill backdrop-filter — biggest single mobile paint cost. */
+  .call-card .card-bg,
+  .all-time-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    /* Slightly less transparent so the missing blur doesn't reveal
+       too much of the (now also lighter) ambient bg through the card. */
+    opacity: 0.95;
+  }
+
+  /* 2. Skip rendering off-screen cards. Estimated intrinsic size matches
+     the rendered card height so the scrollbar stays accurate. */
+  .cards > *,
+  .call-grid > *,
+  .all-time-grid > * {
+    content-visibility: auto;
+    contain-intrinsic-size: 320px;
+  }
+
+  /* 3. Drop the always-running conic chrome + hover sheen on touch. */
+  .call-card .card-bg::before,
+  .call-card[role='button'] .card-bg::after,
+  .all-time-card::before,
+  .all-time-card::after {
+    display: none !important;
+  }
+
+  /* 4. Mobile ambient: bright-star twinkle is cheap (4 elements, single
+     keyframe) — keep it. Only the heavyweight stuff (shader, parallax,
+     meteor spawner) is gone. */
+
+  /* Disable the breathing glow halo on glow-added / glow-flipped — it's
+     a constantly-animating box-shadow on every flagged card. */
+  .call-card.glow-added,
+  .call-card.glow-flipped {
+    animation: none !important;
+  }
+
+  /* 5. Kill the per-card breathe-tint halo. It's a 3.5s box-shadow
+     keyframe that runs in parallel on EVERY rendered card — 37+
+     simultaneous box-shadow animations is the heaviest single CSS
+     cost on mobile. Cards keep their state tint via the existing
+     border-left + .card-bg chrome; only the breathing halo goes. The
+     card-enter entrance stagger is preserved (it runs once on mount,
+     not infinitely). */
+  .cards > *,
+  .call-grid > *,
+  .all-time-grid > *,
+  .top5-scroll > * {
+    animation: card-enter 0.4s ease-out backwards !important;
+  }
+
+  /* Conviction-bar shimmer + ticker-swirl chrome on tickers — neither
+     adds info on mobile, both burn paint cycles. */
+  .conviction-bar-fill::before,
+  .price-pulse,
+  .ticker-swirl,
+  [class*='ticker-swirl'] {
+    animation: none !important;
+  }
+}
+
+/* ===================================================================
+   MOBILE "PRETTY" LAYER — adds back curated low-cost visuals.
+   Everything here is GPU-composited transform/opacity work on a tiny
+   number of elements. No backdrop-filter. No JS animation loops.
+   =================================================================== */
+
+@media (max-width: 640px) {
+  /* --- Aurora wash ------------------------------------------------
+     A single full-screen layer with two large radial gradients tinted
+     by the active market-mood color. The gradient is 2x size and we
+     animate its background-position so it drifts; this is one of the
+     cheapest "looks alive" effects you can do — the browser composites
+     a single texture and shifts it. No paint, no layout. */
+  .ambient-mobile-aurora {
+    position: absolute;
+    inset: -10%;            /* overscan so edges don't pop in/out */
+    pointer-events: none;
+    background:
+      radial-gradient(
+        ellipse 60% 50% at 30% 40%,
+        rgba(var(--ambient-dominant), 0.22) 0%,
+        rgba(var(--ambient-dominant), 0.06) 35%,
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 50% 60% at 75% 70%,
+        rgba(180, 110, 220, 0.18) 0%,
+        rgba(180, 110, 220, 0.04) 40%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 40% 35% at 50% 15%,
+        rgba(120, 200, 255, 0.10) 0%,
+        transparent 60%
+      );
+    background-size: 200% 200%, 220% 220%, 180% 180%;
+    animation: mobile-aurora-drift 28s ease-in-out infinite alternate;
+    z-index: 0;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+  }
+
+  @keyframes mobile-aurora-drift {
+    0%   { background-position:   0%   0%,  100% 100%,  50%   0%; }
+    50%  { background-position:  60%  40%,   40%  60%,  30%  20%; }
+    100% { background-position: 100% 100%,    0%   0%,  70%  10%; }
+  }
+
+  /* --- Drifting comets -------------------------------------------
+     Two static elements, one keyframe each. Cycle is long (15s/22s)
+     and staggered so the sky always has one in flight. Each comet is
+     a thin gradient streak rotated diagonally — the transform-only
+     animation translates the whole element off-screen and back, which
+     the compositor handles for free. */
+  .mobile-comet {
+    position: absolute;
+    top: -20px;
+    left: -120px;
+    width: 140px;
+    height: 1.5px;
+    border-radius: 50%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(180, 220, 255, 0.18) 30%,
+      rgba(220, 240, 255, 0.85) 75%,
+      rgba(255, 255, 255, 1) 100%
+    );
+    filter: blur(0.5px) drop-shadow(0 0 4px rgba(180, 220, 255, 0.45));
+    pointer-events: none;
+    will-change: transform, opacity;
+    z-index: 2;
+  }
+
+  .mobile-comet-1 {
+    top: 12%;
+    animation: mobile-comet-drift 15s linear infinite;
+  }
+
+  .mobile-comet-2 {
+    top: 38%;
+    animation: mobile-comet-drift 22s linear infinite;
+    animation-delay: 7s;
+    /* Second comet leans a touch steeper for variety. */
+    transform: rotate(22deg);
+  }
+
+  @keyframes mobile-comet-drift {
+    0%   { transform: translate(0, 0) rotate(15deg);              opacity: 0; }
+    8%   {                                                         opacity: 1; }
+    50%  { transform: translate(60vw, 30vh) rotate(15deg);         opacity: 1; }
+    92%  {                                                         opacity: 1; }
+    100% { transform: translate(120vw, 60vh) rotate(15deg);        opacity: 0; }
+  }
+
+  /* --- Constellation tweak --------------------------------------
+     The lines render at full opacity in the SVG; layer-level opacity
+     gives a soft fade-in effect without animation cost (single
+     transition on mount). */
+  .ambient-mobile .ambient-constellation {
+    opacity: 0.7;
+  }
+
+  /* --- Card depth replacement (no backdrop-filter) --------------
+     Without blur the cards can read flat. A static radial highlight
+     inside .card-bg restores depth at zero animation cost — it's just
+     extra layers in the existing card background. */
+  .call-card .card-bg {
+    background:
+      radial-gradient(
+        ellipse 80% 50% at 20% 0%,
+        rgba(255, 255, 255, 0.06) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 50% 60% at 100% 100%,
+        rgba(var(--card-tint), 0.10) 0%,
+        transparent 65%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 25%),
+      rgba(18, 22, 32, 0.92) !important;
+  }
+}

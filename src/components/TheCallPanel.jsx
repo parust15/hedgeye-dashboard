@@ -12,6 +12,7 @@ import { TickerFilter } from './TickerFilter'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { useCountUp } from '../lib/useCountUp'
+import { isMobileNow } from '../lib/useIsMobile'
 import {
   canonicalSector,
   normalizeSectorKey,
@@ -227,6 +228,8 @@ function CallPriceCountUp({ value }) {
 // Inline transient flash class on .cc-price when the displayed live
 // price changes. Tracks the previous numeric value via a ref so we can
 // distinguish initial render (no flash) from a real tick (flash up/down).
+// Mobile skips the flash entirely — the per-card setTimeout + class
+// toggle on every live tick was a measurable scroll-jank source.
 function useFlashOnChange(value) {
   const prevRef = useRef(null)
   const [flash, setFlash] = useState('')
@@ -235,6 +238,7 @@ function useFlashOnChange(value) {
     const prev = prevRef.current
     prevRef.current = value
     if (prev == null || !Number.isFinite(prev) || prev === value) return
+    if (isMobileNow()) return
     setFlash(value > prev ? 'flash-up' : 'flash-down')
     const id = setTimeout(() => setFlash(''), 350)
     return () => clearTimeout(id)

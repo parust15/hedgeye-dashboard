@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { CosmosShader } from './CosmosShader'
+import { useIsMobile } from '../lib/useIsMobile'
 
 const STATE_TINTS = {
   'HH/HL':     { r: 34,  g: 197, b: 94  },
@@ -281,9 +282,112 @@ function Supernova() {
   )
 }
 
+// Mobile gets a stripped-down ambient: no WebGL shader, no framer-motion
+// parallax / pointermove listener, no meteor spawner, no ticker stars,
+// no alert pulse interval, no second star layer, fewer stars in the
+// remaining layer.
+//
+// To keep the "wow" factor without burning the GPU we DO render:
+//   - .ambient-mobile-aurora: a single tint-reactive radial gradient
+//     that slowly drifts (one element, one animation, GPU-composited).
+//   - 2 .mobile-comet streaks on staggered CSS keyframes (15s + 22s).
+//     Pure CSS, no JS spawner, no setInterval.
+//   - A static 12-edge constellation rendered once from current
+//     tickers (SVG, no animation).
+//   - 4 bright stars with their original twinkle/diffraction-spike
+//     chrome (1 keyframe × 4 elements).
+function MobileAmbient({ tint, dominance, cssVars, tickers }) {
+  // Smaller seed-stable star set — 200 vs 600 — to keep box-shadow paint
+  // cost cheap on mobile.
+  const farStars = useMemo(() => generateStarShadows(200, 7), [])
+  // Cap constellation at 12 edges on mobile — desktop runs 60. Reuse the
+  // existing edge generator so the lines follow the same intra-state
+  // grouping logic (lines only connect tickers of the same range_state).
+  const constellation = useMemo(() => constellationEdges(tickers).slice(0, 12), [tickers])
+
+  return (
+    <div className="ambient ambient-mobile" aria-hidden="true" style={cssVars}>
+      {/* Aurora wash — single element, CSS-only background-position drift.
+          Tint is driven by --ambient-dominant (set on the parent), so the
+          market mood paints the sky without any JS per-frame work. */}
+      <div className="ambient-mobile-aurora" />
+
+      <div
+        className="ambient-stars-far"
+        style={{ boxShadow: farStars }}
+      />
+
+      {/* Sparse constellation — purely decorative, no animation. */}
+      {constellation.length > 0 && (
+        <svg
+          className="ambient-constellation"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {constellation.map(([a, b], i) => {
+            const t = STATE_TINTS[a.state] || NEUTRAL
+            return (
+              <line
+                key={i}
+                x1={a.pos.x} y1={a.pos.y}
+                x2={b.pos.x} y2={b.pos.y}
+                stroke={`rgba(${t.r},${t.g},${t.b},0.32)`}
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+            )
+          })}
+        </svg>
+      )}
+
+      {BRIGHT_STARS.slice(0, 4).map((s, i) => (
+        <span
+          key={i}
+          className={`ambient-bright-star bright-${s.hue}`}
+          style={{ left: `${s.x}vw`, top: `${s.y}vh`, animationDelay: `${i * 0.7}s` }}
+        />
+      ))}
+
+      {/* Two slow CSS-only comets crossing the sky on long staggered
+          cycles. Each is one element with a single transform keyframe
+          — vastly cheaper than the desktop spawner (which can have
+          12+ live meteors at once driven by setInterval + setState). */}
+      <span className="mobile-comet mobile-comet-1" />
+      <span className="mobile-comet mobile-comet-2" />
+
+      <div className="ambient-vignette" />
+    </div>
+  )
+}
+
 export function AmbientBackground({ tickers }) {
+  const isMobile = useIsMobile()
   const { tint, dominance } = useMemo(() => dominantState(tickers), [tickers])
 
+  const cssVars = {
+    '--ambient-dominant': `${tint.r}, ${tint.g}, ${tint.b}`,
+    '--ambient-dominance': dominance.toFixed(2),
+  }
+
+  // Mobile gets a vastly cheaper ambient (no shader, no parallax, no
+  // meteors). The breakpoint hook re-renders when crossing the boundary
+  // so rotating to landscape on a tablet swaps in the full version.
+  if (isMobile) {
+    return (
+      <MobileAmbient
+        tint={tint}
+        dominance={dominance}
+        cssVars={cssVars}
+        tickers={tickers}
+      />
+    )
+  }
+
+  return <DesktopAmbient tint={tint} dominance={dominance} cssVars={cssVars} tickers={tickers} />
+}
+
+function DesktopAmbient({ tint, dominance, cssVars, tickers }) {
   // Star fields are deterministic — generated once, never re-rendered.
   const farStars = useMemo(() => generateStarShadows(600, 7), [])
   const midStars = useMemo(() => generateStarShadows(180, 23), [])
@@ -306,11 +410,6 @@ export function AmbientBackground({ tickers }) {
     window.addEventListener('pointermove', onMove, { passive: true })
     return () => window.removeEventListener('pointermove', onMove)
   }, [mx, my])
-
-  const cssVars = {
-    '--ambient-dominant': `${tint.r}, ${tint.g}, ${tint.b}`,
-    '--ambient-dominance': dominance.toFixed(2),
-  }
 
   return (
     <div className="ambient" aria-hidden="true" style={cssVars}>
