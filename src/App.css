@@ -78,6 +78,12 @@
   background: #a78bfa;
 }
 
+/* Teal accent for the Macro Show tab — fifth color slot, distinct from
+   the four existing tab accents. */
+.top-tab.top-tab-teal.active::before {
+  background: #2dd4bf;
+}
+
 /* The container each panel renders inside — handles the page padding that
    App used to own directly. */
 .panel {
@@ -4229,6 +4235,8 @@ body,
   .call-card .card-bg,
   .rerank-row .card-bg,
   .rerank-movers-card .card-bg,
+  .macro-synthesis-card .card-bg,
+  .macro-day-card .card-bg,
   .all-time-card {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -4417,6 +4425,547 @@ body,
       ),
       linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 25%),
       rgba(18, 22, 32, 0.92) !important;
+  }
+}
+
+/* ===================================================================
+   MACRO SHOW panel
+   Synthesis card at the top (always rendered, no collapse), then a
+   vertical stack of expandable day cards. First day expanded by
+   default. Reuses theme tokens (--bg-elev, --border, --bull, --bear,
+   --radius-card, --mono) — no redefined colors.
+   =================================================================== */
+
+.macro-panel {
+  /* inherits .panel padding */
+}
+
+/* --- Shared bits ----------------------------------------------------- */
+
+.macro-empty {
+  margin: 48px auto;
+  max-width: 480px;
+  text-align: center;
+  padding: 32px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.macro-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 6px;
+}
+
+.macro-empty-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Ticker chip rows — used in both the synthesis card and the day
+   cards' POSITIONS MENTIONED section. */
+.macro-tick-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+
+.macro-tick-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  padding-top: 4px;
+  min-width: 110px;
+}
+
+.macro-tick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+}
+
+.macro-tick-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.macro-tick-bull {
+  background: var(--bull-bg);
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
+.macro-tick-bear {
+  background: var(--bear-bg);
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.32);
+}
+
+/* Skeleton placeholders — used while data loads. */
+.macro-skel-card {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: macro-skel-pulse 1.4s ease-in-out infinite;
+}
+
+.macro-skel-line {
+  height: 14px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-badge);
+}
+
+@keyframes macro-skel-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+
+/* --- 5-day synthesis card -------------------------------------------- */
+
+/* Synthesis card is a positioning shell — visual chrome lives on the
+   .card-bg sibling so the surface is translucent (opacity 0.7,
+   backdrop-filter blur) and shares the same look as every other
+   ticker box on the dashboard. */
+.macro-synthesis-card {
+  position: relative;
+  margin: 20px 0 24px;
+  padding: 20px 22px 18px;
+  border-radius: var(--radius-card);
+  /* Tint = teal so the .card-bg radial gradient + top-stripe accent
+     pick up the synthesis-specific colour. */
+  --card-tint: 45, 212, 191;
+}
+
+.macro-synthesis-card > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.macro-synthesis-card .card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 0% 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-width: 2px;
+  border-top-color: rgb(var(--card-tint));
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0.7;
+}
+
+/* Inline ticker colorization inside synthesis bullets — green for
+   tickers in the bullish callout array, red for bearish. Slightly
+   bolder than the surrounding bullet text so the names pop. */
+.macro-tick-inline {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.macro-tick-inline-bull { color: var(--bull); }
+.macro-tick-inline-bear { color: var(--bear); }
+
+.macro-synthesis-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.macro-synthesis-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #2dd4bf;
+}
+
+.macro-synthesis-date {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.macro-synthesis-bullets {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.macro-synthesis-bullets li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.macro-synthesis-bullets li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: #2dd4bf;
+  font-weight: 700;
+}
+
+.macro-synthesis-callouts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.macro-synthesis-attribution {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.7;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* --- Day cards stack ------------------------------------------------- */
+
+.macro-day-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Day card uses the same .card-bg pattern — translucent dark surface
+   with backdrop-filter blur + 0.7 opacity revealing the cosmos
+   shader through. Content sits above the chrome layer. */
+.macro-day-card {
+  position: relative;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  transition: transform 160ms ease;
+  /* Default tint = neutral grey so the .card-bg radial gradient has
+     a usable value. Open state bumps to teal to match the synthesis
+     accent and signal active selection. */
+  --card-tint: 156, 163, 175;
+}
+
+.macro-day-card.open {
+  --card-tint: 45, 212, 191;
+}
+
+.macro-day-card > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.macro-day-card .card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 0% 0%,
+      rgba(var(--card-tint), 0.08),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 14px rgba(0, 0, 0, 0.20);
+  opacity: 0.7;
+  transition: border-color 160ms ease;
+}
+
+.macro-day-card.open .card-bg {
+  border-color: rgba(var(--card-tint), 0.45);
+}
+
+/* The clickable header — full-width button so the whole row is the
+   click target. Cursor pointer + hover highlight. */
+.macro-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.macro-day-head:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.macro-day-head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.macro-day-date {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.macro-day-themes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Theme pills bumped from 10px muted → 13px near-strong so the
+   themes carry more visual weight next to the date. They're often
+   the single most useful at-a-glance signal on the collapsed card. */
+.macro-day-theme-pill {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-strong);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.macro-day-caret {
+  font-size: 14px;
+  color: var(--text-dim);
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+}
+
+.macro-day-caret.open {
+  transform: rotate(180deg);
+}
+
+/* Expanded body — padded, sections separated by space. */
+.macro-day-body {
+  padding: 4px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.macro-day-intro {
+  font-style: italic;
+  font-size: 14px;
+  color: var(--text-strong);
+  line-height: 1.5;
+  margin: 14px 0 0;
+}
+
+.macro-day-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.macro-day-section-head,
+.macro-day-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.macro-day-ranges {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.macro-day-ranges-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.macro-day-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.macro-day-bullets li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.macro-day-bullets li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+/* Top 3 things — numbered list with theme accent and body paragraph. */
+.macro-day-top3 {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  counter-reset: macro-top3;
+}
+
+.macro-day-top3-item {
+  padding-left: 6px;
+}
+
+.macro-day-top3-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.macro-day-top3-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2dd4bf;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.4);
+}
+
+.macro-day-top3-rank {
+  font-family: var(--mono);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.macro-day-top3-theme {
+  color: var(--text-strong);
+}
+
+.macro-day-top3-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0;
+  padding-left: 16px;
+}
+
+/* Full summary — large block of text with line breaks preserved,
+   scrollable when long so the card doesn't take over the viewport. */
+.macro-day-summary {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.macro-day-attribution {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.65;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* --- Mobile tweaks --------------------------------------------------- */
+@media (max-width: 640px) {
+  .macro-tick-label {
+    min-width: 0;
+    width: 100%;
+  }
+  .macro-day-summary {
+    max-height: 400px;
+    font-size: 12px;
+  }
+  .macro-day-head {
+    padding: 12px 14px;
+  }
+  .macro-day-body {
+    padding: 4px 14px 16px;
+  }
+  .macro-day-date {
+    font-size: 14px;
   }
 }
 

@@ -6,6 +6,7 @@ const TABS = [
   { id: 'the-call', label: 'THE CALL', accent: 'amber' },
   { id: 'etf-pro-plus', label: 'ETF PRO PLUS', accent: 'blue' },
   { id: 'etf-re-rank', label: 'ETF RE-RANK', accent: 'purple' },
+  { id: 'macro-show', label: 'MACRO SHOW', accent: 'teal' },
 ]
 
 export function TopTabs({ active, onChange }) {
