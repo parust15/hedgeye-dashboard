@@ -36,6 +36,7 @@ const TABS = [
   { id: 'etf-pro-plus', label: 'ETF PRO PLUS' },
   { id: 'etf-re-rank', label: 'ETF RE-RANK' },
   { id: 'macro-show', label: 'MACRO SHOW' },
+  { id: 'signal-strength', label: 'SIGNAL STRENGTH' },
 ]
 const N = TABS.length
 

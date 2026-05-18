@@ -5,6 +5,7 @@ import { TheCallPanel } from './components/TheCallPanel'
 import { EtfProPlusPanel } from './components/EtfProPlusPanel'
 import { EtfReRankPanel } from './components/EtfReRankPanel'
 import { MacroShowPanel } from './components/MacroShowPanel'
+import { SignalStrengthPanel } from './components/SignalStrengthPanel'
 import { TabBarPreview } from './components/preview/TabBarPreview'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
@@ -15,7 +16,14 @@ import { supabase } from './lib/supabase'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
-const VALID_TABS = ['risk-ranges', 'the-call', 'etf-pro-plus', 'etf-re-rank', 'macro-show']
+const VALID_TABS = [
+  'risk-ranges',
+  'the-call',
+  'etf-pro-plus',
+  'etf-re-rank',
+  'macro-show',
+  'signal-strength',
+]
 
 function loadInitialTab() {
   try {
@@ -141,6 +149,7 @@ export default function App() {
       {activeTab === 'etf-pro-plus' && <EtfProPlusPanel />}
       {activeTab === 'etf-re-rank' && <EtfReRankPanel />}
       {activeTab === 'macro-show' && <MacroShowPanel />}
+      {activeTab === 'signal-strength' && <SignalStrengthPanel />}
       {modalPosition && (
         <TickerDetailModal position={modalPosition} onClose={closeModal} />
       )}
