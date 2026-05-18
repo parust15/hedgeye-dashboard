@@ -24,16 +24,17 @@
    constellation backdrop (dotted connector line + node dots). */
 .top-tabs {
   display: flex;
-  align-items: center;          /* center tabs vertically as bar grows */
+  align-items: center;
   justify-content: flex-start;
   gap: 4px;
-  /* No fixed width — the bar shrink-wraps its content. When collapsed
-     only the active tab + "•••" hint are visible at natural width;
-     bar follows. When expanded, all 5 tabs reveal and bar grows
-     horizontally to fit them. Height + vertical padding animate via
-     Framer (see TopTabs.jsx). */
+  /* Width auto so the bar shrink-wraps its content (collapsed
+     = active tab + hint; expanded = all 5 tabs). Height + vertical
+     padding animate via Framer in TopTabs.jsx — the height baseline
+     here matches BAR_REST so the bar renders correctly before
+     Framer's animate prop kicks in on first interaction. */
   width: auto;
   box-sizing: border-box;
+  height: 56px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   padding-left: 16px;
@@ -63,10 +64,8 @@
      gets squeezed by the VIX pill on the right side of .top-bar.
      Each tab claims exactly the room its label needs + padding. */
   flex: 0 0 auto;
-  /* Easing tuned to feel close to BAR_SPRING's settle (~400ms with
-     spring stiffness 380, damping 30). The cubic-bezier mimics the
-     spring's slight overshoot + settle so horizontal tab collapse
-     finishes roughly when the bar height animation does. */
+  /* Easing approximates BAR_SPRING's settle so horizontal tab
+     collapse finishes roughly when the bar height animation does. */
   transition:
     color 160ms ease,
     background 160ms ease,
@@ -2880,9 +2879,8 @@
 
 .top-bar {
   display: flex;
-  /* align-items: center so the VIX pill rides the tab bar's height
-     growth instead of staying anchored at the top while the bar
-     grows downward past it. */
+  /* Center vertically so the VIX pill tracks the tab bar's
+     animated height. */
   align-items: center;
   justify-content: space-between;
   gap: 12px;

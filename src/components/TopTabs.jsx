@@ -39,11 +39,8 @@ const TABS = [
 ]
 const N = TABS.length
 
-// Fallback equal-spacing positions used ONLY before
-// useLayoutEffect's first measurement lands. measure() runs
-// synchronously before paint so this is rarely visible — but it
-// prevents NaN/undefined positions in the SVG attributes on the
-// very first render (and on any future SSR snapshot).
+// Pre-measurement fallback — prevents NaN positions in SVG attrs
+// on the first render before useLayoutEffect's measure() runs.
 const FALLBACK_CENTERS = Array.from({ length: N }, (_, i) => ((i + 0.5) / N) * 100)
 
 const STAR_SPRING = { type: 'spring', stiffness: 320, damping: 26 }
@@ -54,10 +51,8 @@ const BAR_SPRING = { type: 'spring', stiffness: 380, damping: 30, mass: 0.8 }
 const BAR_REST = { height: 56, paddingTop: 0, paddingBottom: 0 }
 const BAR_EXPANDED = { height: 88, paddingTop: 12, paddingBottom: 12 }
 
-// How long after an active change we hold the "travelling" state.
-// Exceeds both the ignition fade (600ms) and the comet trail spring
-// settle (~500ms). Restarted on each click via the effect cleanup so
-// rapid-fire clicks don't end the transit prematurely.
+// How long the "travelling" state holds after an active change.
+// Exceeds the ignition fade (600ms) and trail spring settle (~500ms).
 const TRANSIT_MS = 700
 
 export function TopTabs({ active, onChange }) {
@@ -68,9 +63,12 @@ export function TopTabs({ active, onChange }) {
   // --- Dynamic tab-center measurement -------------------------------
   const barRef = useRef(null)
   const tabRefs = useRef([])
-  // Trim stale refs each render — idempotent for the static-TABS case
-  // today; defensive if TABS ever becomes dynamic.
-  tabRefs.current = tabRefs.current.slice(0, N)
+  // Cache of the bar width measure() last computed against. The bar's
+  // height animates (Framer spring) which fires ResizeObserver every
+  // frame; tab-center % only changes when bar WIDTH changes, so we
+  // short-circuit if width is unchanged. Eliminates ~24 redundant
+  // getBoundingClientRect calls per height transit.
+  const lastMeasuredWidth = useRef(0)
   const [centers, setCenters] = useState(FALLBACK_CENTERS)
 
   useLayoutEffect(() => {
@@ -79,6 +77,8 @@ export function TopTabs({ active, onChange }) {
     function measure() {
       const barRect = bar.getBoundingClientRect()
       if (barRect.width === 0) return
+      if (barRect.width === lastMeasuredWidth.current) return
+      lastMeasuredWidth.current = barRect.width
       const next = tabRefs.current.map((node) => {
         if (!node) return null
         const r = node.getBoundingClientRect()
@@ -92,9 +92,11 @@ export function TopTabs({ active, onChange }) {
         return equal ? curr : next
       })
     }
+    // Force a re-measure when the effect re-runs (active/hover
+    // change) by clearing the cached width — otherwise the
+    // short-circuit would skip the measurement we actually need.
+    lastMeasuredWidth.current = 0
     measure()
-    // Observing the bar alone catches both viewport resize and tab
-    // width changes (they propagate through the bar's content rect).
     const ro = new ResizeObserver(measure)
     ro.observe(bar)
     return () => ro.disconnect()
@@ -117,10 +119,8 @@ export function TopTabs({ active, onChange }) {
   const isExpanded = hovered || travelling
 
   // Settle "travelling" after the transit window. Cleanup cancels
-  // the prior timer on each new click so rapid-fire clicks keep the
-  // bar in transit until the user stops. Replaces the old
-  // onAnimationComplete approach, which closed over a stale `active`
-  // and could corrupt the trail's origin during rapid clicks.
+  // the prior timer on each click so rapid-fire clicks keep the
+  // bar in transit until the user stops.
   useEffect(() => {
     if (!travelling) return undefined
     const id = setTimeout(() => setPrev(active), TRANSIT_MS)
