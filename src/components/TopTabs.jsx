@@ -37,6 +37,7 @@ const TABS = [
   { id: 'etf-re-rank', label: 'ETF RE-RANK' },
   { id: 'macro-show', label: 'MACRO SHOW' },
   { id: 'signal-strength', label: 'SIGNAL STRENGTH' },
+  { id: 'investing-ideas', label: 'INVESTING IDEAS' },
 ]
 const N = TABS.length
 

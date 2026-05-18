@@ -5898,3 +5898,349 @@ body,
     opacity: 0.95;
   }
 }
+
+/* ===================================================================
+   INVESTING IDEAS panel
+   Two side-by-side columns (LONGS green / SHORTS red) of expandable
+   ticker cards. Cards reuse the .card-bg chrome and the .posbar
+   visual the existing dashboard already defines.
+   =================================================================== */
+
+.ii-panel .topbar {
+  margin-bottom: 20px;
+}
+
+.ii-meta-row {
+  margin-top: 4px;
+}
+
+.ii-meta-line {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.2px;
+}
+
+.ii-meta-line strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.ii-meta-error {
+  color: var(--bear);
+}
+
+.ii-feed-link {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  border: 1px solid rgba(110, 168, 255, 0.35);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.ii-feed-link:hover {
+  background: rgba(110, 168, 255, 0.08);
+  border-color: rgba(110, 168, 255, 0.6);
+}
+
+/* Two-column layout — longs left, shorts right. Stacks on mobile. */
+.ii-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.ii-column {
+  min-width: 0;
+}
+
+.ii-column-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ii-column-title-long {
+  color: var(--bull);
+  border-bottom-color: rgba(34, 197, 94, 0.35);
+}
+
+.ii-column-title-short {
+  color: var(--bear);
+  border-bottom-color: rgba(239, 68, 68, 0.35);
+}
+
+.ii-column-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.3px;
+}
+
+.ii-column-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- Card chrome ----------------------------------------------------- */
+
+.ii-card {
+  position: relative;
+  border-radius: var(--radius-card);
+  /* Default to neutral tint; modifier classes override per side. */
+  --card-tint: 156, 163, 175;
+}
+
+.ii-card-long {
+  --card-tint: 34, 197, 94;
+}
+
+.ii-card-short {
+  --card-tint: 239, 68, 68;
+}
+
+.ii-card > *:not(.card-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.ii-card .card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 0% 0%,
+      rgba(var(--card-tint), 0.10),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 20%),
+    rgba(20, 23, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgb(var(--card-tint));
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 14px rgba(0, 0, 0, 0.20);
+  opacity: 0.7;
+}
+
+/* Clickable header — full-width button to keep the click target large. */
+.ii-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+}
+
+.ii-card-head[aria-disabled='true'] {
+  cursor: default;
+}
+
+.ii-card-head-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ii-ticker {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-strong);
+}
+
+.ii-card-long .ii-price { color: var(--bull); }
+.ii-card-short .ii-price { color: var(--bear); }
+.ii-price {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.ii-caret {
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: transform 160ms ease;
+}
+
+.ii-caret.open {
+  transform: rotate(90deg);
+}
+
+/* Position bar — reuses .posbar / .posbar-track / .posbar-marker
+   classes already defined elsewhere in this file. We just provide
+   the surrounding labels here. */
+.ii-posbar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ii-posbar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.ii-posbar-labels .posbar-end {
+  font-family: var(--mono);
+}
+
+.ii-sector {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.2px;
+}
+
+.ii-sector-sep {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.ii-sector-head {
+  color: var(--text);
+}
+
+/* --- Expanded body --------------------------------------------------- */
+
+.ii-card-body {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 14px;
+}
+
+.ii-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ii-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.ii-paragraph {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.ii-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ii-bullets li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.ii-bullets li::before {
+  content: '•';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: rgb(var(--card-tint));
+  font-weight: 700;
+}
+
+/* Skeleton placeholder. */
+.ii-card-skeleton {
+  height: 110px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  animation: ii-skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ii-skel-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.9; }
+}
+
+/* Empty state. */
+.ii-empty {
+  margin: 48px auto;
+  max-width: 520px;
+  text-align: center;
+  padding: 32px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ii-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 6px;
+}
+
+.ii-empty-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Mobile: stack the columns + drop backdrop blur on card chrome
+   (matches the existing perf cut applied to other .card-bg variants). */
+@media (max-width: 768px) {
+  .ii-split {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ii-card .card-bg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    opacity: 0.95;
+  }
+}

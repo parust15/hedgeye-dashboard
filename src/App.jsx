@@ -6,6 +6,7 @@ import { EtfProPlusPanel } from './components/EtfProPlusPanel'
 import { EtfReRankPanel } from './components/EtfReRankPanel'
 import { MacroShowPanel } from './components/MacroShowPanel'
 import { SignalStrengthPanel } from './components/SignalStrengthPanel'
+import { InvestingIdeasPanel } from './components/InvestingIdeasPanel'
 import { TabBarPreview } from './components/preview/TabBarPreview'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
@@ -23,6 +24,7 @@ const VALID_TABS = [
   'etf-re-rank',
   'macro-show',
   'signal-strength',
+  'investing-ideas',
 ]
 
 function loadInitialTab() {
@@ -150,6 +152,7 @@ export default function App() {
       {activeTab === 'etf-re-rank' && <EtfReRankPanel />}
       {activeTab === 'macro-show' && <MacroShowPanel />}
       {activeTab === 'signal-strength' && <SignalStrengthPanel />}
+      {activeTab === 'investing-ideas' && <InvestingIdeasPanel />}
       {modalPosition && (
         <TickerDetailModal position={modalPosition} onClose={closeModal} />
       )}
