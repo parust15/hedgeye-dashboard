@@ -63,12 +63,16 @@
      gets squeezed by the VIX pill on the right side of .top-bar.
      Each tab claims exactly the room its label needs + padding. */
   flex: 0 0 auto;
+  /* Easing tuned to feel close to BAR_SPRING's settle (~400ms with
+     spring stiffness 380, damping 30). The cubic-bezier mimics the
+     spring's slight overshoot + settle so horizontal tab collapse
+     finishes roughly when the bar height animation does. */
   transition:
     color 160ms ease,
     background 160ms ease,
-    max-width 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    padding 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 220ms ease;
+    max-width 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    padding 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 240ms ease;
   max-width: 300px;
 }
 
@@ -98,11 +102,15 @@
   text-shadow: 0 0 14px rgba(180, 230, 255, 0.55);
 }
 
-/* "•••" trailing hint — only at rest. Fades on hover. */
+/* "•••" trailing hint — only at rest. Absolutely positioned so it
+   doesn't occupy flex layout space (otherwise it'd push the bar
+   wider at rest). Fades out when expanded. */
 .top-tabs::after {
   content: "•••";
-  align-self: center;
-  margin-left: 4px;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 12px;
   letter-spacing: 2px;
   color: var(--text-dim);
@@ -115,11 +123,11 @@
   opacity: 0;
 }
 
-/* Constellation backdrop SVG. Spans the full bar. At rest only the
-   active star is visible (line + node dots faded to 0); on hover
-   they all fade in. The star animates via Framer Motion directly
-   on the SVG circle attributes, so positions follow tab centers
-   automatically as the bar resizes. */
+/* Constellation backdrop SVG — carries only the dotted connector
+   line + the ignition stroke. Dots + star + comet trail are HTML
+   siblings further down so they stay circular (SVG circles get
+   stretched into ellipses when the bar's aspect ratio shifts
+   during the height animation). */
 .top-tabs-constellation {
   position: absolute;
   inset: 0;
@@ -129,26 +137,84 @@
   z-index: 0;
 }
 
-.top-tabs-constellation > line,
-.top-tabs-constellation > circle:not(.top-tabs-star) {
+.top-tabs-constellation > line {
   opacity: 0;
   transition: opacity 240ms ease;
 }
 
-.top-tabs.expanded .top-tabs-constellation > line,
-.top-tabs.expanded .top-tabs-constellation > circle:not(.top-tabs-star) {
+.top-tabs.expanded .top-tabs-constellation > line {
   opacity: 1;
 }
 
-/* The active star — layered drop-shadow halo for the soft glow.
-   Opacity is driven by Framer Motion in TopTabs.jsx (not CSS) so it
-   can interpolate with the bar's expand/collapse spring without
+/* --- HTML constellation layer ----------------------------------- */
+
+/* Per-tab node dots. Fixed pixel size + `transform: translateX(-50%)`
+   centers each dot under its tab's measured center. `bottom` keeps
+   them anchored near the lower edge of the bar regardless of how
+   the Framer height animation interpolates. */
+.top-tabs-node {
+  position: absolute;
+  bottom: 10px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.top-tabs.expanded .top-tabs-node {
+  opacity: 1;
+}
+
+/* Active star — sits at the active tab's center with a layered
+   drop-shadow halo. Opacity is driven by Framer in TopTabs.jsx
+   (not CSS) so it can interpolate with the bar's spring without
    fighting Framer's inline styles. */
 .top-tabs-star {
+  position: absolute;
+  bottom: 6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: rgba(200, 240, 255, 1);
+  pointer-events: none;
+  z-index: 0;
   filter:
-    drop-shadow(0 0 1.2px rgba(220, 240, 255, 0.95))
-    drop-shadow(0 0 3px rgba(180, 230, 255, 0.7))
-    drop-shadow(0 0 6px rgba(140, 200, 240, 0.45));
+    drop-shadow(0 0 2px rgba(220, 240, 255, 0.95))
+    drop-shadow(0 0 6px rgba(180, 230, 255, 0.7))
+    drop-shadow(0 0 12px rgba(140, 200, 240, 0.45));
+}
+
+/* Comet trail dots that follow the star during transit. */
+.top-tabs-trail {
+  position: absolute;
+  bottom: 6px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: rgba(180, 230, 255, 0.7);
+  pointer-events: none;
+  z-index: 0;
+  filter: drop-shadow(0 0 4px rgba(180, 230, 255, 0.5));
+}
+
+/* Reduced-motion fallback. The Framer side reads useReducedMotion
+   and collapses spring transitions to duration:0; here we mirror
+   for the CSS-driven transitions (tab collapse, hint fade,
+   constellation line fade) so the experience is consistent. */
+@media (prefers-reduced-motion: reduce) {
+  .top-tab,
+  .top-tabs::after,
+  .top-tabs-constellation > line,
+  .top-tabs-node {
+    transition: none !important;
+  }
 }
 
 /* The container each panel renders inside — handles the page padding that
@@ -2814,7 +2880,10 @@
 
 .top-bar {
   display: flex;
-  align-items: flex-start;
+  /* align-items: center so the VIX pill rides the tab bar's height
+     growth instead of staying anchored at the top while the bar
+     grows downward past it. */
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
