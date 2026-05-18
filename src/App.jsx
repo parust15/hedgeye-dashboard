@@ -5,6 +5,7 @@ import { TheCallPanel } from './components/TheCallPanel'
 import { EtfProPlusPanel } from './components/EtfProPlusPanel'
 import { EtfReRankPanel } from './components/EtfReRankPanel'
 import { MacroShowPanel } from './components/MacroShowPanel'
+import { TabBarPreview } from './components/preview/TabBarPreview'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
 import { AmbientBackground } from './components/AmbientBackground'
@@ -90,6 +91,24 @@ export default function App() {
   }, [])
 
   const closeModal = useCallback(() => setModalPosition(null), [])
+
+  // ?tabsPreview=1 short-circuits the dashboard and renders the
+  // side-by-side tab-bar variant preview instead. The cosmos ambient
+  // still paints behind so we can judge each treatment against the
+  // real backdrop. Reading window.location.search at render time is
+  // fine here — the preview flag isn't expected to flip mid-session.
+  const isTabsPreview =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('tabsPreview') === '1'
+
+  if (isTabsPreview) {
+    return (
+      <div className="app">
+        <AmbientBackground tickers={signalTickers} />
+        <TabBarPreview />
+      </div>
+    )
+  }
 
   return (
     <div className="app">

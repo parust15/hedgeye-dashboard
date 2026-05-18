@@ -13,28 +13,63 @@
   margin-bottom: 2px;
 }
 
-/* Top-level RISK RANGES | THE CALL tab bar. Sits above any panel. */
+/* Top-level tab bar — constellation aesthetic.
+   The dark strip is ALWAYS full-width of its flex slot in .top-bar
+   (no width animation) — only height + vertical padding animate.
+   Both are driven by Framer Motion in TopTabs.jsx using the same
+   spring as the constellation star travel so the bar growth stays
+   in lockstep with the click-transit motion.
+   Collapsed-on-rest: only the active tab is visible at natural
+   width; hovering the bar reveals the other four AND the
+   constellation backdrop (dotted connector line + node dots). */
 .top-tabs {
   display: flex;
-  gap: 0;
+  align-items: center;          /* center tabs vertically as bar grows */
+  justify-content: flex-start;
+  gap: 4px;
+  /* No fixed width — the bar shrink-wraps its content. When collapsed
+     only the active tab + "•••" hint are visible at natural width;
+     bar follows. When expanded, all 5 tabs reveal and bar grows
+     horizontally to fit them. Height + vertical padding animate via
+     Framer (see TopTabs.jsx). */
+  width: auto;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
-  padding: 0 24px;
+  padding-left: 16px;
+  padding-right: 16px;
+  position: relative;
 }
 
 .top-tab {
   position: relative;
+  display: flex;
+  align-items: center;           /* keep label vertically centered */
   border: none;
   background: transparent;
   color: var(--text-dim);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 16px 24px;
+  padding: 0 20px;               /* vertical padding owned by bar wrapper */
+  height: 100%;                  /* fill the bar's animated height */
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  z-index: 1;
+  /* flex-shrink: 0 so labels don't clip when the parent .top-tabs
+     gets squeezed by the VIX pill on the right side of .top-bar.
+     Each tab claims exactly the room its label needs + padding. */
+  flex: 0 0 auto;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    max-width 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 220ms ease;
+  max-width: 300px;
 }
 
 .top-tab:hover {
@@ -42,46 +77,78 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Collapsed state — non-active tabs shrink to zero width, lose
+   padding + opacity, become non-interactive. Driven by the
+   `.expanded` class set by React state (hover OR mid-transition),
+   so tabs stay open while the click ignition animation runs even
+   if the cursor leaves the bar. */
+.top-tabs:not(.expanded) .top-tab:not(.active) {
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Active tab text glows softly with a hint of cyan — the constellation
+   star sits below the label baseline (cy=44 in viewBox), so the text
+   gets the visual lift. */
 .top-tab.active {
   color: var(--text-strong);
+  text-shadow: 0 0 14px rgba(180, 230, 255, 0.55);
 }
 
-/* Accent left-border on the active tab. Green for Risk Ranges, amber for
-   The Call — matches the spec's color anchoring per panel. */
-.top-tab.active::before {
-  content: "";
+/* "•••" trailing hint — only at rest. Fades on hover. */
+.top-tabs::after {
+  content: "•••";
+  align-self: center;
+  margin-left: 4px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.top-tabs.expanded::after {
+  opacity: 0;
+}
+
+/* Constellation backdrop SVG. Spans the full bar. At rest only the
+   active star is visible (line + node dots faded to 0); on hover
+   they all fade in. The star animates via Framer Motion directly
+   on the SVG circle attributes, so positions follow tab centers
+   automatically as the bar resizes. */
+.top-tabs-constellation {
   position: absolute;
-  left: 0;
-  top: 12px;
-  bottom: 12px;
-  width: 3px;
-  border-radius: 2px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.top-tab.top-tab-green.active::before {
-  background: var(--bull);
+.top-tabs-constellation > line,
+.top-tabs-constellation > circle:not(.top-tabs-star) {
+  opacity: 0;
+  transition: opacity 240ms ease;
 }
 
-.top-tab.top-tab-amber.active::before {
-  background: var(--amber-strong);
+.top-tabs.expanded .top-tabs-constellation > line,
+.top-tabs.expanded .top-tabs-constellation > circle:not(.top-tabs-star) {
+  opacity: 1;
 }
 
-/* Blue accent for the ETF Pro Plus tab — keeps RR=green/Call=amber as
-   the existing anchor colors and gives ETF Pro Plus its own. */
-.top-tab.top-tab-blue.active::before {
-  background: var(--accent);
-}
-
-/* Purple accent for the ETF Re-Rank tab — distinct from the blue ETF
-   Pro Plus tab so the two ETF tabs read as a related-but-separate pair. */
-.top-tab.top-tab-purple.active::before {
-  background: #a78bfa;
-}
-
-/* Teal accent for the Macro Show tab — fifth color slot, distinct from
-   the four existing tab accents. */
-.top-tab.top-tab-teal.active::before {
-  background: #2dd4bf;
+/* The active star — layered drop-shadow halo for the soft glow.
+   Opacity is driven by Framer Motion in TopTabs.jsx (not CSS) so it
+   can interpolate with the bar's expand/collapse spring without
+   fighting Framer's inline styles. */
+.top-tabs-star {
+  filter:
+    drop-shadow(0 0 1.2px rgba(220, 240, 255, 0.95))
+    drop-shadow(0 0 3px rgba(180, 230, 255, 0.7))
+    drop-shadow(0 0 6px rgba(140, 200, 240, 0.45));
 }
 
 /* The container each panel renders inside — handles the page padding that
@@ -2752,8 +2819,13 @@
   gap: 12px;
 }
 
+/* Bar shrink-wraps its content — does NOT claim the .top-bar flex
+   slot. When collapsed only the active tab is visible so the bar
+   becomes a small pill; when expanded it grows to fit all 5 tabs.
+   The VIX pill on the right stays anchored via .top-bar's
+   justify-content: space-between. */
 .top-bar .top-tabs {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -5198,4 +5270,341 @@ body,
 @keyframes etf-info-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ===================================================================
+   TAB BAR PREVIEW (?tabsPreview=1)
+   Side-by-side stack of four candidate tab-bar implementations.
+   Renders over the cosmos ambient so each treatment can be judged
+   against the real backdrop.
+   =================================================================== */
+
+.tabs-preview {
+  position: relative;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  color: var(--text);
+}
+
+.tabs-preview-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+  margin-bottom: 28px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.tabs-preview-hint code {
+  font-family: var(--mono);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  color: var(--text);
+}
+
+.tabs-preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.tabs-preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tabs-preview-block-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tabs-preview-block-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.tabs-preview-block-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Each variant lives inside a uniform-height bar with the dashboard's
+   standard dark strip + bottom border, so the visual context is the
+   same as the live top bar. */
+.tabs-preview-bar {
+  position: relative;
+  background: rgba(11, 13, 18, 0.7);
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* === Shared variant defaults ====================================== */
+
+.su-tabs,
+.fp-tabs,
+.ct-tabs,
+.mb-tabs {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  height: 56px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* === 01 SLIDING GLOW UNDERLINE ==================================== */
+
+.su-tab {
+  position: relative;
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0 12px;
+  transition: color 160ms ease;
+}
+
+.su-tab:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.su-tab.active {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+/* The animated underline lives inside the active button (Framer
+   layoutId tweens it across all buttons that mount it with the same
+   layoutId). Anchored to the bottom edge, 2px tall, with a soft
+   green halo. transform-origin: center so the asymmetric stretch
+   reads as a brief flash rather than a one-sided dart. */
+.su-underline {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  background: var(--bull);
+  border-radius: 1px;
+  box-shadow: 0 0 12px 1px rgba(34, 197, 94, 0.55);
+  transform-origin: center;
+}
+
+/* === 02 FROSTED PILL ============================================== */
+
+.fp-tab {
+  position: relative;
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0 12px;
+  transition: color 160ms ease;
+}
+
+.fp-tab:hover .fp-label {
+  color: rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+}
+
+.fp-tab.active {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.fp-label {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+/* Pill sits behind the label. ~8px vertical inset + 6px horizontal
+   inset relative to the tab button. Frosted glass via backdrop-filter
+   over the bar background. */
+.fp-pill {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 6px;
+  right: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  z-index: 0;
+}
+
+/* === 03 CONSTELLATION TRAVELER ==================================== */
+
+.ct-tabs {
+  position: relative;
+}
+
+.ct-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ct-tab {
+  position: relative;
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0 12px;
+  z-index: 1;
+  transition: color 160ms ease, text-shadow 220ms ease;
+}
+
+.ct-tab:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ct-tab.active {
+  color: var(--text-strong);
+  font-weight: 700;
+  text-shadow: 0 0 14px rgba(180, 230, 255, 0.55);
+}
+
+/* The active star — SVG circle. The drop-shadow filter gives it the
+   layered halo; the circle itself is a simple 1.6r fill so the halo
+   is the dominant visual. */
+.ct-star {
+  filter:
+    drop-shadow(0 0 1.2px rgba(220, 240, 255, 0.95))
+    drop-shadow(0 0 3px rgba(180, 230, 255, 0.7))
+    drop-shadow(0 0 6px rgba(140, 200, 240, 0.45));
+}
+
+/* === 04 LIQUID MERCURY ============================================ */
+
+.mb-tab {
+  position: relative;
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0 12px;
+  transition: color 160ms ease;
+}
+
+.mb-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mb-tab.active {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.mb-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Blob frame absolutely fills the tab button bounds; layoutId animates
+   this whole frame between tabs. Inner div carries the squash/stretch
+   and magnetic translateX so layoutId's box interpolation stays
+   uncontested. */
+.mb-blob-frame {
+  position: absolute;
+  inset: 8px 6px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.mb-blob-inner {
+  width: 100%;
+  height: 100%;
+}
+
+/* The actual blob shape — rounded lozenge with metallic CSS gradient.
+   filter: url(#mb-goo) softens edges through the inline SVG filter
+   def. Low opacity so the cosmos reads through and the blob feels
+   like polished chrome over the dark surface. */
+.mb-blob-shape {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(232, 238, 247, 0.95) 0%,
+    rgba(184, 196, 214, 0.8) 35%,
+    rgba(130, 144, 168, 0.7) 70%,
+    rgba(168, 192, 219, 0.6) 100%
+  );
+  opacity: 0.18;
+  filter: url(#mb-goo);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* === Mobile tightening ============================================ */
+@media (max-width: 640px) {
+  .tabs-preview {
+    padding: 20px 12px 48px;
+  }
+  .tabs-preview-stack {
+    gap: 36px;
+  }
+  .su-tabs,
+  .fp-tabs,
+  .ct-tabs,
+  .mb-tabs {
+    height: 48px;
+  }
+  .su-tab,
+  .fp-tab,
+  .ct-tab,
+  .mb-tab {
+    font-size: 10px;
+    padding: 0 6px;
+    letter-spacing: 0.06em;
+  }
 }
