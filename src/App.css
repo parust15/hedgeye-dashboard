@@ -4575,9 +4575,7 @@ body,
    --radius-card, --mono) — no redefined colors.
    =================================================================== */
 
-.macro-panel {
-  /* inherits .panel padding */
-}
+/* .macro-panel has no styles of its own — inherits .panel padding. */
 
 /* --- Shared bits ----------------------------------------------------- */
 

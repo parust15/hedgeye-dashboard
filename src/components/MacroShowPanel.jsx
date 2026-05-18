@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { useMacroShow } from '../lib/useMacroShow'
 import { MacroDayCard } from './MacroDayCard'
 import { StatusChip } from './StatusChip'
+import { readJsonbStringArray } from '../lib/jsonbArray'
 
 const SKELETON_DAY_COUNT = 6
 
@@ -14,21 +16,6 @@ function formatSynthDate(iso) {
     month: 'long',
     day: 'numeric',
   })
-}
-
-// Defensive read for jsonb arrays — supabase-js parses them but a
-// schema/driver shift to text would break us silently otherwise.
-function readArray(value) {
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
 }
 
 // ticker_callouts is jsonb shaped as { bullish: [...], bearish: [...] }.
@@ -55,21 +42,34 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-// Walks a bullet string and wraps any callout-listed ticker symbol in
-// a colored <span> — green if it's in the bullish set, red if bearish.
-// Bullish wins ties (rare). Word boundaries prevent partial-word
-// matches (e.g. "ALL" doesn't recolor inside "WALL"). Returns the
-// original string when no callouts are configured so React still
-// renders it as a single text node.
-function colorizeTickers(text, bullishSet, bearishSet) {
-  if (!text || (bullishSet.size === 0 && bearishSet.size === 0)) return text
+// Build a reusable ticker-matcher from the callout arrays. Compiled
+// once per synthesis render (via useMemo in SynthesisCard) and reused
+// across every bullet, instead of recompiling the regex per bullet.
+// Returns null when there are no tickers to highlight, so callers can
+// skip the colorization pass entirely.
+function makeTickerMatcher(bullish, bearish) {
+  const bullishSet = new Set(bullish)
+  const bearishSet = new Set(bearish)
   const all = [...new Set([...bullishSet, ...bearishSet])]
-  if (all.length === 0) return text
+  if (all.length === 0) return null
   // Longest-first so multi-char tickers win over substrings of them.
   all.sort((a, b) => b.length - a.length)
   const pattern = all.map(escapeRegex).join('|')
   const regex = new RegExp(`\\b(${pattern})\\b`, 'g')
+  return { regex, bullishSet, bearishSet }
+}
 
+// Walks a bullet string and wraps any callout-listed ticker symbol in
+// a colored <span> — green if it's in the bullish set, red if bearish.
+// Bullish wins ties (rare). Word boundaries prevent partial-word
+// matches (e.g. "ALL" doesn't recolor inside "WALL"). Returns the
+// original string when no matcher (or no matches).
+function colorizeTickers(text, matcher) {
+  if (!text || !matcher) return text
+  const { regex, bullishSet } = matcher
+  // Reset lastIndex — same matcher is reused across multiple bullets
+  // and `g` flag persists state between calls.
+  regex.lastIndex = 0
   const parts = []
   let lastIndex = 0
   let match
@@ -95,39 +95,38 @@ function colorizeTickers(text, bullishSet, bearishSet) {
 }
 
 function SynthesisCard({ synthesis }) {
-  // Top-level guard so the panel can pass synthesis unconditionally
-  // and not worry about whether the row exists.
+  // Derive bullets + callouts BEFORE any early return so the hook
+  // call order below is stable per Rules of Hooks. Defaults to empty
+  // arrays when synthesis is missing.
+  const bullets = readJsonbStringArray(synthesis?.synthesis_bullets)
+  const { bullish, bearish } = readCallouts(synthesis?.ticker_callouts)
+
+  // Compile the ticker matcher once and reuse across all bullets —
+  // saves rebuilding the regex per-bullet on every render.
+  const matcher = useMemo(() => makeTickerMatcher(bullish, bearish), [bullish, bearish])
+
+  // Guards after hooks: nothing to render when synthesis is missing
+  // or the LLM returned an entirely empty payload.
   if (!synthesis) return null
-
-  const bullets = readArray(synthesis.synthesis_bullets).filter(
-    (b) => typeof b === 'string' && b.trim().length > 0
-  )
-  const { bullish, bearish } = readCallouts(synthesis.ticker_callouts)
-  const dateLabel = formatSynthDate(synthesis.end_date)
-  const window = synthesis.window_days ?? 5
-
   if (bullets.length === 0 && bullish.length === 0 && bearish.length === 0) {
-    // Empty synthesis — better to hide entirely than render a stub.
     return null
   }
 
-  // Memoization isn't necessary at this scale (synthesis renders once)
-  // but the Set lookup is what colorizeTickers needs internally.
-  const bullishSet = new Set(bullish)
-  const bearishSet = new Set(bearish)
+  const dateLabel = formatSynthDate(synthesis.end_date)
+  const windowDays = synthesis.window_days ?? 5
 
   return (
     <article className="macro-synthesis-card">
       <div className="card-bg" aria-hidden="true" />
       <header className="macro-synthesis-head">
-        <span className="macro-synthesis-eyebrow">{window}-DAY SYNTHESIS</span>
+        <span className="macro-synthesis-eyebrow">{windowDays}-DAY SYNTHESIS</span>
         {dateLabel && <span className="macro-synthesis-date">through {dateLabel}</span>}
       </header>
 
       {bullets.length > 0 && (
         <ul className="macro-synthesis-bullets">
           {bullets.map((b, i) => (
-            <li key={i}>{colorizeTickers(b, bullishSet, bearishSet)}</li>
+            <li key={i}>{colorizeTickers(b, matcher)}</li>
           ))}
         </ul>
       )}

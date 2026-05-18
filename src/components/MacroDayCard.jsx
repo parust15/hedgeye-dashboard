@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { readJsonbArray, readJsonbStringArray } from '../lib/jsonbArray'
 
 // "Friday, May 15" formatter for the card header. ISO date string in,
 // localized string out. Uses local zone — signal_date is date-only so
@@ -29,22 +30,6 @@ function formatAttributionTime(iso) {
   })
 }
 
-// jsonb/json fields arrive parsed when supabase-js handles them, but
-// defensively handle the string case too in case the column type or
-// driver behavior shifts. Returns [] for anything we can't parse.
-function readArray(value) {
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-
 function TickerChipRow({ label, tickers, kind }) {
   if (!tickers || tickers.length === 0) return null
   const chipClass = kind === 'bull' ? 'macro-tick-bull' : 'macro-tick-bear'
@@ -63,10 +48,8 @@ function TickerChipRow({ label, tickers, kind }) {
 export function MacroDayCard({ day, defaultExpanded = false }) {
   const [open, setOpen] = useState(defaultExpanded)
 
-  const top3 = readArray(day.top3)
-  const tldr = readArray(day.llm_tldr_bullets).filter(
-    (b) => typeof b === 'string' && b.trim().length > 0
-  )
+  const top3 = readJsonbArray(day.top3)
+  const tldr = readJsonbStringArray(day.llm_tldr_bullets)
   const bullish = Array.isArray(day.bullish_tickers) ? day.bullish_tickers : []
   const bearish = Array.isArray(day.bearish_tickers) ? day.bearish_tickers : []
   const hasPositions = bullish.length > 0 || bearish.length > 0

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { TopTabs } from './components/TopTabs'
 import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
@@ -56,19 +56,25 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const latestRes = await supabase
-        .from('hedgeye_signals_v')
-        .select('signal_date')
-        .order('signal_date', { ascending: false })
-        .limit(1)
-      if (cancelled || latestRes.error || !latestRes.data?.[0]) return
-      const date = latestRes.data[0].signal_date
-      const rowsRes = await supabase
-        .from('hedgeye_signals_v')
-        .select('ticker, range_state')
-        .eq('signal_date', date)
-      if (cancelled || rowsRes.error) return
-      setSignalTickers(rowsRes.data ?? [])
+      try {
+        const latestRes = await supabase
+          .from('hedgeye_signals_v')
+          .select('signal_date')
+          .order('signal_date', { ascending: false })
+          .limit(1)
+        if (cancelled || latestRes.error || !latestRes.data?.[0]) return
+        const date = latestRes.data[0].signal_date
+        const rowsRes = await supabase
+          .from('hedgeye_signals_v')
+          .select('ticker, range_state')
+          .eq('signal_date', date)
+        if (cancelled || rowsRes.error) return
+        setSignalTickers(rowsRes.data ?? [])
+      } catch (err) {
+        // Non-fatal — the ambient just renders with neutral tint. Log
+        // so a real outage shows up in console.
+        if (!cancelled) console.warn('App: signalTickers fetch failed:', err)
+      }
     })()
     return () => { cancelled = true }
   }, [])
@@ -93,11 +99,12 @@ export default function App() {
   const closeModal = useCallback(() => setModalPosition(null), [])
 
   // ?tabsPreview=1 short-circuits the dashboard and renders the
-  // side-by-side tab-bar variant preview instead. The cosmos ambient
-  // still paints behind so we can judge each treatment against the
-  // real backdrop. Reading window.location.search at render time is
-  // fine here — the preview flag isn't expected to flip mid-session.
+  // side-by-side tab-bar variant preview instead. Gated to DEV builds
+  // so prod users can't reach it via URL fiddling (and so the preview/*
+  // chunk doesn't ship in the prod bundle once we tree-shake the
+  // unreachable branch). The cosmos ambient still paints behind.
   const isTabsPreview =
+    import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('tabsPreview') === '1'
 

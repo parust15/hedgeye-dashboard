@@ -375,7 +375,7 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
 
     list.sort((a, b) => {
-      let cmp = 0
+      let cmp
       switch (sortField) {
         case 'ticker':
           cmp = a.ticker.localeCompare(b.ticker)

@@ -17,5 +17,14 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // React 19's react-hooks plugin flags any setState inside an
+      // effect as "cascading renders". The codebase legitimately uses
+      // this pattern to reset state when a prop becomes null (e.g.
+      // useTickerSummary / useEtfInfo / etc.), so the rule's signal-
+      // to-noise is poor. Downgrade to warning so the real errors —
+      // ones we'd want to address — aren't drowned by the resets.
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

@@ -308,27 +308,6 @@ function RrCrossoverBadge({ show }) {
 }
 
 // Click-to-expand rationale block. Collapsed: clamped to N lines with a
-// fade overflow; expanded: full text. stopPropagation keeps clicks here
-// from also triggering the card-level "open modal" handler.
-function Rationale({ text, maxLines = 4 }) {
-  const [open, setOpen] = useState(false)
-  if (!text) return null
-  const cls = open ? 'cc-rationale open' : `cc-rationale clamp-${maxLines}`
-  return (
-    <button
-      type="button"
-      className={cls}
-      onClick={(e) => {
-        e.stopPropagation()
-        setOpen((o) => !o)
-      }}
-      aria-expanded={open}
-    >
-      <span className="cc-rationale-text">{text}</span>
-    </button>
-  )
-}
-
 // --- cards ---
 
 // Reusable card-click handler factory. Both card variants forward to
@@ -836,7 +815,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
 
     list.sort((a, b) => {
-      let cmp = 0
+      let cmp
       switch (sortField) {
         case 'ticker':
           cmp = a.ticker.localeCompare(b.ticker)

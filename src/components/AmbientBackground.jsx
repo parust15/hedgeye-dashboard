@@ -296,7 +296,7 @@ function Supernova() {
 //     tickers (SVG, no animation).
 //   - 4 bright stars with their original twinkle/diffraction-spike
 //     chrome (1 keyframe × 4 elements).
-function MobileAmbient({ tint, dominance, cssVars, tickers }) {
+function MobileAmbient({ cssVars, tickers }) {
   // Smaller seed-stable star set — 200 vs 600 — to keep box-shadow paint
   // cost cheap on mobile.
   const farStars = useMemo(() => generateStarShadows(200, 7), [])
@@ -374,14 +374,7 @@ export function AmbientBackground({ tickers }) {
   // meteors). The breakpoint hook re-renders when crossing the boundary
   // so rotating to landscape on a tablet swaps in the full version.
   if (isMobile) {
-    return (
-      <MobileAmbient
-        tint={tint}
-        dominance={dominance}
-        cssVars={cssVars}
-        tickers={tickers}
-      />
-    )
+    return <MobileAmbient cssVars={cssVars} tickers={tickers} />
   }
 
   return <DesktopAmbient tint={tint} dominance={dominance} cssVars={cssVars} tickers={tickers} />

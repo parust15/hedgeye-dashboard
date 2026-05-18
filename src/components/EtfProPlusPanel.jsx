@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { SignalCard } from './SignalCard'
 import { SortControl } from './SortControl'
@@ -219,12 +219,17 @@ export function EtfProPlusPanel() {
     }
   }, [activeAssetClasses])
 
+  // Debounce search persistence — otherwise every keystroke triggers a
+  // synchronous localStorage write while the user is typing.
   useEffect(() => {
-    try {
-      localStorage.setItem(SEARCH_KEY, search)
-    } catch (err) {
-      console.warn('Failed to persist etfSearch:', err)
-    }
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(SEARCH_KEY, search)
+      } catch (err) {
+        console.warn('Failed to persist etfSearch:', err)
+      }
+    }, 200)
+    return () => clearTimeout(id)
   }, [search])
 
   useEffect(() => {
@@ -246,13 +251,14 @@ export function EtfProPlusPanel() {
 
   // SignalCard's onToggle fires on card click. For ETF cards we route
   // it to the EtfInfoModal instead of toggling an inline ExpandedChart.
-  const openInfoModal = (ticker) => setSelectedTicker(ticker)
-  const closeInfoModal = () => setSelectedTicker(null)
+  // useCallback so SignalCard children can be memoized in future.
+  const openInfoModal = useCallback((ticker) => setSelectedTicker(ticker), [])
+  const closeInfoModal = useCallback(() => setSelectedTicker(null), [])
 
-  const handleSortChange = (nextField, nextDir) => {
+  const handleSortChange = useCallback((nextField, nextDir) => {
     setSortField(nextField)
     setSortDir(nextDir)
-  }
+  }, [])
 
   // --- Transform rows once at the panel boundary --------------------------
   const transformedRows = useMemo(() => rows.map(toSignalRow), [rows])
@@ -344,7 +350,7 @@ export function EtfProPlusPanel() {
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
 
     list.sort((a, b) => {
-      let cmp = 0
+      let cmp
       switch (sortField) {
         case 'ticker':
           cmp = a.ticker.localeCompare(b.ticker)

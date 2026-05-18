@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEtfInfo } from '../lib/useEtfInfo'
+import { readJsonbStringArray } from '../lib/jsonbArray'
 
 // Map raw category strings → CSS modifier class. Unknown / new
 // categories fall through to .etf-info-cat-unknown so the chip still
@@ -17,15 +18,6 @@ function categoryClass(category) {
   }
 }
 
-// Coerce summary_bullets into an array of strings even when the jsonb
-// arrives as null, a single string, or a malformed structure.
-function readBullets(value) {
-  if (Array.isArray(value)) {
-    return value.filter((b) => typeof b === 'string' && b.trim().length > 0)
-  }
-  return []
-}
-
 // "May 17, 2026" formatter for the attribution line. Uses the user's
 // local zone since the timestamptz is informational only.
 function formatGeneratedAt(iso) {
@@ -37,6 +29,7 @@ function formatGeneratedAt(iso) {
 
 export function EtfInfoModal({ ticker, onClose }) {
   const { row, status } = useEtfInfo(ticker)
+  const closeBtnRef = useRef(null)
 
   // Close on Escape — same pattern TickerDetailModal uses so the
   // shortcut works consistently across both modals.
@@ -47,6 +40,21 @@ export function EtfInfoModal({ ticker, onClose }) {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // a11y: focus the close button on mount, restore previous focus on
+  // unmount, and lock body scroll so background panels don't move
+  // behind the modal. Runs once per modal open since ticker is the
+  // identity key on the parent (modal unmounts/remounts per ticker).
+  useEffect(() => {
+    const prevFocus = document.activeElement
+    closeBtnRef.current?.focus()
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+      if (prevFocus instanceof HTMLElement) prevFocus.focus()
+    }
+  }, [])
 
   if (!ticker) return null
 
@@ -63,7 +71,13 @@ export function EtfInfoModal({ ticker, onClose }) {
         aria-labelledby="etf-info-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+        <button
+          ref={closeBtnRef}
+          type="button"
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
           ×
         </button>
 
@@ -116,13 +130,17 @@ export function EtfInfoModal({ ticker, onClose }) {
               )}
             </div>
 
-            {readBullets(row.summary_bullets).length > 0 && (
-              <ul className="etf-info-bullets">
-                {readBullets(row.summary_bullets).map((b, i) => (
-                  <li key={i}>{b}</li>
-                ))}
-              </ul>
-            )}
+            {(() => {
+              const bullets = readJsonbStringArray(row.summary_bullets)
+              if (bullets.length === 0) return null
+              return (
+                <ul className="etf-info-bullets">
+                  {bullets.map((b, i) => (
+                    <li key={i}>{b}</li>
+                  ))}
+                </ul>
+              )
+            })()}
 
             {row.typical_use && (
               <p className="etf-info-typical-use">
