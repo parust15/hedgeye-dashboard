@@ -171,12 +171,11 @@ function Mag7Chip({ pct }) {
   )
 }
 
-// TREND vs TRADE chip. These are intentionally rendered as two
-// separate pills (with explicit `TREND:` / `TRADE:` prefix labels)
-// so the user always knows which signal is which — never collapsed
-// into a single ambiguous "BIAS" chip. Examples on 2026-05-18 where
-// they disagree: MSFT (TREND BEARISH / TRADE BULLISH) and TSLA
-// (TREND BULLISH / TRADE BEARISH).
+// TREND vs TRADE chip. Two separate pills so the user always knows
+// which signal is which — never collapsed into a single ambiguous
+// "BIAS" chip. The pill's green/red color is the BULLISH/BEARISH
+// signal; the only text inside is the source label (TREND / TRADE)
+// since the value would be redundant with the color.
 //
 // kind: 'trend' | 'trade'
 // bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null
@@ -187,10 +186,16 @@ function BiasChip({ kind, bias }) {
     : b === 'BEARISH' ? 'tt-bias-neg'
     : 'tt-bias-neutral'
   const label = kind === 'trend' ? 'TREND' : 'TRADE'
+  // a11y: title + aria-label restore the bias word for screen readers
+  // and on-hover tooltip since the visual layer relies on color alone.
+  const fullLabel = `${label}: ${b}`
   return (
-    <span className={`tt-bias tt-bias-labeled ${tone}`}>
-      <span className="tt-bias-prefix">{label}:</span>
-      <span className="tt-bias-value">{b}</span>
+    <span
+      className={`tt-bias tt-bias-labeled ${tone}`}
+      title={fullLabel}
+      aria-label={fullLabel}
+    >
+      {label}
     </span>
   )
 }
@@ -235,9 +240,9 @@ function EarningsCell({ row }) {
 
 // Headline mover chip — these come from `headline_movers` jsonb on the
 // MOMO subject, which is the TRADE call (Christian Drake's weekly tag).
-// The `TRADE:` prefix is explicit so the user reads it correctly even
-// if the same ticker carries a different TREND (3-month RR) view in
-// the table below.
+// The `TRADE` label tells the user this is a trade call (not a 3-month
+// trend). The bullish/bearish value isn't repeated as text because the
+// pill's green/red color already conveys it.
 function MoverChip({ mover }) {
   const bias = (mover.bias || '').toUpperCase()
   const cls = bias === 'BULLISH' ? 'tt-mover tt-mover-pos'
@@ -245,14 +250,13 @@ function MoverChip({ mover }) {
     : 'tt-mover tt-mover-neutral'
   const pctTxt = formatPct(mover.pct)
   return (
-    <span className={cls}>
+    <span
+      className={cls}
+      title={bias ? `TRADE: ${bias}` : undefined}
+    >
       <strong>{mover.ticker}</strong>
       {pctTxt && <span className="tt-mover-pct">{pctTxt}</span>}
-      {bias && (
-        <span className="tt-mover-bias">
-          <span className="tt-mover-bias-prefix">TRADE:</span> {bias}
-        </span>
-      )}
+      {bias && <span className="tt-mover-bias">TRADE</span>}
     </span>
   )
 }

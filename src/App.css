@@ -6030,41 +6030,20 @@ body,
 
 .tt-bias-cell { justify-self: start; }
 
-/* --- Labeled bias chip (TREND: BEARISH / TRADE: BULLISH) --------- */
-/* The prefix label is muted on the same pill background — the eye
-   reads the colored value first ("BEARISH"), then the label tells
-   you WHICH signal you're looking at. Used in MOMO to keep the
-   user from confusing the 3-month TREND view with the weekly TRADE
-   call (they can disagree). */
+/* --- Labeled bias chip (TREND / TRADE) --------------------------- */
+/* Single-word chip — the pill's green/red color carries the
+   BULLISH/BEARISH signal; the only text is the source label so
+   the user can tell TREND (3-month RR) apart from TRADE (weekly
+   subject-line call). Both labels use the same chip chrome, only
+   the label text changes. */
 .tt-bias-labeled {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 9px;
-  font-size: 10px;
-}
-
-.tt-bias-prefix {
-  font-size: 9px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.7px;
-  opacity: 0.65;
-  /* Keep prefix colour neutral so the value dominates visually. */
-  color: var(--text-dim);
-}
-
-.tt-bias-labeled.tt-bias-pos .tt-bias-prefix,
-.tt-bias-labeled.tt-bias-neg .tt-bias-prefix,
-.tt-bias-labeled.tt-bias-neutral .tt-bias-prefix {
-  /* Inherit the chip's value colour but at reduced opacity so the
-     label still reads as "label" not "shouty word". */
-  color: currentColor;
-  opacity: 0.55;
-}
-
-.tt-bias-value {
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 
 /* Dual chip container for top-box rows + table cells. Stacks
@@ -6098,15 +6077,6 @@ body,
   text-align: left;
 }
 
-/* Mover chip TRADE: prefix — same muted treatment so the visual
-   grammar matches the table chips. */
-.tt-mover-bias-prefix {
-  font-size: 9px;
-  letter-spacing: 0.6px;
-  opacity: 0.65;
-  text-transform: uppercase;
-  margin-right: 2px;
-}
 
 /* --- 1W Δ pill (MOMO) --------------------------------------------- */
 .tt-pct {
