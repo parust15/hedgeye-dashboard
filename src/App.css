@@ -4038,13 +4038,14 @@ body,
   gap: 6px;
 }
 
-/* 4-column grid: ticker | asset class (flexes) | rank | delta chip.
-   Asset class takes the leftover space and ellipsis-truncates so long
-   names ("Macro, Housing, Digital Assets & Financials") don't wrap and
-   push the rank/delta off-row. */
+/* 4-column equal-width grid: ticker | asset | rank | delta chip.
+   Equal columns so each value sits dead-center under its column
+   header (added Apr 2026 — same chrome the SS/II/MOMO top boxes
+   use). Asset class still ellipsis-truncates long names via
+   .rerank-movers-asset's overflow rules. */
 .rerank-movers-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
   gap: 12px;
   padding: 6px 0;
@@ -4077,6 +4078,8 @@ body,
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.3px;
+  text-align: center;
+  justify-self: center;
 }
 
 .rerank-movers-empty {

@@ -172,30 +172,43 @@ function MoversStrip({ rows, proLookup, onSelect }) {
         {top.length === 0 ? (
           <div className="rerank-movers-empty">No upward movers this week.</div>
         ) : (
-          <ul className="rerank-movers-list">
-            {top.map((r) => (
-              <li
-                key={r.ticker}
-                className="rerank-movers-row"
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelect?.(r.ticker)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onSelect?.(r.ticker)
-                  }
-                }}
-              >
-                <span className="rerank-movers-ticker">{r.ticker}</span>
-                <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
-                  {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
-                </span>
-                <span className="rerank-movers-rank">#{r.rank}</span>
-                <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
-              </li>
-            ))}
-          </ul>
+          <>
+            {/* Column header row — shares the grid template with the
+                data rows below so each label sits dead-center over its
+                values. TICKER is left-aligned to match its data cell. */}
+            <div className="tt-mover-head" aria-hidden="true">
+              <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
+              <span className="tt-mover-head-cell">ASSET</span>
+              <span className="tt-mover-head-cell">RANK</span>
+              <span className="tt-mover-head-cell">1W Δ</span>
+            </div>
+            <ul className="rerank-movers-list">
+              {top.map((r) => (
+                <li
+                  key={r.ticker}
+                  className="rerank-movers-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect?.(r.ticker)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelect?.(r.ticker)
+                    }
+                  }}
+                >
+                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
+                    {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
+                  </span>
+                  <span className="rerank-movers-rank">#{r.rank}</span>
+                  <span className="tt-mover-cell-c">
+                    <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
 
@@ -205,30 +218,40 @@ function MoversStrip({ rows, proLookup, onSelect }) {
         {bottom.length === 0 ? (
           <div className="rerank-movers-empty">No downward movers this week.</div>
         ) : (
-          <ul className="rerank-movers-list">
-            {bottom.map((r) => (
-              <li
-                key={r.ticker}
-                className="rerank-movers-row"
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelect?.(r.ticker)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onSelect?.(r.ticker)
-                  }
-                }}
-              >
-                <span className="rerank-movers-ticker">{r.ticker}</span>
-                <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
-                  {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
-                </span>
-                <span className="rerank-movers-rank">#{r.rank}</span>
-                <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="tt-mover-head" aria-hidden="true">
+              <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
+              <span className="tt-mover-head-cell">ASSET</span>
+              <span className="tt-mover-head-cell">RANK</span>
+              <span className="tt-mover-head-cell">1W Δ</span>
+            </div>
+            <ul className="rerank-movers-list">
+              {bottom.map((r) => (
+                <li
+                  key={r.ticker}
+                  className="rerank-movers-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect?.(r.ticker)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelect?.(r.ticker)
+                    }
+                  }}
+                >
+                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
+                    {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
+                  </span>
+                  <span className="rerank-movers-rank">#{r.rank}</span>
+                  <span className="tt-mover-cell-c">
+                    <DeltaChip delta={r.delta_1w} ariaPrefix={`${r.ticker} 1W`} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </section>
