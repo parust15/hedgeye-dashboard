@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
+import { StatusChip } from './StatusChip'
 import { formatPrice } from '../lib/format'
 
-// "May 18, 2026" — for the metadata header.
-function formatNewsletterDate(iso) {
+const SKELETON_ROWS = 12
+
+// "May 18, 2026" — used in the header chip + section labels.
+function formatLong(iso) {
   if (!iso) return null
   const [y, m, d] = iso.split('-').map(Number)
-  if (!y || !m || !d) return iso
+  if (!y || !m || !d) return null
   return new Date(y, m - 1, d).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -14,29 +18,10 @@ function formatNewsletterDate(iso) {
   })
 }
 
-// "4 hours ago" / "yesterday" for ≤7 days, absolute date after. Same
-// conservative phrasing as SignalStrengthPanel — keeps stale views
-// from rendering misleading active-timer copy.
-function formatRelativeTime(iso) {
-  if (!iso) return null
-  const then = new Date(iso)
-  if (Number.isNaN(then.getTime())) return null
-  const diffMs = Date.now() - then.getTime()
-  const min = Math.floor(diffMs / 60000)
-  const hr = Math.floor(min / 60)
-  const day = Math.floor(hr / 24)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`
-  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`
-  if (day === 1) return 'yesterday'
-  if (day < 7) return `${day} days ago`
-  return then.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-// Position-in-range pct for the marker. Returns null when any input
-// is missing/invalid OR span is zero. Guarded with the `!= null`
-// pattern called out in CLAUDE.md so Number(null) === 0 can't bite.
-function rangePct(prevClose, lowEnd, topEnd) {
+// Range marker fraction (0..1) of prev_close inside [low_end, top_end].
+// Null whenever any input is missing or the span is zero. The bar UI
+// clamps to [0, 1] separately — this just returns the raw fraction.
+function markerPct(prevClose, lowEnd, topEnd) {
   if (prevClose == null || lowEnd == null || topEnd == null) return null
   const px = Number(prevClose)
   const lo = Number(lowEnd)
@@ -44,146 +29,221 @@ function rangePct(prevClose, lowEnd, topEnd) {
   if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
   const span = hi - lo
   if (span === 0) return null
-  const raw = (px - lo) / span
-  return Math.max(0, Math.min(1, raw))
+  return (px - lo) / span
 }
 
-// Lightweight position bar — track + marker dot. Reuses the dashboard's
-// existing `.posbar` chrome but skips the per-tick hover tooltip /
-// connector that SignalCard's heavier PositionBar carries. The bar
-// only renders when we can compute a valid marker position.
-function PositionBar({ prevClose, lowEnd, topEnd }) {
-  const pct = rangePct(prevClose, lowEnd, topEnd)
+// Inline ~120px range bar shared by all three new panels. Reuses the
+// `.posbar` / `.posbar-track` / `.posbar-marker` primitives Risk Ranges
+// already styles so the marker dot + zone gradient + tick rhythm are
+// pixel-identical with the RR cards. Wrapped in `.tt-range` so we can
+// constrain width without leaking into the RR styles.
+export function MiniRangeBar({ prevClose, lowEnd, topEnd, ariaLabel }) {
+  const pct = markerPct(prevClose, lowEnd, topEnd)
   if (pct == null) {
-    return <div className="posbar disabled" aria-hidden="true" />
+    return (
+      <div className="tt-range" aria-label={ariaLabel}>
+        <div className="posbar disabled">
+          <div className="posbar-track" />
+        </div>
+      </div>
+    )
   }
+  const clamped = Math.max(0, Math.min(1, pct))
   return (
-    <div className="posbar mid">
-      <div className="posbar-track" />
-      <div
-        className="posbar-marker"
-        style={{ left: `${pct * 100}%` }}
-        aria-hidden="true"
-      />
+    <div className="tt-range" aria-label={ariaLabel}>
+      <div className="posbar mid">
+        <div className="posbar-track" />
+        <div
+          className="posbar-marker"
+          style={{ left: `${clamped * 100}%` }}
+          aria-label={`Position ${(clamped * 100).toFixed(0)}% of range`}
+        />
+      </div>
     </div>
   )
 }
 
-function SectorLine({ sector, sectorHead }) {
-  if (!sector && !sectorHead) return null
+// === Dual top boxes ===================================================
+function TopBox({ title, tone, rows }) {
+  const toneClass = tone === 'top' ? 'rerank-movers-top' : 'rerank-movers-bottom'
   return (
-    <div className="ii-sector">
-      {sector && <span>{sector}</span>}
-      {sector && sectorHead && <span className="ii-sector-sep"> · </span>}
-      {sectorHead && <span className="ii-sector-head">{sectorHead}</span>}
-    </div>
-  )
-}
-
-// `bullets` is a Postgres text[] — supabase-js parses to a JS array,
-// but guard for null + non-array shapes defensively.
-function readBullets(value) {
-  if (!Array.isArray(value)) return []
-  return value.filter((b) => typeof b === 'string' && b.trim().length > 0)
-}
-
-// One card. Click anywhere on the header to toggle expanded.
-// Side controls the tint (--card-tint) used by the chrome + the
-// price color (green for long, red for short).
-function IdeaCard({ row }) {
-  const [open, setOpen] = useState(false)
-  const sideClass = row.side === 'long' ? 'ii-card-long' : 'ii-card-short'
-  const bullets = readBullets(row.bullets)
-  const hasExpansion = Boolean(row.thesis_summary || row.weekend_update || bullets.length > 0)
-
-  return (
-    <article className={`ii-card ${sideClass}${open ? ' ii-card-open' : ''}`}>
+    <div className={`rerank-movers-card ${toneClass}`}>
       <div className="card-bg" aria-hidden="true" />
-      <button
-        type="button"
-        className="ii-card-head"
-        onClick={() => hasExpansion && setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-disabled={!hasExpansion}
-      >
-        <div className="ii-card-head-top">
-          <span className="ii-ticker">{row.ticker}</span>
-          <span className="ii-price">{formatPrice(row.prev_close)}</span>
-          {hasExpansion && (
-            <span className={`ii-caret${open ? ' open' : ''}`} aria-hidden="true">▸</span>
-          )}
-        </div>
-
-        <div className="ii-posbar-section">
-          <PositionBar
-            prevClose={row.prev_close}
-            lowEnd={row.low_end}
-            topEnd={row.top_end}
-          />
-          <div className="ii-posbar-labels">
-            <span className="posbar-end buy">{formatPrice(row.low_end)}</span>
-            <span className="posbar-end sell">{formatPrice(row.top_end)}</span>
-          </div>
-        </div>
-
-        <SectorLine sector={row.sector} sectorHead={row.sector_head} />
-      </button>
-
-      {open && hasExpansion && (
-        <div className="ii-card-body">
-          {row.thesis_summary && (
-            <section className="ii-section">
-              <h3 className="ii-section-title">THESIS SUMMARY</h3>
-              <p className="ii-paragraph">{row.thesis_summary}</p>
-            </section>
-          )}
-          {row.weekend_update && (
-            <section className="ii-section">
-              <h3 className="ii-section-title">WEEKEND UPDATE</h3>
-              <p className="ii-paragraph">{row.weekend_update}</p>
-            </section>
-          )}
-          {bullets.length > 0 && (
-            <ul className="ii-bullets">
-              {bullets.map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <h2 className="rerank-movers-title">{title}</h2>
+      {rows.length === 0 ? (
+        <div className="rerank-movers-empty">No data yet.</div>
+      ) : (
+        <ul className="rerank-movers-list">
+          {rows.map((r) => (
+            <li key={r.ticker} className="rerank-movers-row tt-ii-mover-row">
+              <span className="rerank-movers-ticker">{r.ticker}</span>
+              <span className="rerank-movers-asset" title={r.sector ?? ''}>
+                {r.sector ?? '—'}
+              </span>
+              <span className="tt-price">{formatPrice(r.prev_close)}</span>
+              <span className="tt-range-chip">
+                {formatPrice(r.low_end)} – {formatPrice(r.top_end)}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
-    </article>
+    </div>
   )
 }
 
-function IdeaCardSkeleton() {
-  return <article className="ii-card ii-card-skeleton" aria-hidden="true" />
+// === Side pill ========================================================
+function SidePill({ side }) {
+  const isLong = side === 'long'
+  return (
+    <span className={`tt-side ${isLong ? 'tt-side-long' : 'tt-side-short'}`}>
+      {isLong ? 'L' : 'S'}
+    </span>
+  )
+}
+
+// === Single full-table row + expansion ================================
+function IdeaRow({ row, isOpen, onToggle }) {
+  const isLong = row.side === 'long'
+  const tintClass = isLong ? 'rerank-row-up' : 'rerank-row-down'
+  // The bullets array can be empty/null for tickers whose writeup uses
+  // Keith's Real-Time Signal format (AMZN, DGX in the May 18 newsletter);
+  // skip the bullets list entirely so the expansion stays clean.
+  const bullets = Array.isArray(row.bullets) ? row.bullets : []
+  const expId = `idea-expand-${row.side}-${row.position}`
+
+  return (
+    <>
+      <li
+        className={`rerank-row tt-ii-row ${tintClass} ${isOpen ? 'tt-ii-row-open' : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        aria-controls={expId}
+        onClick={() => onToggle(row.ticker)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle(row.ticker)
+          }
+        }}
+      >
+        <div className="card-bg" aria-hidden="true" />
+        <SidePill side={row.side} />
+        <span className="rerank-rank tt-ii-pos">{row.position}</span>
+        <span className="rerank-ticker">{row.ticker}</span>
+        <span className="rerank-asset" title={row.sector ?? ''}>
+          {row.sector ?? <span className="tt-cell-dim">—</span>}
+        </span>
+        <span className="tt-price">{formatPrice(row.prev_close)}</span>
+        <span className="tt-price tt-price-dim">{formatPrice(row.low_end)}</span>
+        <span className="tt-price tt-price-dim">{formatPrice(row.top_end)}</span>
+        <MiniRangeBar
+          prevClose={row.prev_close}
+          lowEnd={row.low_end}
+          topEnd={row.top_end}
+          ariaLabel={`${row.ticker} range`}
+        />
+      </li>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.li
+            key={expId}
+            id={expId}
+            className="tt-ii-expand-row"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="tt-ii-expand-body">
+              {row.thesis_summary && (
+                <section className="tt-ii-section">
+                  <h3 className="tt-ii-section-head">THESIS SUMMARY</h3>
+                  <p className="tt-ii-section-body">{row.thesis_summary}</p>
+                </section>
+              )}
+              {row.weekend_update && (
+                <section className="tt-ii-section">
+                  <h3 className="tt-ii-section-head">WEEKEND UPDATE</h3>
+                  <p className="tt-ii-section-body">{row.weekend_update}</p>
+                </section>
+              )}
+              {bullets.length > 0 && (
+                <section className="tt-ii-section">
+                  <ul className="tt-ii-bullets">
+                    {bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {!row.thesis_summary && !row.weekend_update && bullets.length === 0 && (
+                <p className="tt-ii-empty">No detail available for this idea.</p>
+              )}
+            </div>
+          </motion.li>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function IdeasSkeleton() {
+  return (
+    <ol className="rerank-list rerank-list-skeleton" aria-busy="true" aria-live="polite">
+      {Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+        <li key={i} className="rerank-row tt-ii-row rerank-row-skeleton" />
+      ))}
+    </ol>
+  )
 }
 
 export function InvestingIdeasPanel() {
   const { longs, shorts, meta, status } = useInvestingIdeas()
+  const [openTicker, setOpenTicker] = useState(null)
+
+  // Top-box rows: first 5 of each side. Shorts list may be shorter than
+  // 5 in real data (May 18 has 7, but the spec calls for graceful empty
+  // bottom rows so we just truncate).
+  const { topLongs, topShorts } = useMemo(
+    () => ({
+      topLongs: longs.slice(0, 5),
+      topShorts: shorts.slice(0, 5),
+    }),
+    [longs, shorts]
+  )
+
+  // Full list: longs first, then shorts. Both arrays are already
+  // position-ASC sorted by the hook.
+  const allRows = useMemo(() => [...longs, ...shorts], [longs, shorts])
+
+  function toggleOpen(ticker) {
+    setOpenTicker((curr) => (curr === ticker ? null : ticker))
+  }
 
   return (
-    <div className="panel ii-panel">
+    <div className="panel rerank-panel investing-ideas-panel">
       <header className="topbar">
         <div className="topbar-left">
-          <h1>Investing Ideas</h1>
-          <div className="status-row ii-meta-row">
-            {status === 'ready' && meta && (
-              <span className="ii-meta-line">
-                Week of <strong>{formatNewsletterDate(meta.newsletterDate)}</strong>
-                {meta.eventAt && <> · updated {formatRelativeTime(meta.eventAt)}</>}
-              </span>
+          <h1>Hedgeye Investing Ideas — Weekly Long/Short Book</h1>
+          <div className="status-row">
+            {status === 'ready' && meta?.newsletterDate && (
+              <StatusChip label="Week of" value={formatLong(meta.newsletterDate)} />
             )}
-            {status === 'loading' && <span className="ii-meta-line">Loading…</span>}
+            {status === 'ready' && (
+              <StatusChip
+                value={`${longs.length} LONG · ${shorts.length} SHORT`}
+                dot={false}
+              />
+            )}
             {status === 'empty' && (
-              <span className="ii-meta-line">No newsletter data yet</span>
+              <StatusChip label="Week of" value="No data yet" dot={false} />
             )}
-            {status === 'error' && (
-              <span className="ii-meta-line ii-meta-error">
-                Could not load Investing Ideas data.
-              </span>
-            )}
+            {status === 'loading' && <StatusChip value="loading" dot={false} />}
+            {status === 'error' && <StatusChip value="error" dot={false} />}
           </div>
         </div>
         {status === 'ready' && meta?.feedItemUrl && (
@@ -191,67 +251,54 @@ export function InvestingIdeasPanel() {
             href={meta.feedItemUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ii-feed-link"
+            className="tt-feed-link"
           >
             view on Hedgeye →
           </a>
         )}
       </header>
 
-      {status === 'loading' && (
-        <section className="ii-split">
-          <div className="ii-column ii-column-long">
-            <h2 className="ii-column-title ii-column-title-long">LONGS</h2>
-            <div className="ii-column-grid">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <IdeaCardSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-          <div className="ii-column ii-column-short">
-            <h2 className="ii-column-title ii-column-title-short">SHORTS</h2>
-            <div className="ii-column-grid">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <IdeaCardSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-        </section>
+      {status === 'loading' && <IdeasSkeleton />}
+
+      {status === 'error' && (
+        <div className="state error">Could not load Investing Ideas data.</div>
       )}
 
       {status === 'empty' && (
-        <div className="ii-empty">
-          <p className="ii-empty-title">No Investing Ideas data yet.</p>
-          <p className="ii-empty-sub">
-            The ingestion workflow hasn't run yet. The first newsletter will
-            appear here once the latest Investing Ideas email has been parsed.
-          </p>
+        <div className="rerank-empty">
+          <p className="rerank-empty-title">No data yet.</p>
         </div>
       )}
 
       {status === 'ready' && (
-        <section className="ii-split">
-          <div className="ii-column ii-column-long">
-            <h2 className="ii-column-title ii-column-title-long">
-              LONGS <span className="ii-column-count">{longs.length}</span>
-            </h2>
-            <div className="ii-column-grid">
-              {longs.map((row) => (
-                <IdeaCard key={`long-${row.ticker}`} row={row} />
-              ))}
-            </div>
+        <>
+          <section className="rerank-movers" aria-label="Top long and short ideas">
+            <TopBox title="5 LONGS" tone="top" rows={topLongs} />
+            <TopBox title="5 SHORTS" tone="bottom" rows={topShorts} />
+          </section>
+
+          <div className="rerank-list-head tt-ii-row" aria-hidden="true">
+            <span className="tt-side-head">SIDE</span>
+            <span className="rerank-rank tt-ii-pos">POS</span>
+            <span className="rerank-ticker">TICKER</span>
+            <span className="rerank-asset">SECTOR</span>
+            <span className="tt-price">PREV CLOSE</span>
+            <span className="tt-price">LRR</span>
+            <span className="tt-price">TRR</span>
+            <span className="tt-range-head">RANGE</span>
           </div>
-          <div className="ii-column ii-column-short">
-            <h2 className="ii-column-title ii-column-title-short">
-              SHORTS <span className="ii-column-count">{shorts.length}</span>
-            </h2>
-            <div className="ii-column-grid">
-              {shorts.map((row) => (
-                <IdeaCard key={`short-${row.ticker}`} row={row} />
-              ))}
-            </div>
-          </div>
-        </section>
+
+          <ol className="rerank-list">
+            {allRows.map((r) => (
+              <IdeaRow
+                key={`${r.side}-${r.position}-${r.ticker}`}
+                row={r}
+                isOpen={openTicker === r.ticker}
+                onToggle={toggleOpen}
+              />
+            ))}
+          </ol>
+        </>
       )}
     </div>
   )

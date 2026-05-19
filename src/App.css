@@ -5675,607 +5675,528 @@ body,
 }
 
 /* ===================================================================
-   SIGNAL STRENGTH panel
-   Two side-by-side highlight sections (5 newest / 5 oldest) above a
-   responsive full grid. Ticker boxes reuse the dashboard's .card-bg
-   chrome (backdrop-filter blur + 0.7 opacity) so the look matches
-   RR / Call / ETF cards without coupling to SignalCard's row shape.
+   TT-* (Tab-Table) shared chrome
+   Three panels (Signal Strength, Investing Ideas, MOMO) share the
+   ETF Re-Rank chrome: `.rerank-panel`, `.rerank-movers` dual top
+   boxes, `.rerank-list-head` + `.rerank-list` of `.rerank-row` lis.
+   Per-panel grid templates override the 7-cell Re-Rank default.
+   New chips (NEW, SIDE, BIAS, PCT pill, EARN, mover pill) and the
+   inline range bar live under the `tt-*` namespace so they don't
+   collide with any feature prefix.
    =================================================================== */
 
-.ss-panel .topbar {
-  margin-bottom: 20px;
+/* --- Per-panel grid templates -------------------------------------- */
+/* Signal Strength: POS | TICKER | (blank flex) | DATE | DAYS | NEW
+   The blank cell preserves Re-Rank's ASSET CLASS rhythm — eye lands
+   on the date column at the same horizontal anchor as ETF Re-Rank's
+   ADDED column. */
+.signal-strength-panel .rerank-list-head,
+.signal-strength-panel .rerank-row {
+  grid-template-columns:
+    64px                  /* pos        */
+    minmax(86px, auto)    /* ticker     */
+    minmax(40px, 1fr)     /* spacer     */
+    140px                 /* date added */
+    100px                 /* days       */
+    80px;                 /* new chip   */
 }
 
-.ss-status-row {
-  margin-top: 4px;
+/* Investing Ideas: SIDE | POS | TICKER | SECTOR | PREV | LRR | TRR | RANGE */
+.investing-ideas-panel .rerank-list-head,
+.investing-ideas-panel .rerank-row.tt-ii-row {
+  grid-template-columns:
+    48px                  /* side L/S pill */
+    48px                  /* pos          */
+    minmax(70px, auto)    /* ticker       */
+    minmax(120px, 1fr)    /* sector       */
+    96px                  /* prev close   */
+    84px                  /* LRR          */
+    84px                  /* TRR          */
+    130px;                /* range bar    */
 }
 
-.ss-status-line {
+/* MOMO: TICKER | (blank flex) | PREV | LRR | TRR | RANGE | BIAS | EARN | 1W Δ */
+.momo-panel.rerank-panel .rerank-list-head,
+.momo-panel.rerank-panel .rerank-row.tt-momo-row {
+  grid-template-columns:
+    minmax(80px, auto)    /* ticker     */
+    minmax(40px, 1fr)     /* spacer     */
+    96px                  /* prev close */
+    80px                  /* LRR        */
+    80px                  /* TRR        */
+    130px                 /* range bar  */
+    96px                  /* bias       */
+    110px                 /* earnings   */
+    88px;                 /* 1W Δ       */
+}
+
+/* --- Shared cells: date, days pill, dim placeholder ---------------- */
+.tt-date {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tt-days {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
   font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 0.2px;
-}
-
-.ss-status-line strong {
-  color: var(--text-strong);
-  font-weight: 600;
-}
-
-.ss-status-error {
-  color: var(--bear);
-}
-
-/* Two-column split for the "5 newest" + "5 oldest" highlight sections.
-   Stacks on mobile. */
-.ss-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.ss-section {
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
   min-width: 0;
+  justify-self: end;
 }
 
-.ss-section-title {
+.tt-cell-dim {
+  color: var(--text-dim);
+  opacity: 0.45;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Header cells override the default text-align for the matching row
+   cells, mirroring how Re-Rank handles its header alignment. */
+.signal-strength-panel .rerank-list-head .tt-date,
+.investing-ideas-panel .rerank-list-head .tt-date,
+.momo-panel.rerank-panel .rerank-list-head .tt-date,
+.signal-strength-panel .rerank-list-head .tt-days,
+.momo-panel.rerank-panel .rerank-list-head .tt-pct-head,
+.signal-strength-panel .rerank-list-head .tt-newhead {
+  font-family: var(--sans);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
+  letter-spacing: 1px;
   color: var(--text-dim);
-  margin: 0 0 10px;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
-.ss-section-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
+.signal-strength-panel .rerank-list-head .tt-days,
+.signal-strength-panel .rerank-list-head .tt-newhead {
+  text-align: right;
+  justify-self: end;
 }
 
-.ss-divider {
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--border) 20%,
-    var(--border) 80%,
-    transparent 100%
-  );
-  margin: 8px 0 20px;
-}
-
-.ss-full-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-}
-
-/* --- TickerBox chrome ----------------------------------------------- */
-
-.ss-box {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: var(--radius-card);
-  min-height: 64px;
-  transition: transform 160ms ease, box-shadow 160ms ease;
-  /* Default tint = neutral so .card-bg has a usable value. NEW
-     variant overrides to bull-green via the modifier below. */
-  --card-tint: 156, 163, 175;
-}
-
-.ss-box > *:not(.card-bg) {
-  position: relative;
-  z-index: 1;
-}
-
-.ss-box-new {
-  --card-tint: 34, 197, 94;
-}
-
-.ss-box .card-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(
-      ellipse 70% 60% at 0% 0%,
-      rgba(var(--card-tint), 0.10),
-      transparent 55%
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 20%),
-    rgba(20, 23, 31, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 4px 14px rgba(0, 0, 0, 0.20);
-  opacity: 0.7;
-}
-
-.ss-box-new .card-bg {
-  border-left: 3px solid rgb(var(--card-tint));
-}
-
-.ss-box:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 1px rgba(var(--card-tint), 0.25);
-}
-
-.ss-box-head {
-  display: flex;
+/* --- NEW chip (Signal Strength) ----------------------------------- */
+.tt-newchip {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--bull);
+  background: var(--bull-bg);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  white-space: nowrap;
+  justify-self: end;
 }
 
-.ss-box-ticker {
+.tt-newhead { text-align: right; }
+
+/* --- Side pill (Investing Ideas) ---------------------------------- */
+.tt-side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  border: 1px solid transparent;
+}
+
+.tt-side-long {
+  color: var(--bull);
+  background: var(--bull-bg);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.tt-side-short {
+  color: var(--bear);
+  background: var(--bear-bg);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.investing-ideas-panel .rerank-list-head .tt-side-head {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* II row POS — slightly smaller mono than the main RANK font since the
+   POS values here (1..10) and (1..7) need less visual real estate. */
+.tt-ii-pos {
   font-family: var(--mono);
   font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.4px;
-  color: var(--text-strong);
-}
-
-/* NEW badge — same shape as the "↗ In Risk Ranges" crossover pill on
-   Call cards (small inline pill, outlined). Uses bull-green so it
-   reads as "freshly added" rather than informational. */
-.ss-box-new-badge {
-  background: transparent;
-  border: 1px solid rgba(34, 197, 94, 0.6);
-  color: var(--bull);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 1px 6px;
-  border-radius: var(--radius-badge);
-  flex-shrink: 0;
-}
-
-.ss-box-date {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.2px;
-}
-
-/* Skeleton box — same outer geometry, no inner content, subtle pulse. */
-.ss-box-skeleton {
-  min-height: 64px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  animation: ss-skel-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes ss-skel-pulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 0.9; }
-}
-
-/* Empty placeholder when the ingestion workflow hasn't run yet. */
-.ss-empty {
-  margin: 48px auto;
-  max-width: 520px;
-  text-align: center;
-  padding: 32px 20px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.ss-empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-strong);
-  margin: 0 0 6px;
-}
-
-.ss-empty-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Mobile: stack the split, kill backdrop-filter on the box chrome
-   (matches the existing perf cut applied to other .card-bg variants). */
-@media (max-width: 768px) {
-  .ss-split {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-}
-
-@media (max-width: 640px) {
-  .ss-box .card-bg {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    opacity: 0.95;
-  }
-}
-
-/* ===================================================================
-   INVESTING IDEAS panel
-   Two side-by-side columns (LONGS green / SHORTS red) of expandable
-   ticker cards. Cards reuse the .card-bg chrome and the .posbar
-   visual the existing dashboard already defines.
-   =================================================================== */
-
-.ii-panel .topbar {
-  margin-bottom: 20px;
-}
-
-.ii-meta-row {
-  margin-top: 4px;
-}
-
-.ii-meta-line {
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 0.2px;
-}
-
-.ii-meta-line strong {
-  color: var(--text-strong);
-  font-weight: 600;
-}
-
-.ii-meta-error {
-  color: var(--bear);
-}
-
-.ii-feed-link {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: var(--accent);
-  text-decoration: none;
-  padding: 4px 10px;
-  border-radius: var(--radius-badge);
-  border: 1px solid rgba(110, 168, 255, 0.35);
-  transition: background 160ms ease, border-color 160ms ease;
-}
-
-.ii-feed-link:hover {
-  background: rgba(110, 168, 255, 0.08);
-  border-color: rgba(110, 168, 255, 0.6);
-}
-
-/* Two-column layout — longs left, shorts right. Stacks on mobile. */
-.ii-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.ii-column {
-  min-width: 0;
-}
-
-.ii-column-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  margin: 0 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.ii-column-title-long {
-  color: var(--bull);
-  border-bottom-color: rgba(34, 197, 94, 0.35);
-}
-
-.ii-column-title-short {
-  color: var(--bear);
-  border-bottom-color: rgba(239, 68, 68, 0.35);
-}
-
-.ii-column-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  letter-spacing: 0.3px;
-}
-
-.ii-column-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* --- Card chrome ----------------------------------------------------- */
-
-.ii-card {
-  position: relative;
-  border-radius: var(--radius-card);
-  /* Default to neutral tint; modifier classes override per side. */
-  --card-tint: 156, 163, 175;
-}
-
-.ii-card-long {
-  --card-tint: 34, 197, 94;
-}
-
-.ii-card-short {
-  --card-tint: 239, 68, 68;
-}
-
-.ii-card > *:not(.card-bg) {
-  position: relative;
-  z-index: 1;
-}
-
-.ii-card .card-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(
-      ellipse 70% 60% at 0% 0%,
-      rgba(var(--card-tint), 0.10),
-      transparent 55%
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 20%),
-    rgba(20, 23, 31, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 3px solid rgb(var(--card-tint));
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 4px 14px rgba(0, 0, 0, 0.20);
-  opacity: 0.7;
-}
-
-/* Clickable header — full-width button to keep the click target large. */
-.ii-card-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  background: transparent;
-  border: none;
   color: var(--text);
   text-align: left;
-  cursor: pointer;
-  font: inherit;
-  width: 100%;
-}
-
-.ii-card-head[aria-disabled='true'] {
-  cursor: default;
-}
-
-.ii-card-head-top {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.ii-ticker {
-  font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: var(--text-strong);
-}
-
-.ii-card-long .ii-price { color: var(--bull); }
-.ii-card-short .ii-price { color: var(--bear); }
-.ii-price {
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-  margin-left: auto;
-}
-
-.ii-caret {
-  font-size: 11px;
-  color: var(--text-dim);
-  transition: transform 160ms ease;
-}
-
-.ii-caret.open {
-  transform: rotate(90deg);
-}
-
-/* Position bar — reuses .posbar / .posbar-track / .posbar-marker
-   classes already defined elsewhere in this file. We just provide
-   the surrounding labels here. */
-.ii-posbar-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ii-posbar-labels {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.ii-posbar-labels .posbar-end {
-  font-family: var(--mono);
-}
-
-.ii-sector {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.2px;
-}
-
-.ii-sector-sep {
-  color: var(--text-dim);
-  opacity: 0.6;
-}
-
-.ii-sector-head {
-  color: var(--text);
-}
-
-/* --- Expanded body --------------------------------------------------- */
-
-.ii-card-body {
-  padding: 0 14px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 14px;
-}
-
-.ii-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ii-section-title {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin: 0;
-}
-
-.ii-paragraph {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.ii-bullets {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ii-bullets li {
-  position: relative;
-  padding-left: 16px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.ii-bullets li::before {
-  content: '•';
-  position: absolute;
-  left: 4px;
-  top: 0;
-  color: rgb(var(--card-tint));
-  font-weight: 700;
-}
-
-/* Skeleton placeholder. */
-.ii-card-skeleton {
-  height: 110px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  animation: ii-skel-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes ii-skel-pulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 0.9; }
-}
-
-/* Empty state. */
-.ii-empty {
-  margin: 48px auto;
-  max-width: 520px;
-  text-align: center;
-  padding: 32px 20px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.ii-empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-strong);
-  margin: 0 0 6px;
-}
-
-.ii-empty-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Mobile: stack the columns + drop backdrop blur on card chrome
-   (matches the existing perf cut applied to other .card-bg variants). */
-@media (max-width: 768px) {
-  .ii-split {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-}
-
-@media (max-width: 640px) {
-  .ii-card .card-bg {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    opacity: 0.95;
-  }
-}
-
-/* ===================================================================
-   MOMO TRACKER PANEL
-   Daily Hedgeye MOMO Tracker — 9-stock range cards + chart strip +
-   chart lightbox. Cards reuse the .card-bg chrome with a per-card
-   --card-tint; the headline ribbon uses the same chip grammar as
-   other panels (RR mover chips). The range bar is the marquee
-   element — marker position is the heart of the "instantly
-   readable proximity" promise from the spec.
-   =================================================================== */
-
-.momo-panel {
-  --card-tint: 156, 163, 175;  /* neutral default; cards override */
-}
-
-.momo-topbar {
-  align-items: flex-end;
-}
-
-.momo-header-eyebrow {
-  letter-spacing: 0.4px;
-  color: var(--text-strong);
-}
-
-.momo-header-date {
-  color: var(--text-dim);
-  font-size: 18px;
-  font-weight: 500;
   letter-spacing: 0;
 }
 
-.momo-feed-link {
+/* --- Mag7 chip (MOMO header) -------------------------------------- */
+/* Lives inside the .status-row alongside StatusChips. Spec calls for
+   green positive / red negative which StatusChip's tone palette
+   (live/stale/closed/idle) doesn't cover, so this is a custom pill. */
+.tt-mag7 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.tt-mag7-label {
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.tt-mag7-value {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.tt-mag7-pos {
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--bull-bg);
+}
+
+.tt-mag7-pos .tt-mag7-label { color: var(--bull); }
+
+.tt-mag7-neg {
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--bear-bg);
+}
+
+.tt-mag7-neg .tt-mag7-label { color: var(--bear); }
+
+/* --- Bias chip ----------------------------------------------------- */
+.tt-bias {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tt-bias-pos {
+  color: var(--bull);
+  background: var(--bull-bg);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.tt-bias-neg {
+  color: var(--bear);
+  background: var(--bear-bg);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.tt-bias-neutral {
+  color: var(--neutral);
+  background: var(--neutral-bg);
+  border-color: rgba(156, 163, 175, 0.35);
+}
+
+.tt-bias-cell { justify-self: start; }
+
+/* --- 1W Δ pill (MOMO) --------------------------------------------- */
+.tt-pct {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.tt-pct-pos {
+  background: var(--bull-bg);
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.tt-pct-neg {
+  background: var(--bear-bg);
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.tt-pct-zero {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.tt-pct-null {
+  background: transparent;
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+/* --- Earnings chip ------------------------------------------------- */
+.tt-earn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--amber-light);
+  background: rgba(245, 158, 11, 0.10);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  white-space: nowrap;
+}
+
+.tt-earn-cell { justify-self: start; }
+
+.momo-panel.rerank-panel .rerank-list-head .tt-bias-head,
+.momo-panel.rerank-panel .rerank-list-head .tt-earn-head {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.momo-panel.rerank-panel .rerank-list-head .tt-pct-head {
+  text-align: center;
+}
+
+/* --- Price cells --------------------------------------------------- */
+.tt-price {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tt-price-dim { color: var(--text-dim); }
+
+/* Header price labels mirror the dim header treatment elsewhere. */
+.investing-ideas-panel .rerank-list-head .tt-price,
+.momo-panel.rerank-panel .rerank-list-head .tt-price {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* --- Inline range bar (~120px) ------------------------------------ */
+.tt-range {
+  width: 100%;
+  max-width: 120px;
+  padding: 0 4px;
+  justify-self: end;
+}
+
+.tt-range .posbar { height: 6px; }
+
+.tt-range .posbar-marker {
+  width: 10px;
+  height: 10px;
+}
+
+.investing-ideas-panel .rerank-list-head .tt-range-head,
+.momo-panel.rerank-panel .rerank-list-head .tt-range-head {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: center;
+  justify-self: end;
+  width: 100%;
+  max-width: 120px;
+  padding: 0 4px;
+}
+
+/* Range CHIP variant (used in II + MOMO dual top boxes) — small
+   text-only range like "$60 – $65", neutral pill, NO directional
+   tint per spec. */
+.tt-range-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+  justify-self: end;
+}
+
+/* --- Mover chips inside top boxes / headline ribbon --------------- */
+.tt-mover {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.tt-mover strong {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text-strong);
+}
+
+.tt-mover-pct {
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.tt-mover-bias {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.tt-mover-pos {
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--bull-bg);
+}
+
+.tt-mover-neg {
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--bear-bg);
+}
+
+.tt-mover-neutral { color: var(--neutral); }
+
+/* MOMO top-box bias cell: bias chip sits centered inside the asset
+   column slot. */
+.tt-mover-bias-cell { display: inline-flex; justify-content: center; }
+
+/* --- Headline ribbon (MOMO) --------------------------------------- */
+.tt-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  margin: 10px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: rgba(20, 23, 31, 0.55);
+}
+
+.tt-ribbon-movers {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tt-ribbon-earn {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+  color: var(--amber-light);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin-left: auto; /* push to right edge of ribbon */
+}
+
+.tt-earn-bolt { font-size: 12px; line-height: 1; }
+
+.tt-earn-label {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--amber-strong);
+}
+
+.tt-earn-item strong {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0;
+}
+
+/* --- Theme note (MOMO, conditional) ------------------------------- */
+.tt-theme {
+  margin: 4px 0 18px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent);
+  background: rgba(110, 168, 255, 0.05);
+  border-radius: 0 var(--radius-badge) var(--radius-badge) 0;
+  color: var(--text);
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+/* --- "view on Hedgeye →" link (II + MOMO topbar right) ----------- */
+.tt-feed-link {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.6px;
@@ -6290,405 +6211,86 @@ body,
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
-.momo-feed-link:hover {
+.tt-feed-link:hover {
   background: rgba(110, 168, 255, 0.16);
   border-color: var(--accent);
   color: var(--text-strong);
 }
 
-/* === OCR banner (rare — only when ocr_status != 'ok') === */
-.momo-ocr-banner {
-  margin: 4px 0 14px;
-  padding: 8px 12px;
-  border-radius: var(--radius-badge);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: var(--amber-light);
-  font-size: 12px;
+/* --- Investing Ideas row expansion -------------------------------- */
+.tt-ii-row { cursor: pointer; }
+
+.tt-ii-row-open {
+  /* When open, row gets a slight emphasis to anchor the expansion
+     visually below. */
+  box-shadow:
+    0 0 0 1px rgba(var(--card-tint), 0.45),
+    0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
-/* === Headline ribbon (Mag7 + movers + earnings) === */
-.momo-ribbon {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+.tt-ii-expand-row {
+  list-style: none;
+  margin: -4px 0 6px;
+  padding: 0;
+  /* The expansion row doesn't get the .card-bg chrome — it visually
+     extends the open row above so user reads them as one unit. */
+}
+
+.tt-ii-expand-body {
+  padding: 14px 18px 18px;
   background: rgba(20, 23, 31, 0.55);
-}
-
-.momo-chip-mag7 {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
   border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--text);
-}
-
-.momo-chip-mag7.momo-pos {
-  color: var(--bull);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: var(--bull-bg);
-}
-
-.momo-chip-mag7.momo-neg {
-  color: var(--bear);
-  border-color: rgba(239, 68, 68, 0.35);
-  background: var(--bear-bg);
-}
-
-.momo-movers {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.momo-chip-mover {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  letter-spacing: 0.4px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-}
-
-.momo-chip-mover strong {
-  font-weight: 700;
-  font-family: var(--mono);
-  letter-spacing: 0;
-  color: var(--text-strong);
-}
-
-.momo-chip-mover .momo-chip-pct {
-  font-weight: 700;
-  font-family: var(--mono);
-}
-
-.momo-chip-mover .momo-chip-bias {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.momo-chip-mover.momo-pos {
-  color: var(--bull);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: var(--bull-bg);
-}
-
-.momo-chip-mover.momo-neg {
-  color: var(--bear);
-  border-color: rgba(239, 68, 68, 0.35);
-  background: var(--bear-bg);
-}
-
-.momo-chip-mover.momo-neutral {
-  color: var(--neutral);
-}
-
-.momo-earnings-ribbon {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: var(--amber-light);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-}
-
-.momo-earnings-bolt {
-  font-size: 12px;
-  line-height: 1;
-}
-
-.momo-earnings-label {
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--amber-strong);
-}
-
-.momo-earnings-item strong {
-  font-family: var(--mono);
-  font-weight: 700;
-  color: var(--text-strong);
-  letter-spacing: 0;
-}
-
-/* === Theme note (conditional, often null) === */
-.momo-theme {
-  margin: 4px 0 18px;
-  padding: 12px 16px;
-  border-left: 3px solid var(--accent);
-  background: rgba(110, 168, 255, 0.05);
-  border-radius: 0 var(--radius-badge) var(--radius-badge) 0;
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-/* === Empty state === */
-.momo-empty {
-  padding: 60px 24px;
-  text-align: center;
-  color: var(--text-dim);
-}
-
-.momo-empty-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-strong);
-  margin: 0 0 6px;
-}
-
-.momo-empty-sub {
-  font-size: 13px;
-  max-width: 480px;
-  margin: 0 auto;
-  line-height: 1.55;
-}
-
-/* === 9-stock card grid === */
-.momo-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.momo-card {
-  position: relative;
   border-radius: var(--radius-card);
-  padding: 14px 16px 16px;
-  isolation: isolate;
-  min-height: 138px;
-}
-
-.momo-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Top mover (biggest gainer) — green tint */
-.momo-card.momo-card-top {
-  --card-tint: 34, 197, 94;
-}
-
-/* Bottom mover (biggest loser) — red tint */
-.momo-card.momo-card-bottom {
-  --card-tint: 239, 68, 68;
-}
-
-.momo-card-skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.03) 100%
-  );
-  background-size: 200% 100%;
-  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
-  border: 1px solid var(--border);
-}
-
-@keyframes momo-skel-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.momo-card-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
-  margin-bottom: 10px;
 }
 
-.momo-card-ticker {
-  font-family: var(--mono);
-  font-size: 18px;
+.tt-ii-section { display: flex; flex-direction: column; gap: 6px; }
+
+.tt-ii-section-head {
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-strong);
-  letter-spacing: 0.2px;
-}
-
-.momo-pct {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.momo-pos { color: var(--bull); }
-.momo-neg { color: var(--bear); }
-.momo-neutral { color: var(--neutral); }
-
-.momo-card-price-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.momo-card-price-label {
-  font-size: 10px;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
   color: var(--text-dim);
+  margin: 0;
 }
 
-.momo-card-price {
-  font-family: var(--mono);
+.tt-ii-section-body {
+  margin: 0;
   font-size: 13px;
+  line-height: 1.55;
   color: var(--text);
 }
 
-/* === Range bar — the marquee feature === */
-.momo-range {
-  margin: 6px 0 10px;
-}
-
-.momo-range-track {
-  position: relative;
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(239, 68, 68, 0.35) 0%,
-    rgba(156, 163, 175, 0.30) 50%,
-    rgba(34, 197, 94, 0.35) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.momo-range-track-dashed {
-  background: none;
-  border: 1px dashed var(--border);
-}
-
-.momo-range-marker {
-  position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--text-strong);
-  border: 2px solid var(--bg);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 1px 4px rgba(0, 0, 0, 0.5);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.momo-range-marker-broken {
-  background: var(--amber-light);
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 0 12px rgba(245, 158, 11, 0.6);
-}
-
-.momo-range-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--amber-light);
+.tt-ii-bullets {
+  margin: 0;
+  padding-left: 18px;
   font-size: 13px;
-  line-height: 1;
-  text-shadow: 0 0 4px rgba(245, 158, 11, 0.6);
-  pointer-events: none;
+  line-height: 1.55;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.momo-range-arrow-left  { left: -4px; }
-.momo-range-arrow-right { right: -4px; }
-
-.momo-range-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 10px;
+.tt-ii-empty {
+  margin: 0;
   color: var(--text-dim);
-  letter-spacing: 0;
+  font-style: italic;
+  font-size: 13px;
 }
 
-/* === Card footer chips (bias + earnings this week) === */
-.momo-card-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: auto;
-}
-
-.momo-bias {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.7px;
-  text-transform: uppercase;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-}
-
-.momo-bias.momo-pos {
-  color: var(--bull);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: var(--bull-bg);
-}
-
-.momo-bias.momo-neg {
-  color: var(--bear);
-  border-color: rgba(239, 68, 68, 0.35);
-  background: var(--bear-bg);
-}
-
-.momo-bias.momo-neutral {
-  color: var(--neutral);
-}
-
-.momo-earnings-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--amber-light);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-}
-
-/* === Chart strip + thumbnails === */
-.momo-chart-strip {
+/* --- MOMO chart strip + lightbox ---------------------------------- */
+.tt-chart-strip {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
-  margin-bottom: 24px;
+  margin: 20px 0 24px;
 }
 
-.momo-chart-thumb {
+.tt-chart-thumb {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -6701,13 +6303,13 @@ body,
   transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
-.momo-chart-thumb:hover {
+.tt-chart-thumb:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.momo-chart-thumb img {
+.tt-chart-thumb img {
   display: block;
   width: 100%;
   height: 110px;
@@ -6716,7 +6318,7 @@ body,
   background: var(--bg-chart);
 }
 
-.momo-chart-thumb-label {
+.tt-chart-thumb-label {
   padding: 8px 10px;
   font-size: 11px;
   font-weight: 600;
@@ -6727,24 +6329,9 @@ body,
   border-top: 1px solid var(--border);
 }
 
-.momo-chart-thumb-skeleton {
-  height: 152px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.03) 100%
-  );
-  background-size: 200% 100%;
-  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
-}
+.tt-chart-backdrop { cursor: zoom-out; }
 
-/* === Chart modal === */
-.momo-chart-backdrop {
-  cursor: zoom-out;
-}
-
-.momo-chart-modal {
+.tt-chart-modal {
   position: relative;
   width: 100%;
   max-width: 1100px;
@@ -6760,7 +6347,7 @@ body,
   overflow: hidden;
 }
 
-.momo-chart-modal-head {
+.tt-chart-modal-head {
   display: flex;
   align-items: baseline;
   gap: 12px;
@@ -6768,13 +6355,13 @@ body,
   margin-bottom: 14px;
 }
 
-.momo-chart-modal-head h2 {
+.tt-chart-modal-head h2 {
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.3px;
 }
 
-.momo-chart-modal-img {
+.tt-chart-modal-img {
   display: block;
   width: 100%;
   height: auto;
@@ -6784,38 +6371,9 @@ body,
   border-radius: var(--radius-badge);
 }
 
-/* === Skeleton ribbons for loading state === */
-.momo-skel-ribbon {
-  height: 44px;
-  border-radius: var(--radius-card);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.03) 100%
-  );
-  background-size: 200% 100%;
-  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
-  margin-bottom: 14px;
-}
-
-.momo-skel-theme {
-  height: 60px;
-  border-radius: var(--radius-badge);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(255, 255, 255, 0.04) 50%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
-  background-size: 200% 100%;
-  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
-  margin-bottom: 18px;
-}
-
-/* === Author footer === */
-.momo-footer {
-  margin-top: 24px;
+/* --- Author footer (MOMO) ----------------------------------------- */
+.tt-author-footer {
+  margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
   font-size: 12px;
@@ -6825,50 +6383,77 @@ body,
   align-items: baseline;
 }
 
-.momo-author-name {
-  color: var(--text);
-  font-weight: 500;
+.tt-author-name { color: var(--text); font-weight: 500; }
+.tt-author-handle { color: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+.tt-author-sep { color: var(--border-strong); }
+
+/* --- Top-box row tweaks for each panel ---------------------------- */
+/* Signal Strength: 4 cells (TICKER · blank · DATE · DAYS|NEW). */
+.signal-strength-panel .tt-ss-mover-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
-.momo-author-handle {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 11px;
+/* Investing Ideas: 4 cells (TICKER · SECTOR · PREV · RANGE chip). */
+.investing-ideas-panel .tt-ii-mover-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
-.momo-author-sep {
-  color: var(--border-strong);
+/* MOMO: 4 cells (TICKER · BIAS · PREV · PCT). */
+.momo-panel.rerank-panel .tt-momo-mover-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
-/* === Mobile: drop backdrop blur on card chrome (perf), single-col
-       grid for charts, smaller card padding. === */
+/* --- Mobile -------------------------------------------------------- */
+@media (max-width: 900px) {
+  /* On narrow screens, drop the spacer + non-essential columns and
+     compress the table to its core signal. Reuses the same idiom
+     ETF Re-Rank uses for its mobile collapse. */
+  .signal-strength-panel .rerank-list-head,
+  .signal-strength-panel .rerank-row {
+    grid-template-columns: 48px minmax(64px, auto) 1fr 70px 70px;
+  }
+  .signal-strength-panel .rerank-asset,
+  .signal-strength-panel .rerank-list-head .rerank-asset {
+    display: none;
+  }
+  .investing-ideas-panel .rerank-list-head,
+  .investing-ideas-panel .rerank-row.tt-ii-row {
+    grid-template-columns: 40px 40px minmax(60px, auto) 80px 110px;
+  }
+  .investing-ideas-panel .rerank-asset,
+  .investing-ideas-panel .rerank-list-head .rerank-asset,
+  .investing-ideas-panel .tt-price:nth-of-type(2),
+  .investing-ideas-panel .tt-price:nth-of-type(3) {
+    display: none;
+  }
+  .momo-panel.rerank-panel .rerank-list-head,
+  .momo-panel.rerank-panel .rerank-row.tt-momo-row {
+    grid-template-columns: minmax(70px, auto) 1fr 110px 80px;
+  }
+  .momo-panel.rerank-panel .rerank-asset,
+  .momo-panel.rerank-panel .rerank-list-head .rerank-asset,
+  .momo-panel.rerank-panel .tt-price:nth-of-type(2),
+  .momo-panel.rerank-panel .tt-price:nth-of-type(3),
+  .momo-panel.rerank-panel .tt-bias-cell,
+  .momo-panel.rerank-panel .tt-earn-cell,
+  .momo-panel.rerank-panel .rerank-list-head .tt-bias-head,
+  .momo-panel.rerank-panel .rerank-list-head .tt-earn-head {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
-  .momo-card .card-bg {
+  /* Drop backdrop blur on row chrome for paint perf on phones. */
+  .signal-strength-panel .rerank-row .card-bg,
+  .investing-ideas-panel .rerank-row .card-bg,
+  .momo-panel.rerank-panel .rerank-row .card-bg {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     opacity: 0.95;
   }
-  .momo-card-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  .momo-chart-strip {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .momo-chart-thumb img {
-    height: 90px;
-  }
-  .momo-chart-modal {
-    padding: 14px;
-  }
-  .momo-feed-link {
-    padding: 5px 10px;
-    font-size: 11px;
-  }
-  .momo-header-date {
-    display: block;
-    font-size: 13px;
-    margin-top: 4px;
-  }
+  .tt-chart-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .tt-chart-thumb img { height: 90px; }
+  .tt-chart-modal { padding: 14px; }
+  .tt-feed-link { padding: 5px 10px; font-size: 11px; }
 }
+
