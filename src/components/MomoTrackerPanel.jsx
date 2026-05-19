@@ -204,18 +204,6 @@ function BiasChip({ kind, bias }) {
 function TrendChip({ bias }) { return <BiasChip kind="trend" bias={bias} /> }
 function TradeChip({ bias }) { return <BiasChip kind="trade" bias={bias} /> }
 
-// Container for the dual chips inside a top-box row or table cell.
-// Stacks vertically on narrow widths, side-by-side otherwise. Empty
-// (renders nothing) when both chips are null.
-function BiasPair({ trend, trade }) {
-  if (!trend && !trade) return null
-  return (
-    <span className="tt-bias-pair">
-      <TrendChip bias={trend} />
-      <TradeChip bias={trade} />
-    </span>
-  )
-}
 
 function PctChip({ pct }) {
   if (pct == null) return <span className="tt-pct tt-pct-null">—</span>
@@ -301,28 +289,50 @@ function GainersLosersBox({ title, tone, rows, isLoser }) {
       {rows.length === 0 ? (
         <div className="rerank-movers-empty">No data yet.</div>
       ) : (
-        <ul className="rerank-movers-list">
-          {rows.map((r) => (
-            <li key={r.ticker} className="rerank-movers-row tt-momo-mover-row">
-              <span className="rerank-movers-ticker">{r.ticker}</span>
-              <span className="rerank-movers-asset tt-mover-bias-cell">
-                <BiasPair trend={r.trend_bias} trade={r.trade_bias} />
-              </span>
-              <span className="tt-price">{formatPrice(r.prev_close)}</span>
-              <span
-                className={`tt-pct ${
-                  r.pct_change_1w == null
-                    ? 'tt-pct-null'
-                    : isLoser
-                      ? 'tt-pct-neg'
-                      : 'tt-pct-pos'
-                }`}
-              >
-                {formatPct(r.pct_change_1w) ?? '—'}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Column header row — shares the same grid template as the
+              data rows below so labels sit dead-center over their values.
+              TICKER is left-aligned to match its data cell. */}
+          <div className="tt-mover-head tt-momo-mover-row" aria-hidden="true">
+            <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
+            <span className="tt-mover-head-cell">TREND</span>
+            <span className="tt-mover-head-cell">TRADE</span>
+            <span className="tt-mover-head-cell">PRICE</span>
+            <span className="tt-mover-head-cell">1W</span>
+          </div>
+          <ul className="rerank-movers-list">
+            {rows.map((r) => {
+              // PRICE = Finnhub live `current_price` (more useful than
+              // yesterday's MOMO chart prev_close at this scale). All 9
+              // Mag7+ stocks have live prices on the free tier, so the
+              // `—` fallback rarely fires here.
+              const price = r.current_price != null
+                ? formatPrice(r.current_price)
+                : formatPrice(r.prev_close)
+              return (
+                <li key={r.ticker} className="rerank-movers-row tt-momo-mover-row">
+                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="tt-mover-cell-c"><TrendChip bias={r.trend_bias} /></span>
+                  <span className="tt-mover-cell-c"><TradeChip bias={r.trade_bias} /></span>
+                  <span className="tt-price tt-mover-cell-c">{price}</span>
+                  <span className="tt-mover-cell-c">
+                    <span
+                      className={`tt-pct ${
+                        r.pct_change_1w == null
+                          ? 'tt-pct-null'
+                          : isLoser
+                            ? 'tt-pct-neg'
+                            : 'tt-pct-pos'
+                      }`}
+                    >
+                      {formatPct(r.pct_change_1w) ?? '—'}
+                    </span>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </>
       )}
     </div>
   )

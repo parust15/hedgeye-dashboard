@@ -94,28 +94,41 @@ function TopBox({ title, tone, rows }) {
       {rows.length === 0 ? (
         <div className="rerank-movers-empty">No data yet.</div>
       ) : (
-        <ul className="rerank-movers-list">
-          {rows.map((r) => {
-            const { dateLabel, days } = parseAdded(r.date_added_to_list)
-            const isNew = tone === 'bottom' && r.added_in_latest_email === true
-            // Price comes from Finnhub; ~22 of 72 tickers (foreign/OTC
-            // names off the free tier) render as "—". Spec is explicit
-            // about no asterisk / explanation — just the dash.
-            const priceTxt = r.current_price == null ? '—' : formatPrice(r.current_price)
-            return (
-              <li key={r.ticker} className="rerank-movers-row tt-ss-mover-row">
-                <span className="rerank-movers-ticker">{r.ticker}</span>
-                <span className="tt-price tt-ss-mover-price">{priceTxt}</span>
-                <span className="tt-date">{dateLabel ?? '—'}</span>
-                {isNew ? (
-                  <span className="tt-newchip" aria-label="Added in latest email">NEW</span>
-                ) : (
-                  <span className="tt-days">{days != null ? `${days}d` : '—'}</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          {/* Column header row — shares the same grid template as the
+              data rows so each label sits dead-center over its values.
+              TICKER is left-aligned to match its data cell. */}
+          <div className="tt-mover-head tt-ss-mover-row" aria-hidden="true">
+            <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
+            <span className="tt-mover-head-cell">PRICE</span>
+            <span className="tt-mover-head-cell">ADDED</span>
+            <span className="tt-mover-head-cell">TENURE</span>
+          </div>
+          <ul className="rerank-movers-list">
+            {rows.map((r) => {
+              const { dateLabel, days } = parseAdded(r.date_added_to_list)
+              const isNew = tone === 'bottom' && r.added_in_latest_email === true
+              // Price comes from Finnhub; ~22 of 72 tickers (foreign/OTC
+              // names off the free tier) render as "—". Spec is explicit
+              // about no asterisk / explanation — just the dash.
+              const priceTxt = r.current_price == null ? '—' : formatPrice(r.current_price)
+              return (
+                <li key={r.ticker} className="rerank-movers-row tt-ss-mover-row">
+                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="tt-price tt-mover-cell-c">{priceTxt}</span>
+                  <span className="tt-date tt-mover-cell-c">{dateLabel ?? '—'}</span>
+                  <span className="tt-mover-cell-c">
+                    {isNew ? (
+                      <span className="tt-newchip" aria-label="Added in latest email">NEW</span>
+                    ) : (
+                      <span className="tt-days">{days != null ? `${days}d` : '—'}</span>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </>
       )}
     </div>
   )

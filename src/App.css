@@ -6046,17 +6046,6 @@ body,
   letter-spacing: 0.8px;
 }
 
-/* Dual chip container for top-box rows. Chips sit side-by-side
-   horizontally — the chip text is short (TREND / TRADE) so the
-   pair fits in the bias cell at typical box widths. */
-.tt-bias-pair {
-  display: inline-flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
 /* Each table cell that hosts a single labeled chip — keep the chip
    left-aligned so it sits flush under its column header. */
 .tt-trend-cell,
@@ -6529,27 +6518,65 @@ body,
 .tt-author-sep { color: var(--border-strong); }
 
 /* --- Top-box row tweaks for each panel ---------------------------- */
-/* Signal Strength: 4 cells (TICKER · PRICE · DATE · DAYS|NEW). PRICE
-   replaces the blank-spacer cell used elsewhere — at top-box width
-   we can't afford an empty column, and the price is informative. */
+/* Equal-width columns so every value sits dead-center under its
+   header label. TICKER cell stays left-aligned (its column header
+   matches via .tt-mover-head-ticker), everything else centers via
+   .tt-mover-cell-c on the cell + center text on the header cell.
+
+   Signal Strength: 4 cells (TICKER · PRICE · ADDED · TENURE). */
 .signal-strength-panel .tt-ss-mover-row {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.tt-ss-mover-price {
-  font-size: 12px;
+/* Investing Ideas: 4 cells (TICKER · SECTOR · PREV CLOSE · RANGE). */
+.investing-ideas-panel .tt-ii-mover-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* MOMO: 5 cells (TICKER · TREND · TRADE · PRICE · 1W). */
+.momo-panel.rerank-panel .tt-momo-mover-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* --- Column header row above the data rows ----------------------- */
+/* Lives in each top box between the green/red corner section title
+   and the data list. Shares the grid template with the data rows
+   below so column labels sit dead-center over their values. */
+.tt-mover-head {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tt-mover-head-cell {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
   text-align: center;
   min-width: 0;
 }
 
-/* Investing Ideas: 4 cells (TICKER · SECTOR · PREV · RANGE chip). */
-.investing-ideas-panel .tt-ii-mover-row {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+/* TICKER column stays left-aligned (data + header). */
+.tt-mover-head-ticker {
+  text-align: left;
 }
 
-/* MOMO: 4 cells (TICKER · BIAS · PREV · PCT). */
-.momo-panel.rerank-panel .tt-momo-mover-row {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+/* Centered data cell utility — applied to every non-ticker cell in
+   the top-box data rows. Keeps the value visually dead-center under
+   its column header label. Inline-flex so contents (chips, pills,
+   range bars) center as a unit, not just text. */
+.tt-mover-cell-c {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
 }
 
 /* --- Mobile -------------------------------------------------------- */

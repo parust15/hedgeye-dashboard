@@ -142,20 +142,31 @@ function TopBox({ title, tone, rows }) {
       {rows.length === 0 ? (
         <div className="rerank-movers-empty">No data yet.</div>
       ) : (
-        <ul className="rerank-movers-list">
-          {rows.map((r) => (
-            <li key={r.ticker} className="rerank-movers-row tt-ii-mover-row">
-              <span className="rerank-movers-ticker">{r.ticker}</span>
-              <span className="rerank-movers-asset" title={r.sector ?? ''}>
-                {r.sector ?? '—'}
-              </span>
-              <span className="tt-price">{formatPrice(r.prev_close)}</span>
-              <span className="tt-range-chip">
-                {formatPrice(r.low_end)} – {formatPrice(r.top_end)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Column header row matches the data grid template below. */}
+          <div className="tt-mover-head tt-ii-mover-row" aria-hidden="true">
+            <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
+            <span className="tt-mover-head-cell">SECTOR</span>
+            <span className="tt-mover-head-cell">PREV CLOSE</span>
+            <span className="tt-mover-head-cell">RANGE</span>
+          </div>
+          <ul className="rerank-movers-list">
+            {rows.map((r) => (
+              <li key={r.ticker} className="rerank-movers-row tt-ii-mover-row">
+                <span className="rerank-movers-ticker">{r.ticker}</span>
+                <span className="rerank-movers-asset tt-mover-cell-c" title={r.sector ?? ''}>
+                  {r.sector ?? '—'}
+                </span>
+                <span className="tt-price tt-mover-cell-c">{formatPrice(r.prev_close)}</span>
+                <span className="tt-mover-cell-c">
+                  <span className="tt-range-chip">
+                    {formatPrice(r.low_end)} – {formatPrice(r.top_end)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )
