@@ -38,6 +38,7 @@ const TABS = [
   { id: 'macro-show', label: 'MACRO SHOW' },
   { id: 'signal-strength', label: 'SIGNAL STRENGTH' },
   { id: 'investing-ideas', label: 'INVESTING IDEAS' },
+  { id: 'momo', label: 'MOMO' },
 ]
 const N = TABS.length
 

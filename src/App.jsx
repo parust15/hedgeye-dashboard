@@ -7,6 +7,7 @@ import { EtfReRankPanel } from './components/EtfReRankPanel'
 import { MacroShowPanel } from './components/MacroShowPanel'
 import { SignalStrengthPanel } from './components/SignalStrengthPanel'
 import { InvestingIdeasPanel } from './components/InvestingIdeasPanel'
+import { MomoTrackerPanel } from './components/MomoTrackerPanel'
 import { TabBarPreview } from './components/preview/TabBarPreview'
 import { TickerDetailModal } from './components/TickerDetailModal'
 import { VixHeaderPill } from './components/VixBucketPill'
@@ -25,6 +26,7 @@ const VALID_TABS = [
   'macro-show',
   'signal-strength',
   'investing-ideas',
+  'momo',
 ]
 
 function loadInitialTab() {
@@ -153,6 +155,7 @@ export default function App() {
       {activeTab === 'macro-show' && <MacroShowPanel />}
       {activeTab === 'signal-strength' && <SignalStrengthPanel />}
       {activeTab === 'investing-ideas' && <InvestingIdeasPanel />}
+      {activeTab === 'momo' && <MomoTrackerPanel />}
       {modalPosition && (
         <TickerDetailModal position={modalPosition} onClose={closeModal} />
       )}

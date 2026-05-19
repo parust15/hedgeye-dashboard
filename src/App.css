@@ -6244,3 +6244,631 @@ body,
     opacity: 0.95;
   }
 }
+
+/* ===================================================================
+   MOMO TRACKER PANEL
+   Daily Hedgeye MOMO Tracker — 9-stock range cards + chart strip +
+   chart lightbox. Cards reuse the .card-bg chrome with a per-card
+   --card-tint; the headline ribbon uses the same chip grammar as
+   other panels (RR mover chips). The range bar is the marquee
+   element — marker position is the heart of the "instantly
+   readable proximity" promise from the spec.
+   =================================================================== */
+
+.momo-panel {
+  --card-tint: 156, 163, 175;  /* neutral default; cards override */
+}
+
+.momo-topbar {
+  align-items: flex-end;
+}
+
+.momo-header-eyebrow {
+  letter-spacing: 0.4px;
+  color: var(--text-strong);
+}
+
+.momo-header-date {
+  color: var(--text-dim);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.momo-feed-link {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid rgba(110, 168, 255, 0.35);
+  border-radius: var(--radius-pill);
+  background: rgba(110, 168, 255, 0.08);
+  white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.momo-feed-link:hover {
+  background: rgba(110, 168, 255, 0.16);
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+/* === OCR banner (rare — only when ocr_status != 'ok') === */
+.momo-ocr-banner {
+  margin: 4px 0 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius-badge);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+  color: var(--amber-light);
+  font-size: 12px;
+}
+
+/* === Headline ribbon (Mag7 + movers + earnings) === */
+.momo-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: rgba(20, 23, 31, 0.55);
+}
+
+.momo-chip-mag7 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.momo-chip-mag7.momo-pos {
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--bull-bg);
+}
+
+.momo-chip-mag7.momo-neg {
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--bear-bg);
+}
+
+.momo-movers {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.momo-chip-mover {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.momo-chip-mover strong {
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0;
+  color: var(--text-strong);
+}
+
+.momo-chip-mover .momo-chip-pct {
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.momo-chip-mover .momo-chip-bias {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.momo-chip-mover.momo-pos {
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--bull-bg);
+}
+
+.momo-chip-mover.momo-neg {
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--bear-bg);
+}
+
+.momo-chip-mover.momo-neutral {
+  color: var(--neutral);
+}
+
+.momo-earnings-ribbon {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+  color: var(--amber-light);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.momo-earnings-bolt {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.momo-earnings-label {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--amber-strong);
+}
+
+.momo-earnings-item strong {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0;
+}
+
+/* === Theme note (conditional, often null) === */
+.momo-theme {
+  margin: 4px 0 18px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: rgba(110, 168, 255, 0.05);
+  border-radius: 0 var(--radius-badge) var(--radius-badge) 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* === Empty state === */
+.momo-empty {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.momo-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 6px;
+}
+
+.momo-empty-sub {
+  font-size: 13px;
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+
+/* === 9-stock card grid === */
+.momo-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.momo-card {
+  position: relative;
+  border-radius: var(--radius-card);
+  padding: 14px 16px 16px;
+  isolation: isolate;
+  min-height: 138px;
+}
+
+.momo-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Top mover (biggest gainer) — green tint */
+.momo-card.momo-card-top {
+  --card-tint: 34, 197, 94;
+}
+
+/* Bottom mover (biggest loser) — red tint */
+.momo-card.momo-card-bottom {
+  --card-tint: 239, 68, 68;
+}
+
+.momo-card-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
+  border: 1px solid var(--border);
+}
+
+@keyframes momo-skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.momo-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.momo-card-ticker {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0.2px;
+}
+
+.momo-pct {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.momo-pos { color: var(--bull); }
+.momo-neg { color: var(--bear); }
+.momo-neutral { color: var(--neutral); }
+
+.momo-card-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.momo-card-price-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-dim);
+}
+
+.momo-card-price {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* === Range bar — the marquee feature === */
+.momo-range {
+  margin: 6px 0 10px;
+}
+
+.momo-range-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(239, 68, 68, 0.35) 0%,
+    rgba(156, 163, 175, 0.30) 50%,
+    rgba(34, 197, 94, 0.35) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.momo-range-track-dashed {
+  background: none;
+  border: 1px dashed var(--border);
+}
+
+.momo-range-marker {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-strong);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.momo-range-marker-broken {
+  background: var(--amber-light);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+.momo-range-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--amber-light);
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.6);
+  pointer-events: none;
+}
+
+.momo-range-arrow-left  { left: -4px; }
+.momo-range-arrow-right { right: -4px; }
+
+.momo-range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0;
+}
+
+/* === Card footer chips (bias + earnings this week) === */
+.momo-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.momo-bias {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.momo-bias.momo-pos {
+  color: var(--bull);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--bull-bg);
+}
+
+.momo-bias.momo-neg {
+  color: var(--bear);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--bear-bg);
+}
+
+.momo-bias.momo-neutral {
+  color: var(--neutral);
+}
+
+.momo-earnings-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--amber-light);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+}
+
+/* === Chart strip + thumbnails === */
+.momo-chart-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.momo-chart-thumb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-elev);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.momo-chart-thumb:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.momo-chart-thumb img {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  object-position: center top;
+  background: var(--bg-chart);
+}
+
+.momo-chart-thumb-label {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text);
+  text-align: left;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+}
+
+.momo-chart-thumb-skeleton {
+  height: 152px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
+}
+
+/* === Chart modal === */
+.momo-chart-backdrop {
+  cursor: zoom-out;
+}
+
+.momo-chart-modal {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  max-height: 92vh;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  overflow: hidden;
+}
+
+.momo-chart-modal-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-right: 40px;
+  margin-bottom: 14px;
+}
+
+.momo-chart-modal-head h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.momo-chart-modal-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(92vh - 80px);
+  object-fit: contain;
+  background: var(--bg-chart);
+  border-radius: var(--radius-badge);
+}
+
+/* === Skeleton ribbons for loading state === */
+.momo-skel-ribbon {
+  height: 44px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
+  margin-bottom: 14px;
+}
+
+.momo-skel-theme {
+  height: 60px;
+  border-radius: var(--radius-badge);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: momo-skel-shimmer 1.4s ease-in-out infinite;
+  margin-bottom: 18px;
+}
+
+/* === Author footer === */
+.momo-footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.momo-author-name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.momo-author-handle {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.momo-author-sep {
+  color: var(--border-strong);
+}
+
+/* === Mobile: drop backdrop blur on card chrome (perf), single-col
+       grid for charts, smaller card padding. === */
+@media (max-width: 640px) {
+  .momo-card .card-bg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    opacity: 0.95;
+  }
+  .momo-card-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .momo-chart-strip {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .momo-chart-thumb img {
+    height: 90px;
+  }
+  .momo-chart-modal {
+    padding: 14px;
+  }
+  .momo-feed-link {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .momo-header-date {
+    display: block;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+}
