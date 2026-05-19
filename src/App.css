@@ -6046,14 +6046,15 @@ body,
   letter-spacing: 0.8px;
 }
 
-/* Dual chip container for top-box rows + table cells. Stacks
-   vertically on narrow widths so neither chip wraps; side-by-side
-   when there's room. */
+/* Dual chip container for top-box rows. Chips sit side-by-side
+   horizontally — the chip text is short (TREND / TRADE) so the
+   pair fits in the bias cell at typical box widths. */
 .tt-bias-pair {
   display: inline-flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 
 /* Each table cell that hosts a single labeled chip — keep the chip
