@@ -176,7 +176,7 @@ function MoversStrip({ rows, proLookup, onSelect }) {
             {/* Column header row — shares the grid template with the
                 data rows below so each label sits dead-center over its
                 values. TICKER is left-aligned to match its data cell. */}
-            <div className="tt-mover-head" aria-hidden="true">
+            <div className="tt-mover-head rerank-movers-row" aria-hidden="true">
               <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
               <span className="tt-mover-head-cell">ASSET</span>
               <span className="tt-mover-head-cell">RANK</span>
@@ -219,7 +219,7 @@ function MoversStrip({ rows, proLookup, onSelect }) {
           <div className="rerank-movers-empty">No downward movers this week.</div>
         ) : (
           <>
-            <div className="tt-mover-head" aria-hidden="true">
+            <div className="tt-mover-head rerank-movers-row" aria-hidden="true">
               <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
               <span className="tt-mover-head-cell">ASSET</span>
               <span className="tt-mover-head-cell">RANK</span>
