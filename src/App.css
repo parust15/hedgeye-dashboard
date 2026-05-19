@@ -5773,15 +5773,15 @@ body,
    =================================================================== */
 
 /* --- Per-panel grid templates -------------------------------------- */
-/* Signal Strength: POS | TICKER | (blank flex) | DATE | DAYS | NEW
-   The blank cell preserves Re-Rank's ASSET CLASS rhythm — eye lands
-   on the date column at the same horizontal anchor as ETF Re-Rank's
-   ADDED column. */
+/* Signal Strength: POS | TICKER | PRICE | (blank flex) | DATE | DAYS | NEW
+   PRICE is Finnhub live (~50 of 72 populated, rest render "—"). The
+   blank cell preserves Re-Rank's ASSET CLASS rhythm. */
 .signal-strength-panel .rerank-list-head,
 .signal-strength-panel .rerank-row {
   grid-template-columns:
     64px                  /* pos        */
     minmax(86px, auto)    /* ticker     */
+    96px                  /* price      */
     minmax(40px, 1fr)     /* spacer     */
     140px                 /* date added */
     100px                 /* days       */
@@ -5802,17 +5802,22 @@ body,
     130px;                /* range bar    */
 }
 
-/* MOMO: TICKER | (blank flex) | PREV | LRR | TRR | RANGE | BIAS | EARN | 1W Δ */
+/* MOMO: TICKER | TREND | TRADE | (blank flex) | PREV | LRR | TRR | RANGE | EARN | 1W Δ
+   TREND + TRADE are intentionally two separate columns — the design
+   feature is that the user can see disagreement (MSFT today: TREND
+   BEARISH, TRADE BULLISH). Width 130px each is enough for the
+   labeled pill `TREND: BEARISH`. */
 .momo-panel.rerank-panel .rerank-list-head,
 .momo-panel.rerank-panel .rerank-row.tt-momo-row {
   grid-template-columns:
     minmax(80px, auto)    /* ticker     */
-    minmax(40px, 1fr)     /* spacer     */
+    130px                 /* trend      */
+    130px                 /* trade      */
+    minmax(20px, 1fr)     /* spacer     */
     96px                  /* prev close */
     80px                  /* LRR        */
     80px                  /* TRR        */
     130px                 /* range bar  */
-    96px                  /* bias       */
     110px                 /* earnings   */
     88px;                 /* 1W Δ       */
 }
@@ -6024,6 +6029,84 @@ body,
 }
 
 .tt-bias-cell { justify-self: start; }
+
+/* --- Labeled bias chip (TREND: BEARISH / TRADE: BULLISH) --------- */
+/* The prefix label is muted on the same pill background — the eye
+   reads the colored value first ("BEARISH"), then the label tells
+   you WHICH signal you're looking at. Used in MOMO to keep the
+   user from confusing the 3-month TREND view with the weekly TRADE
+   call (they can disagree). */
+.tt-bias-labeled {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  font-size: 10px;
+}
+
+.tt-bias-prefix {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  opacity: 0.65;
+  /* Keep prefix colour neutral so the value dominates visually. */
+  color: var(--text-dim);
+}
+
+.tt-bias-labeled.tt-bias-pos .tt-bias-prefix,
+.tt-bias-labeled.tt-bias-neg .tt-bias-prefix,
+.tt-bias-labeled.tt-bias-neutral .tt-bias-prefix {
+  /* Inherit the chip's value colour but at reduced opacity so the
+     label still reads as "label" not "shouty word". */
+  color: currentColor;
+  opacity: 0.55;
+}
+
+.tt-bias-value {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Dual chip container for top-box rows + table cells. Stacks
+   vertically on narrow widths so neither chip wraps; side-by-side
+   when there's room. */
+.tt-bias-pair {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+/* Each table cell that hosts a single labeled chip — keep the chip
+   left-aligned so it sits flush under its column header. */
+.tt-trend-cell,
+.tt-trade-cell {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.momo-panel.rerank-panel .rerank-list-head .tt-trend-head,
+.momo-panel.rerank-panel .rerank-list-head .tt-trade-head {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: left;
+}
+
+/* Mover chip TRADE: prefix — same muted treatment so the visual
+   grammar matches the table chips. */
+.tt-mover-bias-prefix {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  opacity: 0.65;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
 
 /* --- 1W Δ pill (MOMO) --------------------------------------------- */
 .tt-pct {
@@ -6475,9 +6558,17 @@ body,
 .tt-author-sep { color: var(--border-strong); }
 
 /* --- Top-box row tweaks for each panel ---------------------------- */
-/* Signal Strength: 4 cells (TICKER · blank · DATE · DAYS|NEW). */
+/* Signal Strength: 4 cells (TICKER · PRICE · DATE · DAYS|NEW). PRICE
+   replaces the blank-spacer cell used elsewhere — at top-box width
+   we can't afford an empty column, and the price is informative. */
 .signal-strength-panel .tt-ss-mover-row {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.tt-ss-mover-price {
+  font-size: 12px;
+  text-align: center;
+  min-width: 0;
 }
 
 /* Investing Ideas: 4 cells (TICKER · SECTOR · PREV · RANGE chip). */
@@ -6497,7 +6588,7 @@ body,
      ETF Re-Rank uses for its mobile collapse. */
   .signal-strength-panel .rerank-list-head,
   .signal-strength-panel .rerank-row {
-    grid-template-columns: 48px minmax(64px, auto) 1fr 70px 70px;
+    grid-template-columns: 48px minmax(64px, auto) 80px 1fr 70px 70px;
   }
   .signal-strength-panel .rerank-asset,
   .signal-strength-panel .rerank-list-head .rerank-asset {
@@ -6521,9 +6612,11 @@ body,
   .momo-panel.rerank-panel .rerank-list-head .rerank-asset,
   .momo-panel.rerank-panel .tt-price:nth-of-type(2),
   .momo-panel.rerank-panel .tt-price:nth-of-type(3),
-  .momo-panel.rerank-panel .tt-bias-cell,
+  .momo-panel.rerank-panel .tt-trend-cell,
+  .momo-panel.rerank-panel .tt-trade-cell,
   .momo-panel.rerank-panel .tt-earn-cell,
-  .momo-panel.rerank-panel .rerank-list-head .tt-bias-head,
+  .momo-panel.rerank-panel .rerank-list-head .tt-trend-head,
+  .momo-panel.rerank-panel .rerank-list-head .tt-trade-head,
   .momo-panel.rerank-panel .rerank-list-head .tt-earn-head {
     display: none;
   }

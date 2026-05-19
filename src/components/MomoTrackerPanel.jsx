@@ -16,12 +16,15 @@ const SEARCH_KEY = 'dashboard.momoSearch'
 
 // 5 best per user direction. 1W Δ matches the view's natural order
 // (DESC NULLS LAST), so it's the default.
+// "Trend" sort uses `trend_bias` (the 3-month RR signal, populated
+// for all 9 MOMO stocks). `trade_bias` would be a worse sort key —
+// it's null on most rows since Drake only tags a few movers per email.
 const MOMO_SORT_FIELDS = [
   { value: 'pct_1w', label: '1W Δ', defaultDir: 'desc' },
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
   { value: 'dist_low', label: 'Closest to LRR', defaultDir: 'asc' },
   { value: 'dist_high', label: 'Closest to TRR', defaultDir: 'asc' },
-  { value: 'bias', label: 'Bias', defaultDir: 'desc' },
+  { value: 'trend', label: 'Trend', defaultDir: 'desc' },
 ]
 const MOMO_SORT_VALUES = new Set(MOMO_SORT_FIELDS.map((f) => f.value))
 
@@ -168,13 +171,45 @@ function Mag7Chip({ pct }) {
   )
 }
 
-function BiasChip({ bias }) {
+// TREND vs TRADE chip. These are intentionally rendered as two
+// separate pills (with explicit `TREND:` / `TRADE:` prefix labels)
+// so the user always knows which signal is which — never collapsed
+// into a single ambiguous "BIAS" chip. Examples on 2026-05-18 where
+// they disagree: MSFT (TREND BEARISH / TRADE BULLISH) and TSLA
+// (TREND BULLISH / TRADE BEARISH).
+//
+// kind: 'trend' | 'trade'
+// bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null
+function BiasChip({ kind, bias }) {
   if (!bias) return null
   const b = bias.toUpperCase()
-  const cls = b === 'BULLISH' ? 'tt-bias tt-bias-pos'
-    : b === 'BEARISH' ? 'tt-bias tt-bias-neg'
-    : 'tt-bias tt-bias-neutral'
-  return <span className={cls}>{b}</span>
+  const tone = b === 'BULLISH' ? 'tt-bias-pos'
+    : b === 'BEARISH' ? 'tt-bias-neg'
+    : 'tt-bias-neutral'
+  const label = kind === 'trend' ? 'TREND' : 'TRADE'
+  return (
+    <span className={`tt-bias tt-bias-labeled ${tone}`}>
+      <span className="tt-bias-prefix">{label}:</span>
+      <span className="tt-bias-value">{b}</span>
+    </span>
+  )
+}
+
+// Convenience wrappers for clarity at call sites.
+function TrendChip({ bias }) { return <BiasChip kind="trend" bias={bias} /> }
+function TradeChip({ bias }) { return <BiasChip kind="trade" bias={bias} /> }
+
+// Container for the dual chips inside a top-box row or table cell.
+// Stacks vertically on narrow widths, side-by-side otherwise. Empty
+// (renders nothing) when both chips are null.
+function BiasPair({ trend, trade }) {
+  if (!trend && !trade) return null
+  return (
+    <span className="tt-bias-pair">
+      <TrendChip bias={trend} />
+      <TradeChip bias={trade} />
+    </span>
+  )
 }
 
 function PctChip({ pct }) {
@@ -198,6 +233,11 @@ function EarningsCell({ row }) {
 
 // === Headline ribbon ==================================================
 
+// Headline mover chip — these come from `headline_movers` jsonb on the
+// MOMO subject, which is the TRADE call (Christian Drake's weekly tag).
+// The `TRADE:` prefix is explicit so the user reads it correctly even
+// if the same ticker carries a different TREND (3-month RR) view in
+// the table below.
 function MoverChip({ mover }) {
   const bias = (mover.bias || '').toUpperCase()
   const cls = bias === 'BULLISH' ? 'tt-mover tt-mover-pos'
@@ -208,7 +248,11 @@ function MoverChip({ mover }) {
     <span className={cls}>
       <strong>{mover.ticker}</strong>
       {pctTxt && <span className="tt-mover-pct">{pctTxt}</span>}
-      {bias && <span className="tt-mover-bias">{bias}</span>}
+      {bias && (
+        <span className="tt-mover-bias">
+          <span className="tt-mover-bias-prefix">TRADE:</span> {bias}
+        </span>
+      )}
     </span>
   )
 }
@@ -258,7 +302,7 @@ function GainersLosersBox({ title, tone, rows, isLoser }) {
             <li key={r.ticker} className="rerank-movers-row tt-momo-mover-row">
               <span className="rerank-movers-ticker">{r.ticker}</span>
               <span className="rerank-movers-asset tt-mover-bias-cell">
-                <BiasChip bias={r.bias} />
+                <BiasPair trend={r.trend_bias} trade={r.trade_bias} />
               </span>
               <span className="tt-price">{formatPrice(r.prev_close)}</span>
               <span
@@ -295,6 +339,13 @@ function MomoRow({ row }) {
     <li className={`rerank-row tt-momo-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-ticker">{row.ticker}</span>
+      {/* TREND + TRADE rendered as separate cells so each can sit
+          under its own header label. Either may be empty/null —
+          empty cells render nothing rather than a "—" placeholder
+          so the eye reads "this signal isn't tagged" not "we tried
+          and got nothing." */}
+      <span className="tt-trend-cell"><TrendChip bias={row.trend_bias} /></span>
+      <span className="tt-trade-cell"><TradeChip bias={row.trade_bias} /></span>
       <span className="rerank-asset" aria-hidden="true" />
       <span className="tt-price">{formatPrice(row.prev_close)}</span>
       <span className="tt-price tt-price-dim">{formatPrice(row.low_end)}</span>
@@ -305,7 +356,6 @@ function MomoRow({ row }) {
         topEnd={row.top_end}
         ariaLabel={`${row.ticker} range`}
       />
-      <span className="tt-bias-cell"><BiasChip bias={row.bias} /></span>
       <span className="tt-earn-cell"><EarningsCell row={row} /></span>
       <PctChip pct={row.pct_change_1w} />
     </li>
@@ -443,9 +493,9 @@ export function MomoTrackerPanel() {
           )
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
-        case 'bias': {
-          const ra = BIAS_RANK[(a.bias ?? '').toUpperCase()] ?? -1
-          const rb = BIAS_RANK[(b.bias ?? '').toUpperCase()] ?? -1
+        case 'trend': {
+          const ra = BIAS_RANK[(a.trend_bias ?? '').toUpperCase()] ?? -1
+          const rb = BIAS_RANK[(b.trend_bias ?? '').toUpperCase()] ?? -1
           cmp = sortDir === 'asc' ? ra - rb : rb - ra
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
@@ -552,12 +602,13 @@ export function MomoTrackerPanel() {
 
           <div className="rerank-list-head tt-momo-row" aria-hidden="true">
             <span className="rerank-ticker">TICKER</span>
+            <span className="tt-trend-head">TREND</span>
+            <span className="tt-trade-head">TRADE</span>
             <span className="rerank-asset" />
             <span className="tt-price">PREV CLOSE</span>
             <span className="tt-price">LRR</span>
             <span className="tt-price">TRR</span>
             <span className="tt-range-head">RANGE</span>
-            <span className="tt-bias-head">BIAS</span>
             <span className="tt-earn-head">EARNINGS</span>
             <span className="tt-pct-head">1W Δ</span>
           </div>

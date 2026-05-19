@@ -39,8 +39,20 @@ export function useMomoTracker() {
         .select(
           'message_id, publish_at, subject, mag7_pct, headline_movers, ' +
             'earnings_catalysts, theme_note, authors, chart_image_urls, ' +
-            'feed_item_url, ocr_status, ticker, pct_change_1w, bias, ' +
-            'prev_close, low_end, top_end, earnings_this_week, earnings_day'
+            'feed_item_url, ocr_status, ticker, pct_change_1w, ' +
+            // TREND = Hedgeye's 3-month directional view from RR signals.
+            // TRADE = Christian Drake's weekly subject-line call. They can
+            // disagree (e.g. MSFT today: TREND BEARISH, TRADE BULLISH) and
+            // the UI must render both — never collapse into a single chip.
+            'trade_bias, trend_bias, ' +
+            // MOMO chart values (what's drawn on the daily quickread).
+            'prev_close, low_end, top_end, ' +
+            // Official Hedgeye RR values for the same tickers — may differ
+            // slightly from MOMO chart values (rounding / publish lag).
+            'rr_prev_close, buy_trade, sell_trade, ' +
+            // Finnhub live price (intraday). Null on weekends/closed market.
+            'current_price, current_change_pct, price_quoted_at, ' +
+            'earnings_this_week, earnings_day'
         )
         .order('pct_change_1w', { ascending: false, nullsFirst: false })
 
@@ -81,10 +93,17 @@ export function useMomoTracker() {
         data.map((r) => ({
           ticker: r.ticker,
           pct_change_1w: r.pct_change_1w,
-          bias: r.bias,
+          trade_bias: r.trade_bias,
+          trend_bias: r.trend_bias,
           prev_close: r.prev_close,
           low_end: r.low_end,
           top_end: r.top_end,
+          rr_prev_close: r.rr_prev_close,
+          buy_trade: r.buy_trade,
+          sell_trade: r.sell_trade,
+          current_price: r.current_price,
+          current_change_pct: r.current_change_pct,
+          price_quoted_at: r.price_quoted_at,
           earnings_this_week: r.earnings_this_week,
           earnings_day: r.earnings_day,
         }))

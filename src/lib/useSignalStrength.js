@@ -32,9 +32,14 @@ export function useSignalStrength() {
 
       // Explicit ORDER BY mirrors the view's natural order, so any
       // future change to row-storage order doesn't shift the UI.
+      // current_price / change_pct / price_quoted_at come from Finnhub;
+      // ~22 of 72 are null (foreign/OTC names off the free tier).
       const res = await supabase
         .from('hedgeye_signal_strength_current_v')
-        .select('ticker, date_added_to_list, position, added_in_latest_email, snapshot_at')
+        .select(
+          'ticker, date_added_to_list, position, added_in_latest_email, snapshot_at, ' +
+            'current_price, change_pct, price_quoted_at'
+        )
         .order('date_added_to_list', { ascending: true })
         .order('position', { ascending: true })
         .order('ticker', { ascending: true })

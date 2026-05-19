@@ -3,6 +3,7 @@ import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
+import { formatPrice } from '../lib/format'
 
 const SKELETON_ROWS = 20
 
@@ -97,10 +98,14 @@ function TopBox({ title, tone, rows }) {
           {rows.map((r) => {
             const { dateLabel, days } = parseAdded(r.date_added_to_list)
             const isNew = tone === 'bottom' && r.added_in_latest_email === true
+            // Price comes from Finnhub; ~22 of 72 tickers (foreign/OTC
+            // names off the free tier) render as "—". Spec is explicit
+            // about no asterisk / explanation — just the dash.
+            const priceTxt = r.current_price == null ? '—' : formatPrice(r.current_price)
             return (
               <li key={r.ticker} className="rerank-movers-row tt-ss-mover-row">
                 <span className="rerank-movers-ticker">{r.ticker}</span>
-                <span className="rerank-movers-asset" />
+                <span className="tt-price tt-ss-mover-price">{priceTxt}</span>
                 <span className="tt-date">{dateLabel ?? '—'}</span>
                 {isNew ? (
                   <span className="tt-newchip" aria-label="Added in latest email">NEW</span>
@@ -124,11 +129,13 @@ function SignalRow({ row, pos }) {
   // (per spec: "no red rows"). We intentionally don't use rerank-row-down
   // anywhere here — direction has no meaning in this dataset.
   const tintClass = isNew ? 'rerank-row-up' : 'rerank-row-neutral'
+  const priceTxt = row.current_price == null ? '—' : formatPrice(row.current_price)
   return (
     <li className={`rerank-row tt-ss-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-rank">{pos}</span>
       <span className="rerank-ticker">{row.ticker}</span>
+      <span className="tt-price">{priceTxt}</span>
       <span className="rerank-asset" aria-hidden="true" />
       <span className="tt-date">{dateLabel ?? '—'}</span>
       <span className="tt-days">{days != null ? `${days}d` : '—'}</span>
@@ -293,6 +300,7 @@ export function SignalStrengthPanel() {
           <div className="rerank-list-head tt-ss-row" aria-hidden="true">
             <span className="rerank-rank">POS</span>
             <span className="rerank-ticker">TICKER</span>
+            <span className="tt-price">PRICE</span>
             <span className="rerank-asset" />
             <span className="tt-date">DATE ADDED</span>
             <span className="tt-days">DAYS ON LIST</span>
