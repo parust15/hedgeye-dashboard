@@ -1,10 +1,79 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { StatusChip } from './StatusChip'
+import { SortControl } from './SortControl'
+import { TickerSearch } from './TickerSearch'
 import { formatPrice } from '../lib/format'
 
 const SKELETON_ROWS = 12
+
+const SORT_FIELD_KEY = 'dashboard.iiSortField'
+const SORT_DIR_KEY = 'dashboard.iiSortDir'
+const SEARCH_KEY = 'dashboard.iiSearch'
+
+// 5 best per user direction. "side_pos" is the natural longs-then-shorts
+// order (long L=0 / short L=1, then position ASC within each side) —
+// the publishing convention from Hedgeye.
+const II_SORT_FIELDS = [
+  { value: 'side_pos', label: 'Side & position', defaultDir: 'asc' },
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'sector', label: 'Sector', defaultDir: 'asc' },
+  { value: 'dist_low', label: 'Closest to LRR', defaultDir: 'asc' },
+  { value: 'dist_high', label: 'Closest to TRR', defaultDir: 'asc' },
+]
+const II_SORT_VALUES = new Set(II_SORT_FIELDS.map((f) => f.value))
+
+function loadInitialSortField() {
+  try {
+    const raw = localStorage.getItem(SORT_FIELD_KEY)
+    if (raw && II_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read iiSortField from localStorage:', err)
+  }
+  return 'side_pos'
+}
+
+function loadInitialSortDir() {
+  try {
+    const raw = localStorage.getItem(SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read iiSortDir from localStorage:', err)
+  }
+  return 'asc'
+}
+
+function loadInitialSearch() {
+  try {
+    return localStorage.getItem(SEARCH_KEY) ?? ''
+  } catch (err) {
+    console.warn('Failed to read iiSearch from localStorage:', err)
+    return ''
+  }
+}
+
+// Position-in-range pct (0 = at low_end, 1 = at top_end). Null when
+// any input is missing or the span is zero. Guards Number(null)===0.
+function priceInRangePct(row) {
+  if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
+  const px = Number(row.prev_close)
+  const lo = Number(row.low_end)
+  const hi = Number(row.top_end)
+  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
+  const span = hi - lo
+  if (span === 0) return null
+  return (px - lo) / span
+}
+
+function numCmp(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
+}
 
 // "May 18, 2026" — used in the header chip + section labels.
 function formatLong(iso) {
@@ -205,9 +274,35 @@ export function InvestingIdeasPanel() {
   const { longs, shorts, meta, status } = useInvestingIdeas()
   const [openTicker, setOpenTicker] = useState(null)
 
-  // Top-box rows: first 5 of each side. Shorts list may be shorter than
-  // 5 in real data (May 18 has 7, but the spec calls for graceful empty
-  // bottom rows so we just truncate).
+  const [sortField, setSortField] = useState(loadInitialSortField)
+  const [sortDir, setSortDir] = useState(loadInitialSortDir)
+  const [search, setSearch] = useState(loadInitialSearch)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_FIELD_KEY, sortField)
+      localStorage.setItem(SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist iiSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEARCH_KEY, search)
+    } catch (err) {
+      console.warn('Failed to persist iiSearch to localStorage:', err)
+    }
+  }, [search])
+
+  function handleSortChange(field, dir) {
+    setSortField(field)
+    setSortDir(dir)
+  }
+
+  // Top-box rows: first 5 of each side. Anchored to natural order
+  // regardless of sort/search — these are the "5 LONGS / 5 SHORTS"
+  // reference list, not "5 longs in current view".
   const { topLongs, topShorts } = useMemo(
     () => ({
       topLongs: longs.slice(0, 5),
@@ -219,6 +314,65 @@ export function InvestingIdeasPanel() {
   // Full list: longs first, then shorts. Both arrays are already
   // position-ASC sorted by the hook.
   const allRows = useMemo(() => [...longs, ...shorts], [longs, shorts])
+
+  // Filter then sort.
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = q
+      ? allRows.filter((r) => {
+          if (r.ticker?.toLowerCase().includes(q)) return true
+          if (r.sector?.toLowerCase().includes(q)) return true
+          return false
+        })
+      : allRows
+    const sorted = list.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+    sorted.sort((a, b) => {
+      let cmp
+      switch (sortField) {
+        case 'side_pos': {
+          // Long (0) < Short (1) so longs render first in asc.
+          const sa = a.side === 'long' ? 0 : 1
+          const sb = b.side === 'long' ? 0 : 1
+          if (sa !== sb) return sortDir === 'asc' ? sa - sb : sb - sa
+          cmp = (a.position ?? 0) - (b.position ?? 0)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'sector': {
+          const sa = (a.sector ?? '').toLowerCase()
+          const sb = (b.sector ?? '').toLowerCase()
+          if (!sa && !sb) return tieBreak(a, b)
+          if (!sa) return 1
+          if (!sb) return -1
+          cmp = sa.localeCompare(sb)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'dist_low':
+          // Distance to LRR = position pct (0 = at LRR). Smaller = closer.
+          cmp = numCmp(priceInRangePct(a), priceInRangePct(b), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'dist_high': {
+          // Distance to TRR = 1 - position pct. Smaller = closer to TRR.
+          const pa = priceInRangePct(a)
+          const pb = priceInRangePct(b)
+          cmp = numCmp(
+            pa == null ? null : 1 - pa,
+            pb == null ? null : 1 - pb,
+            sortDir
+          )
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return sorted
+  }, [allRows, search, sortField, sortDir])
 
   function toggleOpen(ticker) {
     setOpenTicker((curr) => (curr === ticker ? null : ticker))
@@ -246,15 +400,31 @@ export function InvestingIdeasPanel() {
             {status === 'error' && <StatusChip value="error" dot={false} />}
           </div>
         </div>
-        {status === 'ready' && meta?.feedItemUrl && (
-          <a
-            href={meta.feedItemUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tt-feed-link"
-          >
-            view on Hedgeye →
-          </a>
+        {status === 'ready' && (
+          <div className="tt-controls">
+            <TickerSearch
+              value={search}
+              onChange={setSearch}
+              ariaLabel="Search Investing Ideas tickers"
+            />
+            <SortControl
+              fields={II_SORT_FIELDS}
+              field={sortField}
+              dir={sortDir}
+              onChange={handleSortChange}
+              ariaLabel="Investing Ideas sort"
+            />
+            {meta?.feedItemUrl && (
+              <a
+                href={meta.feedItemUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tt-feed-link"
+              >
+                view on Hedgeye →
+              </a>
+            )}
+          </div>
         )}
       </header>
 
@@ -289,7 +459,7 @@ export function InvestingIdeasPanel() {
           </div>
 
           <ol className="rerank-list">
-            {allRows.map((r) => (
+            {visibleRows.map((r) => (
               <IdeaRow
                 key={`${r.side}-${r.position}-${r.ticker}`}
                 row={r}
@@ -298,6 +468,11 @@ export function InvestingIdeasPanel() {
               />
             ))}
           </ol>
+          {visibleRows.length === 0 && search.trim() && (
+            <div className="state">
+              No tickers match &quot;{search.trim()}&quot;.
+            </div>
+          )}
         </>
       )}
     </div>

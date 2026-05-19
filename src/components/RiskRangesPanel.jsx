@@ -34,23 +34,15 @@ const VALID_TRENDS = ['ALL', 'BULLISH', 'BEARISH', 'NEUTRAL']
 const RR_SORT_FIELDS = [
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
   { value: 'trend', label: 'Trend', defaultDir: 'desc' },
-  { value: 'range_state', label: 'Range state', defaultDir: 'desc' },
   { value: 'range_width', label: 'Range width %', defaultDir: 'desc' },
-  { value: 'buy', label: 'BUY level', defaultDir: 'asc' },
-  { value: 'sell', label: 'SELL level', defaultDir: 'asc' },
-  { value: 'prev_close', label: 'Prev close', defaultDir: 'asc' },
-  { value: 'dist_buy', label: 'Distance to BUY', defaultDir: 'asc' },
-  { value: 'dist_sell', label: 'Distance to SELL', defaultDir: 'asc' },
-  { value: 'flipped', label: 'Flipped today', defaultDir: 'desc' },
+  { value: 'dist_buy', label: 'Closest to BUY', defaultDir: 'asc' },
+  { value: 'dist_sell', label: 'Closest to SELL', defaultDir: 'asc' },
 ]
 const RR_SORT_VALUES = new Set(RR_SORT_FIELDS.map((f) => f.value))
 
 // BULLISH > NEUTRAL > BEARISH. Higher = "more bullish" so desc shows
 // bullish first; asc reverses.
 const TREND_RANK = { BULLISH: 2, NEUTRAL: 1, BEARISH: 0 }
-
-// HH/HL = strongest, LH/LL = weakest. Anything else (incl. "unchanged") sinks.
-const RANGE_STATE_RANK = { 'HH/HL': 4, 'HH/LL': 3, 'LH/HL': 2, 'LH/LL': 1 }
 
 function loadInitialRrSortField() {
   try {
@@ -386,23 +378,8 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
           cmp = sortDir === 'asc' ? ra - rb : rb - ra
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
-        case 'range_state': {
-          const ra = RANGE_STATE_RANK[a.range_state] ?? 0
-          const rb = RANGE_STATE_RANK[b.range_state] ?? 0
-          cmp = sortDir === 'asc' ? ra - rb : rb - ra
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        }
         case 'range_width':
           cmp = numCmp(rangeWidthPct(a), rangeWidthPct(b), sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        case 'buy':
-          cmp = numCmp(Number(a.buy_trade), Number(b.buy_trade), sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        case 'sell':
-          cmp = numCmp(Number(a.sell_trade), Number(b.sell_trade), sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        case 'prev_close':
-          cmp = numCmp(Number(a.prev_close), Number(b.prev_close), sortDir)
           return cmp !== 0 ? cmp : tieBreak(a, b)
         case 'dist_buy': {
           // Distance to BUY = effective pct (0 = at BUY, 1 = at SELL).
@@ -421,18 +398,12 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
           cmp = numCmp(da, db, sortDir)
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
-        case 'flipped': {
-          const fa = changes[a.ticker] ? 1 : 0
-          const fb = changes[b.ticker] ? 1 : 0
-          cmp = sortDir === 'asc' ? fa - fb : fb - fa
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        }
         default:
           return tieBreak(a, b)
       }
     })
     return list
-  }, [visibleCards, sortField, sortDir, displays, changes])
+  }, [visibleCards, sortField, sortDir, displays])
 
   function toggleExpand(ticker) {
     setExpanded((cur) => (cur === ticker ? null : ticker))

@@ -2,11 +2,80 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMomoTracker } from '../lib/useMomoTracker'
 import { StatusChip } from './StatusChip'
+import { SortControl } from './SortControl'
+import { TickerSearch } from './TickerSearch'
 import { MiniRangeBar } from './InvestingIdeasPanel'
 import { formatPrice } from '../lib/format'
 
 const SKELETON_ROWS = 9
 const MAX_CHARTS = 8
+
+const SORT_FIELD_KEY = 'dashboard.momoSortField'
+const SORT_DIR_KEY = 'dashboard.momoSortDir'
+const SEARCH_KEY = 'dashboard.momoSearch'
+
+// 5 best per user direction. 1W Δ matches the view's natural order
+// (DESC NULLS LAST), so it's the default.
+const MOMO_SORT_FIELDS = [
+  { value: 'pct_1w', label: '1W Δ', defaultDir: 'desc' },
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'dist_low', label: 'Closest to LRR', defaultDir: 'asc' },
+  { value: 'dist_high', label: 'Closest to TRR', defaultDir: 'asc' },
+  { value: 'bias', label: 'Bias', defaultDir: 'desc' },
+]
+const MOMO_SORT_VALUES = new Set(MOMO_SORT_FIELDS.map((f) => f.value))
+
+// BULLISH > NEUTRAL > BEARISH so desc surfaces bullish first.
+const BIAS_RANK = { BULLISH: 2, NEUTRAL: 1, BEARISH: 0 }
+
+function loadInitialSortField() {
+  try {
+    const raw = localStorage.getItem(SORT_FIELD_KEY)
+    if (raw && MOMO_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read momoSortField from localStorage:', err)
+  }
+  return 'pct_1w'
+}
+
+function loadInitialSortDir() {
+  try {
+    const raw = localStorage.getItem(SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read momoSortDir from localStorage:', err)
+  }
+  return 'desc'
+}
+
+function loadInitialSearch() {
+  try {
+    return localStorage.getItem(SEARCH_KEY) ?? ''
+  } catch (err) {
+    console.warn('Failed to read momoSearch from localStorage:', err)
+    return ''
+  }
+}
+
+function priceInRangePct(row) {
+  if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
+  const px = Number(row.prev_close)
+  const lo = Number(row.low_end)
+  const hi = Number(row.top_end)
+  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
+  const span = hi - lo
+  if (span === 0) return null
+  return (px - lo) / span
+}
+
+function numCmp(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
+}
 
 // "May 18, 2026 · 8:15 am" — header date chip format.
 function formatHeader(iso) {
@@ -315,10 +384,77 @@ export function MomoTrackerPanel() {
   const { meta, stocks, status } = useMomoTracker()
   const [chartOpen, setChartOpen] = useState(null)
 
+  const [sortField, setSortField] = useState(loadInitialSortField)
+  const [sortDir, setSortDir] = useState(loadInitialSortDir)
+  const [search, setSearch] = useState(loadInitialSearch)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_FIELD_KEY, sortField)
+      localStorage.setItem(SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist momoSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEARCH_KEY, search)
+    } catch (err) {
+      console.warn('Failed to persist momoSearch to localStorage:', err)
+    }
+  }, [search])
+
+  function handleSortChange(field, dir) {
+    setSortField(field)
+    setSortDir(dir)
+  }
+
   const chartEntries = useMemo(
     () => (meta ? orderedCharts(meta.chartImageUrls) : []),
     [meta]
   )
+
+  // Filter then sort for the main 9-row table.
+  const visibleStocks = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = q ? stocks.filter((r) => r.ticker?.toLowerCase().includes(q)) : stocks
+    const sorted = list.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+    sorted.sort((a, b) => {
+      let cmp
+      switch (sortField) {
+        case 'pct_1w':
+          cmp = numCmp(Number(a.pct_change_1w), Number(b.pct_change_1w), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'dist_low':
+          cmp = numCmp(priceInRangePct(a), priceInRangePct(b), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'dist_high': {
+          const pa = priceInRangePct(a)
+          const pb = priceInRangePct(b)
+          cmp = numCmp(
+            pa == null ? null : 1 - pa,
+            pb == null ? null : 1 - pb,
+            sortDir
+          )
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'bias': {
+          const ra = BIAS_RANK[(a.bias ?? '').toUpperCase()] ?? -1
+          const rb = BIAS_RANK[(b.bias ?? '').toUpperCase()] ?? -1
+          cmp = sortDir === 'asc' ? ra - rb : rb - ra
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return sorted
+  }, [stocks, search, sortField, sortDir])
 
   // TOP GAINERS = first 5 rows of view (DESC by pct_change_1w),
   // filtered to strictly-positive values (so a flat market doesn't list
@@ -361,15 +497,31 @@ export function MomoTrackerPanel() {
             {status === 'error' && <StatusChip value="error" dot={false} />}
           </div>
         </div>
-        {status === 'ready' && meta?.feedItemUrl && (
-          <a
-            href={meta.feedItemUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tt-feed-link"
-          >
-            view on Hedgeye →
-          </a>
+        {status === 'ready' && (
+          <div className="tt-controls">
+            <TickerSearch
+              value={search}
+              onChange={setSearch}
+              ariaLabel="Search MOMO tickers"
+            />
+            <SortControl
+              fields={MOMO_SORT_FIELDS}
+              field={sortField}
+              dir={sortDir}
+              onChange={handleSortChange}
+              ariaLabel="MOMO sort"
+            />
+            {meta?.feedItemUrl && (
+              <a
+                href={meta.feedItemUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tt-feed-link"
+              >
+                view on Hedgeye →
+              </a>
+            )}
+          </div>
         )}
       </header>
 
@@ -411,10 +563,15 @@ export function MomoTrackerPanel() {
           </div>
 
           <ol className="rerank-list">
-            {stocks.map((r) => (
+            {visibleStocks.map((r) => (
               <MomoRow key={r.ticker} row={r} />
             ))}
           </ol>
+          {visibleStocks.length === 0 && search.trim() && (
+            <div className="state">
+              No tickers match &quot;{search.trim()}&quot;.
+            </div>
+          )}
 
           {chartEntries.length > 0 && (
             <section className="tt-chart-strip" aria-label="Tracker charts">

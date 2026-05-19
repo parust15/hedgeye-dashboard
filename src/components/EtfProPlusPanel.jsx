@@ -27,15 +27,16 @@ const DIRECTION_FILTERS = [
 ]
 
 // --- Sort fields (mirrors RR's SortControl contract) ----------------------
+// Trimmed to 5 best per user direction. Dropped: "Recent price"
+// (rarely the deciding axis), "Range width %" (the LRR/TRR proximity
+// sorts already surface the actionable extreme), "Date added" (Re-Rank
+// carries that signal better).
 const ETF_SORT_FIELDS = [
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
   { value: 'direction', label: 'Direction', defaultDir: 'desc' },
   { value: 'asset_class', label: 'Asset class', defaultDir: 'asc' },
-  { value: 'price', label: 'Recent price', defaultDir: 'asc' },
-  { value: 'range_width', label: 'Range width %', defaultDir: 'desc' },
-  { value: 'dist_low', label: 'Distance to LRR', defaultDir: 'asc' },
-  { value: 'dist_high', label: 'Distance to TRR', defaultDir: 'asc' },
-  { value: 'date_added', label: 'Date added', defaultDir: 'desc' },
+  { value: 'dist_low', label: 'Closest to LRR', defaultDir: 'asc' },
+  { value: 'dist_high', label: 'Closest to TRR', defaultDir: 'asc' },
 ]
 const ETF_SORT_VALUES = new Set(ETF_SORT_FIELDS.map((f) => f.value))
 
@@ -143,22 +144,6 @@ function toSignalRow(etf) {
     signal_date: etf.snapshot_date,
     _etf: etf,
   }
-}
-
-// Range width % — derived the same way as RR's `rangeWidthPct`. Guards
-// against the Number(null) === 0 footgun called out in CLAUDE.md.
-function rangeWidthPct(row) {
-  const buy = row.buy_trade
-  const sell = row.sell_trade
-  const close = row.prev_close
-  if (buy == null || sell == null || close == null) return null
-  const b = Number(buy)
-  const s = Number(sell)
-  const c = Number(close)
-  if (!Number.isFinite(b) || !Number.isFinite(s) || !Number.isFinite(c) || c === 0) {
-    return null
-  }
-  return ((s - b) / c) * 100
 }
 
 // Position-in-range pct for distance-to-LRR / distance-to-TRR sorts.
@@ -371,12 +356,6 @@ export function EtfProPlusPanel() {
           if (sortDir === 'desc') cmp = -cmp
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
-        case 'price':
-          cmp = numCmp(Number(a.prev_close), Number(b.prev_close), sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        case 'range_width':
-          cmp = numCmp(rangeWidthPct(a), rangeWidthPct(b), sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
         case 'dist_low': {
           // Distance to LRR = position pct (0 = at LRR). Smaller = closer.
           cmp = numCmp(priceInRangePct(a), priceInRangePct(b), sortDir)
@@ -391,17 +370,6 @@ export function EtfProPlusPanel() {
             pb == null ? null : 1 - pb,
             sortDir
           )
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        }
-        case 'date_added': {
-          const da = a._etf?.date_added ?? null
-          const db = b._etf?.date_added ?? null
-          // Empty strings sink in both directions.
-          if (!da && !db) return tieBreak(a, b)
-          if (!da) return 1
-          if (!db) return -1
-          cmp = da < db ? -1 : da > db ? 1 : 0
-          if (sortDir === 'desc') cmp = -cmp
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
         default:

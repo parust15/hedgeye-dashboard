@@ -1,12 +1,71 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useEtfReRank } from '../lib/useEtfReRank'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { shortenAssetClass } from '../lib/assetClass'
 import { StatusChip } from './StatusChip'
 import { EtfInfoModal } from './EtfInfoModal'
+import { SortControl } from './SortControl'
+import { TickerSearch } from './TickerSearch'
 
 const MOVERS_LIMIT = 5
 const SKELETON_ROWS = 20
+
+// localStorage namespace per CLAUDE.md convention.
+const SORT_FIELD_KEY = 'dashboard.rerankSortField'
+const SORT_DIR_KEY = 'dashboard.rerankSortDir'
+const SEARCH_KEY = 'dashboard.rerankSearch'
+
+// Best 5 sort options per user direction. Rank is the natural view
+// order — kept as default. Asset class needs the proLookup join (the
+// re-rank view doesn't carry it native), but that join is already
+// computed below for the row chrome.
+const RERANK_SORT_FIELDS = [
+  { value: 'rank', label: 'Rank', defaultDir: 'asc' },
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'delta_1w', label: '1W Δ', defaultDir: 'desc' },
+  { value: 'delta_1m', label: '1M Δ', defaultDir: 'desc' },
+  { value: 'asset_class', label: 'Asset class', defaultDir: 'asc' },
+]
+const RERANK_SORT_VALUES = new Set(RERANK_SORT_FIELDS.map((f) => f.value))
+
+function loadInitialSortField() {
+  try {
+    const raw = localStorage.getItem(SORT_FIELD_KEY)
+    if (raw && RERANK_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read rerankSortField from localStorage:', err)
+  }
+  return 'rank'
+}
+
+function loadInitialSortDir() {
+  try {
+    const raw = localStorage.getItem(SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read rerankSortDir from localStorage:', err)
+  }
+  return 'asc'
+}
+
+function loadInitialSearch() {
+  try {
+    return localStorage.getItem(SEARCH_KEY) ?? ''
+  } catch (err) {
+    console.warn('Failed to read rerankSearch from localStorage:', err)
+    return ''
+  }
+}
+
+// Numeric compare with nulls-last regardless of direction.
+function numCmp(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
+}
 
 // Parses an ISO YYYY-MM-DD into the two display values the row needs:
 // the formatted date ("Mar 6, 2025") and the integer day count since
@@ -262,6 +321,82 @@ export function EtfReRankPanel() {
   const openInfoModal = (ticker) => setSelectedTicker(ticker)
   const closeInfoModal = () => setSelectedTicker(null)
 
+  // Sort + search state. Persisted to localStorage so users return to
+  // their previous view. Both controls only affect the main list; the
+  // TOP/BOTTOM MOVERS strip stays anchored to the natural delta order.
+  const [sortField, setSortField] = useState(loadInitialSortField)
+  const [sortDir, setSortDir] = useState(loadInitialSortDir)
+  const [search, setSearch] = useState(loadInitialSearch)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_FIELD_KEY, sortField)
+      localStorage.setItem(SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist rerankSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEARCH_KEY, search)
+    } catch (err) {
+      console.warn('Failed to persist rerankSearch to localStorage:', err)
+    }
+  }, [search])
+
+  function handleSortChange(field, dir) {
+    setSortField(field)
+    setSortDir(dir)
+  }
+
+  // Filter then sort. Search matches ticker prefix OR substring of the
+  // joined asset class label (so a user typing "energy" finds all
+  // energy ETFs even if the ticker doesn't carry that string).
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = rows
+    if (q) {
+      list = rows.filter((r) => {
+        if (r.ticker?.toLowerCase().includes(q)) return true
+        const asset = (proLookup.get(r.ticker)?.asset_class ?? '').toLowerCase()
+        return asset.includes(q)
+      })
+    }
+    const sorted = list.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+    sorted.sort((a, b) => {
+      let cmp
+      switch (sortField) {
+        case 'rank':
+          cmp = numCmp(Number(a.rank), Number(b.rank), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'delta_1w':
+          cmp = numCmp(Number(a.delta_1w), Number(b.delta_1w), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'delta_1m':
+          cmp = numCmp(Number(a.delta_1m), Number(b.delta_1m), sortDir)
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'asset_class': {
+          const sa = (proLookup.get(a.ticker)?.asset_class ?? '').toLowerCase()
+          const sb = (proLookup.get(b.ticker)?.asset_class ?? '').toLowerCase()
+          if (!sa && !sb) return tieBreak(a, b)
+          if (!sa) return 1
+          if (!sb) return -1
+          cmp = sa.localeCompare(sb)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return sorted
+  }, [rows, search, sortField, sortDir, proLookup])
+
   return (
     <div className="panel rerank-panel">
       <header className="topbar">
@@ -281,6 +416,22 @@ export function EtfReRankPanel() {
             {status === 'error' && <StatusChip value="error" dot={false} />}
           </div>
         </div>
+        {status === 'ready' && (
+          <div className="tt-controls">
+            <TickerSearch
+              value={search}
+              onChange={setSearch}
+              ariaLabel="Search ETF Re-Rank tickers"
+            />
+            <SortControl
+              fields={RERANK_SORT_FIELDS}
+              field={sortField}
+              dir={sortDir}
+              onChange={handleSortChange}
+              ariaLabel="ETF Re-Rank sort"
+            />
+          </div>
+        )}
       </header>
 
       {status === 'loading' && <RerankSkeleton />}
@@ -319,7 +470,7 @@ export function EtfReRankPanel() {
           </div>
 
           <ol className="rerank-list">
-            {rows.map((r) => (
+            {visibleRows.map((r) => (
               <RerankRow
                 key={r.ticker}
                 row={r}
@@ -328,6 +479,11 @@ export function EtfReRankPanel() {
               />
             ))}
           </ol>
+          {visibleRows.length === 0 && search.trim() && (
+            <div className="state">
+              No tickers match &quot;{search.trim()}&quot;.
+            </div>
+          )}
         </>
       )}
 

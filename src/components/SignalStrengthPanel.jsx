@@ -1,8 +1,54 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
+import { SortControl } from './SortControl'
+import { TickerSearch } from './TickerSearch'
 
 const SKELETON_ROWS = 20
+
+const SORT_FIELD_KEY = 'dashboard.ssSortField'
+const SORT_DIR_KEY = 'dashboard.ssSortDir'
+const SEARCH_KEY = 'dashboard.ssSearch'
+
+// 4 best sort options. View-natural order is position ASC (oldest
+// first) which doubles as the days-on-list descending order; that's
+// the default. No range data → no range-proximity sorts.
+const SS_SORT_FIELDS = [
+  { value: 'position', label: 'Position (oldest first)', defaultDir: 'asc' },
+  { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'date_added', label: 'Date added', defaultDir: 'desc' },
+  { value: 'new', label: 'NEW first', defaultDir: 'desc' },
+]
+const SS_SORT_VALUES = new Set(SS_SORT_FIELDS.map((f) => f.value))
+
+function loadInitialSortField() {
+  try {
+    const raw = localStorage.getItem(SORT_FIELD_KEY)
+    if (raw && SS_SORT_VALUES.has(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read ssSortField from localStorage:', err)
+  }
+  return 'position'
+}
+
+function loadInitialSortDir() {
+  try {
+    const raw = localStorage.getItem(SORT_DIR_KEY)
+    if (raw === 'asc' || raw === 'desc') return raw
+  } catch (err) {
+    console.warn('Failed to read ssSortDir from localStorage:', err)
+  }
+  return 'asc'
+}
+
+function loadInitialSearch() {
+  try {
+    return localStorage.getItem(SEARCH_KEY) ?? ''
+  } catch (err) {
+    console.warn('Failed to read ssSearch from localStorage:', err)
+    return ''
+  }
+}
 
 // Returns the formatted date label + integer day-count since `isoDate`.
 // Mirrors EtfReRankPanel.parseAdded — kept local so the SS panel doesn't
@@ -108,8 +154,35 @@ function SignalSkeleton() {
 export function SignalStrengthPanel() {
   const { rows, snapshotAt, status } = useSignalStrength()
 
-  // Top box: first 5 rows (view returns oldest-first).
-  // Bottom box: last 5 rows reversed (so freshest sits on top).
+  const [sortField, setSortField] = useState(loadInitialSortField)
+  const [sortDir, setSortDir] = useState(loadInitialSortDir)
+  const [search, setSearch] = useState(loadInitialSearch)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_FIELD_KEY, sortField)
+      localStorage.setItem(SORT_DIR_KEY, sortDir)
+    } catch (err) {
+      console.warn('Failed to persist ssSort to localStorage:', err)
+    }
+  }, [sortField, sortDir])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEARCH_KEY, search)
+    } catch (err) {
+      console.warn('Failed to persist ssSearch to localStorage:', err)
+    }
+  }, [search])
+
+  function handleSortChange(field, dir) {
+    setSortField(field)
+    setSortDir(dir)
+  }
+
+  // Top/bottom highlight boxes anchor to the natural view order
+  // regardless of sort/search — the spec calls for "5 OLDEST" and
+  // "5 NEWEST" as a fixed reference, not "5 oldest of current filter".
   const { oldest, newest } = useMemo(() => {
     if (!rows.length) return { oldest: [], newest: [] }
     return {
@@ -117,6 +190,49 @@ export function SignalStrengthPanel() {
       newest: rows.slice(-5).reverse(),
     }
   }, [rows])
+
+  // Filter then sort for the main table.
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = q ? rows.filter((r) => r.ticker?.toLowerCase().includes(q)) : rows
+    const sorted = list.slice()
+    const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
+    sorted.sort((a, b) => {
+      let cmp
+      switch (sortField) {
+        case 'position':
+          cmp = (a.position ?? 0) - (b.position ?? 0)
+          if (sortDir === 'desc') cmp = -cmp
+          // Date is the primary; position is the secondary tiebreaker
+          // inside the view. We collapse them: equal positions almost
+          // never happen across different dates, so this is mostly
+          // ticker-tiebroken.
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        case 'ticker':
+          cmp = a.ticker.localeCompare(b.ticker)
+          return sortDir === 'asc' ? cmp : -cmp
+        case 'date_added': {
+          const da = a.date_added_to_list ?? ''
+          const db = b.date_added_to_list ?? ''
+          if (!da && !db) return tieBreak(a, b)
+          if (!da) return 1
+          if (!db) return -1
+          cmp = da < db ? -1 : da > db ? 1 : 0
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        case 'new': {
+          const na = a.added_in_latest_email ? 1 : 0
+          const nb = b.added_in_latest_email ? 1 : 0
+          cmp = sortDir === 'asc' ? na - nb : nb - na
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
+        default:
+          return tieBreak(a, b)
+      }
+    })
+    return sorted
+  }, [rows, search, sortField, sortDir])
 
   return (
     <div className="panel rerank-panel signal-strength-panel">
@@ -137,6 +253,22 @@ export function SignalStrengthPanel() {
             {status === 'error' && <StatusChip value="error" dot={false} />}
           </div>
         </div>
+        {status === 'ready' && (
+          <div className="tt-controls">
+            <TickerSearch
+              value={search}
+              onChange={setSearch}
+              ariaLabel="Search Signal Strength tickers"
+            />
+            <SortControl
+              fields={SS_SORT_FIELDS}
+              field={sortField}
+              dir={sortDir}
+              onChange={handleSortChange}
+              ariaLabel="Signal Strength sort"
+            />
+          </div>
+        )}
       </header>
 
       {status === 'loading' && <SignalSkeleton />}
@@ -168,10 +300,21 @@ export function SignalStrengthPanel() {
           </div>
 
           <ol className="rerank-list">
-            {rows.map((r, i) => (
-              <SignalRow key={r.ticker} row={r} pos={i + 1} />
-            ))}
+            {visibleRows.map((r) => {
+              // POS column should always reflect the canonical 1..N
+              // index (oldest = 1), regardless of current sort. We
+              // compute it from the source `rows` order, not the
+              // visible order, so re-sorting doesn't renumber the
+              // tickers.
+              const pos = rows.indexOf(r) + 1
+              return <SignalRow key={r.ticker} row={r} pos={pos} />
+            })}
           </ol>
+          {visibleRows.length === 0 && search.trim() && (
+            <div className="state">
+              No tickers match &quot;{search.trim()}&quot;.
+            </div>
+          )}
         </>
       )}
     </div>

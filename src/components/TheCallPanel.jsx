@@ -31,19 +31,20 @@ const VALID_CALL_VIEWS = ['today', 'all_time']
 
 // Sort fields for the Call panel dropdown. Same shape contract as RR: the
 // arrow button flips dir; picking a new field resets dir to its default.
+// Trimmed to 5 best per user direction. "Current price" dropped — it
+// doesn't earn its spot when traders are already filtering by ticker
+// for any specific price interest. Range-proximity sorts (LRR/TRR)
+// can't apply here without joining Risk Ranges data, which the Call
+// positions view doesn't currently carry.
 const CALL_SORT_FIELDS = [
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
   { value: 'position', label: 'Position type', defaultDir: 'desc' },
   { value: 'sector', label: 'Sector', defaultDir: 'asc' },
-  { value: 'price', label: 'Current price', defaultDir: 'asc' },
-  // "Day's setup" on the Call panel has no LONG SETUP/SHORT SETUP analog
-  // (those are RR-only). Closest semantically meaningful flag is
-  // change_status: FLIPPED / ADDED rows are the cards Hedgeye acted on
-  // today. We surface them first via the existing changeTier helper.
+  // "Day's setup" on the Call panel surfaces FLIPPED / RETURNING / ADDED
+  // cards (the ones Hedgeye acted on today) via the existing changeTier
+  // helper. RR's LONG SETUP/SHORT SETUP doesn't apply here.
   { value: 'setup', label: "Day's setup", defaultDir: 'desc' },
-  // Days held uses `consecutive_days` (held_since isn't on the row). It's
-  // the same semantic value — number of consecutive trading days the
-  // position has been held without changing.
+  // Days held = consecutive_days (held_since isn't on the row).
   { value: 'days_held', label: 'Days held', defaultDir: 'desc' },
 ]
 const CALL_SORT_VALUES = new Set(CALL_SORT_FIELDS.map((f) => f.value))
@@ -837,12 +838,6 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
           if (sortDir === 'desc') cmp = -cmp
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
-        case 'price': {
-          const pa = Number(livePrices.get(a.ticker)?.current_price)
-          const pb = Number(livePrices.get(b.ticker)?.current_price)
-          cmp = numCmpNullsLast(pa, pb, sortDir)
-          return cmp !== 0 ? cmp : tieBreak(a, b)
-        }
         case 'setup': {
           // Lower changeTier = more notable (FLIPPED=0, RETURNING=1,
           // ADDED=2, UNCHANGED=3). Desc = "most notable first" which is
@@ -863,7 +858,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
       }
     })
     return list
-  }, [visibleCards, sortField, sortDir, allTickersByTicker, livePrices])
+  }, [visibleCards, sortField, sortDir, allTickersByTicker])
 
   const visibleCount = sortedCards.length
 

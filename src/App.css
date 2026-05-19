@@ -2472,6 +2472,93 @@
   box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
 }
 
+/* === Inline TickerSearch input (Re-Rank / SS / Ideas / MOMO) ========
+   Lightweight alternative to the multi-select TickerFilter popover.
+   Sits next to the SortControl with matching height + chrome so the
+   tabs' controls row reads as a single horizontal strip. */
+.ticker-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ticker-search-input {
+  height: 30px;
+  padding: 0 28px 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 12px;
+  width: 180px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  /* Strip the native search-input clear button so our custom × is the
+     single, consistent affordance across browsers. */
+  appearance: textfield;
+  -webkit-appearance: textfield;
+}
+
+.ticker-search-input::-webkit-search-cancel-button,
+.ticker-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ticker-search-input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 11px;
+}
+
+.ticker-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.25);
+}
+
+.ticker-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ticker-search-clear:hover {
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Shared controls row used by the four new search panels — pushes
+   sort/search to the right side of the topbar so the panel title
+   stays anchored left. */
+.tt-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .ticker-search-input { width: 130px; }
+  .tt-controls { flex-wrap: wrap; gap: 8px; }
+}
+
 /* === "↗ VIEW CALL INFO" cross-panel button on RR cards === */
 
 .btn-view-call {
