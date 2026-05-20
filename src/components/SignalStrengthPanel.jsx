@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
 import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
@@ -120,7 +120,7 @@ function TopBox({ title, tone, rows }) {
 }
 
 // === Single full-table row ============================================
-function SignalRow({ row, pos, onFocus }) {
+const SignalRow = memo(function SignalRow({ row, pos, onFocus }) {
   const { dateLabel, days } = parseAdded(row.date_added_to_list)
   const isNew = row.added_in_latest_email === true
   // Only NEW rows carry the green left-border; everything else is neutral
@@ -150,7 +150,7 @@ function SignalRow({ row, pos, onFocus }) {
       )}
     </li>
   )
-}
+})
 
 function SignalSkeleton() {
   return (
@@ -165,7 +165,12 @@ function SignalSkeleton() {
 export function SignalStrengthPanel() {
   const { rows, snapshotAt, status } = useSignalStrength()
   const { focusTicker } = useTickerFocus()
-  const onFocus = (ticker) => focusTicker(ticker, { source: 'signal-strength' })
+  // Stable identity so memo(SignalRow) skips re-render when only sort/
+  // search state changes elsewhere in the panel.
+  const onFocus = useCallback(
+    (ticker) => focusTicker(ticker, { source: 'signal-strength' }),
+    [focusTicker]
+  )
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)

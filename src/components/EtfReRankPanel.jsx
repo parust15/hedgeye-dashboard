@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
 import { parseAdded } from '../lib/format'
 import { numCmp } from '../lib/range'
@@ -255,7 +255,7 @@ function rerankTintClass(delta) {
   return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
 }
 
-function RerankRow({ row, proInfo, onSelect, onFocus }) {
+const RerankRow = memo(function RerankRow({ row, proInfo, onSelect, onFocus }) {
   const tintClass = rerankTintClass(row.delta_1w)
   const assetClass = shortenAssetClass(proInfo?.asset_class) ?? null
   const { dateLabel, days } = parseAdded(proInfo?.date_added)
@@ -301,7 +301,7 @@ function RerankRow({ row, proInfo, onSelect, onFocus }) {
       <DeltaChip delta={row.delta_1m} ariaPrefix={`${row.ticker} 1M`} />
     </li>
   )
-}
+})
 
 function RerankSkeleton() {
   return (
@@ -331,15 +331,20 @@ export function EtfReRankPanel() {
 
   // Click any rank row or movers row to open the EtfInfoModal.
   const [selectedTicker, setSelectedTicker] = useState(null)
-  const openInfoModal = (ticker) => setSelectedTicker(ticker)
-  const closeInfoModal = () => setSelectedTicker(null)
+  // useCallback so memo(RerankRow) skips re-renders when only
+  // sort/search state churns elsewhere in the panel.
+  const openInfoModal = useCallback((ticker) => setSelectedTicker(ticker), [])
+  const closeInfoModal = useCallback(() => setSelectedTicker(null), [])
 
   // Ticker-text-only click goes to the cross-tab peek modal. Row click
   // still goes to the existing EtfInfoModal — the two surfaces coexist
   // because they serve different intents (in-tab ETF detail vs. cross-
   // tab view of the same ticker everywhere else).
   const { focusTicker } = useTickerFocus()
-  const onFocus = (ticker) => focusTicker(ticker, { source: 'etf-re-rank' })
+  const onFocus = useCallback(
+    (ticker) => focusTicker(ticker, { source: 'etf-re-rank' }),
+    [focusTicker]
+  )
 
   // Sort + search state. Persisted to localStorage so users return to
   // their previous view. Both controls only affect the main list; the

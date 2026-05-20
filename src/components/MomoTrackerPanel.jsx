@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMomoTracker } from '../lib/useMomoTracker'
 import { StatusChip } from './StatusChip'
@@ -311,7 +311,7 @@ function rowTint(pct) {
   return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
 }
 
-function MomoRow({ row, onFocus }) {
+const MomoRow = memo(function MomoRow({ row, onFocus }) {
   const tintClass = rowTint(row.pct_change_1w)
   // PositionBarWithTooltip expects buy_trade / sell_trade / prev_close.
   // The MOMO row uses low_end / top_end / prev_close — same concept,
@@ -361,7 +361,7 @@ function MomoRow({ row, onFocus }) {
       <PctChip pct={row.pct_change_1w} />
     </li>
   )
-}
+})
 
 function MomoSkeleton() {
   return (
@@ -437,7 +437,12 @@ export function MomoTrackerPanel() {
   const { focusTicker } = useTickerFocus()
   // Ticker click → open the cross-tab peek anchored to MOMO so the
   // peek omits MOMO's own slot.
-  const onFocus = (ticker) => focusTicker(ticker, { source: 'momo' })
+  // Stable identity so memo(MomoRow) skips re-render when only sort/
+  // search state changes elsewhere in the panel.
+  const onFocus = useCallback(
+    (ticker) => focusTicker(ticker, { source: 'momo' }),
+    [focusTicker]
+  )
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { formatPrice } from '../lib/format'
 import { LABEL } from '../lib/labels'
 import { priceInRangePct } from '../lib/range'
@@ -29,7 +30,7 @@ function rowTint(trend) {
   return 'rerank-row-neutral'
 }
 
-export function EtfProRow({ row, onOpenInfo }) {
+export const EtfProRow = memo(function EtfProRow({ row, onOpenInfo }) {
   const tintClass = rowTint(row.trend)
   // EtfProRow consumes the post-toSignalRow shape (buy_trade /
   // sell_trade / prev_close) so the canonical priceInRangePct
@@ -74,7 +75,7 @@ export function EtfProRow({ row, onOpenInfo }) {
       <span className="tt-price">{formatPrice(row.prev_close)}</span>
     </li>
   )
-}
+})
 
 // Header row component for use inside the panel's <header> stack.
 // Same grid template as EtfProRow via .tt-etfpp-row.

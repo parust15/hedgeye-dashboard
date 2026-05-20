@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LABEL } from '../lib/labels'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
@@ -137,7 +137,7 @@ function SidePill({ side }) {
 }
 
 // === Single full-table row + expansion ================================
-function IdeaRow({ row, isOpen, onToggle, onFocus }) {
+const IdeaRow = memo(function IdeaRow({ row, isOpen, onToggle, onFocus }) {
   const isLong = row.side === 'long'
   const tintClass = isLong ? 'rerank-row-up' : 'rerank-row-down'
   // The bullets array can be empty/null for tickers whose writeup uses
@@ -248,7 +248,7 @@ function IdeaRow({ row, isOpen, onToggle, onFocus }) {
       </AnimatePresence>
     </>
   )
-}
+})
 
 function IdeasSkeleton() {
   return (
@@ -264,7 +264,10 @@ export function InvestingIdeasPanel() {
   const { longs, shorts, meta, status } = useInvestingIdeas()
   const [openTicker, setOpenTicker] = useState(null)
   const { focusTicker } = useTickerFocus()
-  const onFocus = (ticker) => focusTicker(ticker, { source: 'investing-ideas' })
+  const onFocus = useCallback(
+    (ticker) => focusTicker(ticker, { source: 'investing-ideas' }),
+    [focusTicker]
+  )
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
@@ -366,9 +369,11 @@ export function InvestingIdeasPanel() {
     return sorted
   }, [allRows, search, sortField, sortDir])
 
-  function toggleOpen(ticker) {
+  // useCallback so the IdeaRow memo can skip re-renders triggered by
+  // sort/search-only state churn elsewhere in the panel.
+  const toggleOpen = useCallback((ticker) => {
     setOpenTicker((curr) => (curr === ticker ? null : ticker))
-  }
+  }, [])
 
   return (
     <div className="panel rerank-panel investing-ideas-panel">
