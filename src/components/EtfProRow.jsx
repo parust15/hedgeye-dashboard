@@ -1,4 +1,3 @@
-import { shortenAssetClass } from '../lib/assetClass'
 import { formatPrice } from '../lib/format'
 import { LABEL } from '../lib/labels'
 import { BiasTimeframePill } from './BiasTimeframePill'
@@ -8,50 +7,42 @@ import { PositionBarWithTooltip } from './PositionBar'
 // pattern (single .rerank-row li with grid layout) so the panel reads
 // as a list, not a tile grid.
 //
-// Fields available on hedgeye_etf_pro_current_v (per Finding #6):
-//   ticker, direction (BULLISH|BEARISH only — no NEUTRAL per Finding #2),
-//   description, date_added, recent_price, trend_range_low (LRR),
-//   trend_range_high (TRR), asset_class. No range_state column —
-//   the PositionBar's range-state overlay is absent for ETF Pro Plus
-//   rows (the view doesn't carry that signal).
+// EtfProPlusPanel transforms its source rows via toSignalRow() before
+// sorting / rendering — we consume that SignalCard-shaped row here so
+// the existing sort + filter logic stays untouched:
 //
-// We build a `posbarRow` shim mapping the Pro Plus column names to
-// the buy_trade / sell_trade / prev_close shape PositionBar expects.
-function buildPosbarRow(row) {
-  return {
-    ticker: row.ticker,
-    buy_trade: row.trend_range_low,
-    sell_trade: row.trend_range_high,
-    prev_close: row.recent_price,
-    // signal_date isn't on this view — keep undefined so the tooltip
-    // header omits the date suffix.
-    signal_date: undefined,
-  }
-}
+//   row.trend       ← original direction (BULLISH | BEARISH)
+//   row.category    ← original asset_class (already shortened by the
+//                     panel via shortenAssetClass)
+//   row.prev_close  ← recent_price (snapshot price)
+//   row.buy_trade   ← trend_range_low (LRR)
+//   row.sell_trade  ← trend_range_high (TRR)
+//   row.range_state ← null (no source column; see UNVERIFIED #6)
+//
+// PositionBar's tooltip already expects buy_trade / sell_trade /
+// prev_close, so we pass row through directly — no shim needed.
 
 function markerPct(row) {
-  if (row.recent_price == null || row.trend_range_low == null || row.trend_range_high == null) {
+  if (row.prev_close == null || row.buy_trade == null || row.sell_trade == null) {
     return null
   }
-  const px = Number(row.recent_price)
-  const lo = Number(row.trend_range_low)
-  const hi = Number(row.trend_range_high)
+  const px = Number(row.prev_close)
+  const lo = Number(row.buy_trade)
+  const hi = Number(row.sell_trade)
   if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
   const span = hi - lo
   if (span === 0) return null
   return (px - lo) / span
 }
 
-function rowTint(direction) {
-  if (direction === 'BULLISH') return 'rerank-row-up'
-  if (direction === 'BEARISH') return 'rerank-row-down'
+function rowTint(trend) {
+  if (trend === 'BULLISH') return 'rerank-row-up'
+  if (trend === 'BEARISH') return 'rerank-row-down'
   return 'rerank-row-neutral'
 }
 
 export function EtfProRow({ row, onOpenInfo }) {
-  const tintClass = rowTint(row.direction)
-  const asset = shortenAssetClass(row.asset_class) ?? '—'
-  const posbarRow = buildPosbarRow(row)
+  const tintClass = rowTint(row.trend)
   const pct = markerPct(row)
 
   return (
@@ -70,24 +61,26 @@ export function EtfProRow({ row, onOpenInfo }) {
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-ticker">{row.ticker}</span>
       <span className="tt-trend-cell">
-        <BiasTimeframePill timeframe="trend" bias={row.direction} size="sm" />
+        <BiasTimeframePill timeframe="trend" bias={row.trend} size="sm" />
       </span>
-      <span className="rerank-asset" title={asset}>{asset}</span>
+      <span className="rerank-asset" title={row.category ?? ''}>
+        {row.category ?? '—'}
+      </span>
       {/* PositionBar — visual anchor. LRR / TRR pulled from
-          trend_range_low/high; range_state badge intentionally
+          buy_trade / sell_trade; range_state badge intentionally
           absent (no source column). */}
       <span className="tt-etfpp-range">
         <PositionBarWithTooltip
-          row={posbarRow}
+          row={row}
           display={null}
           markerPct={pct}
           ghostPct={null}
           zone={null}
         />
       </span>
-      <span className="tt-price">{formatPrice(row.trend_range_low)}</span>
-      <span className="tt-price">{formatPrice(row.trend_range_high)}</span>
-      <span className="tt-price">{formatPrice(row.recent_price)}</span>
+      <span className="tt-price">{formatPrice(row.buy_trade)}</span>
+      <span className="tt-price">{formatPrice(row.sell_trade)}</span>
+      <span className="tt-price">{formatPrice(row.prev_close)}</span>
     </li>
   )
 }

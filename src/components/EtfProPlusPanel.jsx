@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
-import { SignalCard } from './SignalCard'
+import { EtfProRow, EtfProRowHead } from './EtfProRow'
 import { SortControl } from './SortControl'
 import { CategoryFilter } from './CategoryFilter'
 import { StatusChip } from './StatusChip'
@@ -385,7 +385,7 @@ export function EtfProPlusPanel() {
   }, [filteredRows, sortField, sortDir])
 
   return (
-    <div className="panel etfpp-panel">
+    <div className="panel etfpp-panel etf-pro-plus-panel">
       <header className="topbar">
         <div className="topbar-left">
           <h1>Hedgeye ETF Pro Plus</h1>
@@ -526,21 +526,14 @@ export function EtfProPlusPanel() {
       )}
 
       {status === 'ready' && sortedRows.length > 0 && (
-        <section className="cards">
-          {sortedRows.map((r) => (
-            <SignalCard
-              key={r.ticker}
-              row={r}
-              change={null}
-              setup={null}
-              display={null}
-              expanded={false}
-              onToggle={openInfoModal}
-              onViewCall={null}
-              vixBucket={null}
-            />
-          ))}
-        </section>
+        <>
+          <EtfProRowHead />
+          <ol className="rerank-list">
+            {sortedRows.map((r) => (
+              <EtfProRow key={r.ticker} row={r} onOpenInfo={openInfoModal} />
+            ))}
+          </ol>
+        </>
       )}
 
       {selectedTicker && (
