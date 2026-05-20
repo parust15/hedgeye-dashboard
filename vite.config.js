@@ -9,5 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    // Extends Vitest's `expect` with jest-dom's DOM matchers so
+    // component tests can call .toBeInTheDocument() etc.
+    setupFiles: ['./src/test-setup.js'],
   },
 })

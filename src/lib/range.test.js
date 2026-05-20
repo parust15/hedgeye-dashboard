@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   rangePct,
+  priceInRangePct,
+  numCmp,
   effectivePct,
   hasLivePrice,
   getSetup,
@@ -32,6 +34,80 @@ describe('rangePct', () => {
   it('allows out-of-range values (un-clamped)', () => {
     expect(rangePct({ buy_trade: 100, sell_trade: 110, prev_close: 90 })).toBe(-1)
     expect(rangePct({ buy_trade: 100, sell_trade: 110, prev_close: 120 })).toBe(2)
+  })
+})
+
+describe('priceInRangePct (field-name override)', () => {
+  // II + MOMO use low_end/top_end/prev_close on their rows; the override
+  // contract is what lets them share the canonical helper instead of
+  // copy-pasting their own. Test covers the shim MOMO/II pass to PositionBar.
+  it('honors lowKey/highKey overrides', () => {
+    const row = { low_end: 200, top_end: 240, prev_close: 220 }
+    expect(priceInRangePct(row, { lowKey: 'low_end', highKey: 'top_end' })).toBe(0.5)
+  })
+
+  it('honors all three field overrides', () => {
+    const row = { lo: 100, hi: 200, px: 175 }
+    expect(
+      priceInRangePct(row, { lowKey: 'lo', highKey: 'hi', priceKey: 'px' })
+    ).toBe(0.75)
+  })
+
+  it('falls back to buy_trade/sell_trade/prev_close defaults', () => {
+    const row = { buy_trade: 100, sell_trade: 110, prev_close: 105 }
+    expect(priceInRangePct(row)).toBeCloseTo(0.5)
+  })
+
+  it('returns null when an overridden field is null (CLAUDE.md footgun guard)', () => {
+    const row = { low_end: 200, top_end: 240, prev_close: null }
+    expect(priceInRangePct(row, { lowKey: 'low_end', highKey: 'top_end' })).toBeNull()
+  })
+
+  it('rangePct(row) === priceInRangePct(row) for the default field set', () => {
+    // Identity invariant: rangePct is now an alias for the canonical helper.
+    // Identical input must produce identical output for every signal-shaped row.
+    const cases = [
+      { buy_trade: 100, sell_trade: 110, prev_close: 105 },
+      { buy_trade: 100, sell_trade: 110, prev_close: 100 },
+      { buy_trade: 100, sell_trade: 110, prev_close: 90 },
+      { buy_trade: null, sell_trade: 110, prev_close: 105 },
+      { buy_trade: 100, sell_trade: 100, prev_close: 100 },
+    ]
+    for (const row of cases) {
+      expect(rangePct(row)).toEqual(priceInRangePct(row))
+    }
+  })
+})
+
+describe('numCmp', () => {
+  // Generic nulls-last comparator used by every sort dropdown.
+  // Direction applies only to the number comparison; nulls always
+  // sort to the bottom regardless of asc/desc.
+  it('asc orders finite numbers low → high', () => {
+    expect([3, 1, 2].sort((a, b) => numCmp(a, b, 'asc'))).toEqual([1, 2, 3])
+  })
+
+  it('desc orders finite numbers high → low', () => {
+    expect([3, 1, 2].sort((a, b) => numCmp(a, b, 'desc'))).toEqual([3, 2, 1])
+  })
+
+  it.each(['asc', 'desc'])('sinks null/undefined to the bottom (%s)', (dir) => {
+    const out = [1, null, 2, undefined, 3].sort((a, b) => numCmp(a, b, dir))
+    // Finite values rank first per direction; null/undefined trail.
+    const finite = out.slice(0, 3)
+    expect(finite.every((v) => v == null)).toBe(false)
+    expect(out.slice(3).every((v) => v == null)).toBe(true)
+  })
+
+  it.each(['asc', 'desc'])('sinks non-finite (NaN, Infinity) (%s)', (dir) => {
+    const out = [1, NaN, 2, Infinity, 3].sort((a, b) => numCmp(a, b, dir))
+    expect(out.slice(0, 3).every(Number.isFinite)).toBe(true)
+    expect(out.slice(3).some((v) => !Number.isFinite(v))).toBe(true)
+  })
+
+  it('returns 0 when both args are nullish', () => {
+    expect(numCmp(null, undefined, 'asc')).toBe(0)
+    expect(numCmp(undefined, null, 'desc')).toBe(0)
   })
 })
 
