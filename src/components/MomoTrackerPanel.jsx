@@ -6,6 +6,7 @@ import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { MiniRangeBar } from './InvestingIdeasPanel'
 import { formatPrice } from '../lib/format'
+import { useTickerFocus } from '../lib/TickerContext'
 
 const SKELETON_ROWS = 9
 const MAX_CHARTS = 8
@@ -347,12 +348,18 @@ function rowTint(pct) {
   return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
 }
 
-function MomoRow({ row }) {
+function MomoRow({ row, onFocus }) {
   const tintClass = rowTint(row.pct_change_1w)
   return (
     <li className={`rerank-row tt-momo-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
-      <span className="rerank-ticker">{row.ticker}</span>
+      <button
+        type="button"
+        className="rerank-ticker tt-ticker-btn"
+        onClick={() => onFocus?.(row.ticker)}
+      >
+        {row.ticker}
+      </button>
       {/* TREND + TRADE rendered as separate cells so each can sit
           under its own header label. Either may be empty/null —
           empty cells render nothing rather than a "—" placeholder
@@ -447,6 +454,10 @@ function ChartModal({ entry, onClose }) {
 export function MomoTrackerPanel() {
   const { meta, stocks, status } = useMomoTracker()
   const [chartOpen, setChartOpen] = useState(null)
+  const { focusTicker } = useTickerFocus()
+  // Ticker click → open the cross-tab peek anchored to MOMO so the
+  // peek omits MOMO's own slot.
+  const onFocus = (ticker) => focusTicker(ticker, { source: 'momo' })
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
@@ -629,7 +640,7 @@ export function MomoTrackerPanel() {
 
           <ol className="rerank-list">
             {visibleStocks.map((r) => (
-              <MomoRow key={r.ticker} row={r} />
+              <MomoRow key={r.ticker} row={r} onFocus={onFocus} />
             ))}
           </ol>
           {visibleStocks.length === 0 && search.trim() && (

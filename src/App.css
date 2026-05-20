@@ -6645,6 +6645,31 @@ body,
    Appended (not modified) so existing rules stay intact.
    ==================================================================== */
 
+/* --- Ticker drill-in button (TickerContext / CrossLevelPeek) --- */
+/* Used on row components in MOMO / SS / II / Re-Rank to make the
+   ticker text element keyboard-accessible while still rendering
+   visually identical to the surrounding span. Click fires
+   focusTicker() which opens the cross-tab peek modal. */
+.tt-ticker-btn {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.tt-ticker-btn:hover { color: var(--accent); }
+.tt-ticker-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* --- RangeStateBadge -------------------------------------------- */
 .range-state-badge {
   display: inline-flex;

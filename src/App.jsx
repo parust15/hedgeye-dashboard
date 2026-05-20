@@ -14,6 +14,7 @@ import { VixHeaderPill } from './components/VixBucketPill'
 import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
+import { TickerProvider, useTickerFocus } from './lib/TickerContext'
 import { supabase } from './lib/supabase'
 import './App.css'
 
@@ -39,14 +40,18 @@ function loadInitialTab() {
   return 'risk-ranges'
 }
 
-export default function App() {
+// Inner body — has to live below <TickerProvider> so useTickerFocus()
+// works. App provides the provider, AppBody consumes its hooks.
+function AppBody() {
   const [activeTab, setActiveTab] = useState(loadInitialTab)
 
-  // Modal state lifted to App so both panels can open the ticker detail
-  // modal from anywhere. `modalPosition` is whatever object the caller had
-  // available — TheCallPanel passes its full position row; RiskRangesPanel
-  // builds a thin synthetic record from the all-tickers lookup.
+  // Modal state lifted to App so RR + The Call can open the ticker
+  // detail modal from anywhere. modalPosition carries call-info data
+  // (the legacy modal body). The new TickerContext focus carries the
+  // peek mode (any panel can call focusTicker to open the cross-tab
+  // peek without supplying a position record).
   const [modalPosition, setModalPosition] = useState(null)
+  const { focus, unfocus } = useTickerFocus()
 
   // One-shot all-tickers fetch lives here so both panels share the same
   // Map<ticker, allTickersRow> without double-querying Supabase. RR uses
@@ -108,7 +113,17 @@ export default function App() {
     setModalPosition(position)
   }, [])
 
-  const closeModal = useCallback(() => setModalPosition(null), [])
+  const closeModal = useCallback(() => {
+    // Close both modal paths — either could be open depending on the
+    // caller (RR/Call use modalPosition; other panels use focus).
+    setModalPosition(null)
+    unfocus()
+  }, [unfocus])
+
+  // CrossLevelPeek tile click → switch active tab + close the modal.
+  const handleJumpTab = useCallback((tabId) => {
+    if (VALID_TABS.includes(tabId)) setActiveTab(tabId)
+  }, [])
 
   // ?tabsPreview=1 short-circuits the dashboard and renders the
   // side-by-side tab-bar variant preview instead. Gated to DEV builds
@@ -128,6 +143,12 @@ export default function App() {
       </div>
     )
   }
+
+  // Either modal source open? Both can technically be open, but at any
+  // given moment only one source path was clicked, so this short-circuit
+  // is safe — modalPosition takes precedence when both are set (e.g. if
+  // a focus call somehow lingers after a position-based open).
+  const modalIsOpen = modalPosition || focus
 
   return (
     <div className="app">
@@ -156,9 +177,22 @@ export default function App() {
       {activeTab === 'signal-strength' && <SignalStrengthPanel />}
       {activeTab === 'investing-ideas' && <InvestingIdeasPanel />}
       {activeTab === 'momo' && <MomoTrackerPanel />}
-      {modalPosition && (
-        <TickerDetailModal position={modalPosition} onClose={closeModal} />
+      {modalIsOpen && (
+        <TickerDetailModal
+          position={modalPosition}
+          focus={focus}
+          onClose={closeModal}
+          onJumpTab={handleJumpTab}
+        />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <TickerProvider>
+      <AppBody />
+    </TickerProvider>
   )
 }

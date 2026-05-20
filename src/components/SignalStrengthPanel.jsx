@@ -5,6 +5,7 @@ import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { formatPrice } from '../lib/format'
+import { useTickerFocus } from '../lib/TickerContext'
 
 const SKELETON_ROWS = 20
 
@@ -136,7 +137,7 @@ function TopBox({ title, tone, rows }) {
 }
 
 // === Single full-table row ============================================
-function SignalRow({ row, pos }) {
+function SignalRow({ row, pos, onFocus }) {
   const { dateLabel, days } = parseAdded(row.date_added_to_list)
   const isNew = row.added_in_latest_email === true
   // Only NEW rows carry the green left-border; everything else is neutral
@@ -148,7 +149,13 @@ function SignalRow({ row, pos }) {
     <li className={`rerank-row tt-ss-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-rank">{pos}</span>
-      <span className="rerank-ticker">{row.ticker}</span>
+      <button
+        type="button"
+        className="rerank-ticker tt-ticker-btn"
+        onClick={() => onFocus?.(row.ticker)}
+      >
+        {row.ticker}
+      </button>
       <span className="tt-price">{priceTxt}</span>
       <span className="rerank-asset" aria-hidden="true" />
       <span className="tt-date">{dateLabel ?? '—'}</span>
@@ -174,6 +181,8 @@ function SignalSkeleton() {
 
 export function SignalStrengthPanel() {
   const { rows, snapshotAt, status } = useSignalStrength()
+  const { focusTicker } = useTickerFocus()
+  const onFocus = (ticker) => focusTicker(ticker, { source: 'signal-strength' })
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
@@ -329,7 +338,7 @@ export function SignalStrengthPanel() {
               // visible order, so re-sorting doesn't renumber the
               // tickers.
               const pos = rows.indexOf(r) + 1
-              return <SignalRow key={r.ticker} row={r} pos={pos} />
+              return <SignalRow key={r.ticker} row={r} pos={pos} onFocus={onFocus} />
             })}
           </ol>
           {visibleRows.length === 0 && search.trim() && (

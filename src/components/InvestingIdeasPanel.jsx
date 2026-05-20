@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LABEL } from '../lib/labels'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
+import { useTickerFocus } from '../lib/TickerContext'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
@@ -184,7 +185,7 @@ function SidePill({ side }) {
 }
 
 // === Single full-table row + expansion ================================
-function IdeaRow({ row, isOpen, onToggle }) {
+function IdeaRow({ row, isOpen, onToggle, onFocus }) {
   const isLong = row.side === 'long'
   const tintClass = isLong ? 'rerank-row-up' : 'rerank-row-down'
   // The bullets array can be empty/null for tickers whose writeup uses
@@ -212,7 +213,19 @@ function IdeaRow({ row, isOpen, onToggle }) {
         <div className="card-bg" aria-hidden="true" />
         <SidePill side={row.side} />
         <span className="rerank-rank tt-ii-pos">{row.position}</span>
-        <span className="rerank-ticker">{row.ticker}</span>
+        <button
+          type="button"
+          className="rerank-ticker tt-ticker-btn"
+          onClick={(e) => {
+            // Don't bubble to the row's onClick (which expands/collapses).
+            // The ticker-button intent is to open the cross-tab peek;
+            // expansion is the rest-of-row's intent.
+            e.stopPropagation()
+            onFocus?.(row.ticker)
+          }}
+        >
+          {row.ticker}
+        </button>
         <span className="rerank-asset" title={row.sector ?? ''}>
           {row.sector ?? <span className="tt-cell-dim">—</span>}
         </span>
@@ -285,6 +298,8 @@ function IdeasSkeleton() {
 export function InvestingIdeasPanel() {
   const { longs, shorts, meta, status } = useInvestingIdeas()
   const [openTicker, setOpenTicker] = useState(null)
+  const { focusTicker } = useTickerFocus()
+  const onFocus = (ticker) => focusTicker(ticker, { source: 'investing-ideas' })
 
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
@@ -477,6 +492,7 @@ export function InvestingIdeasPanel() {
                 row={r}
                 isOpen={openTicker === r.ticker}
                 onToggle={toggleOpen}
+                onFocus={onFocus}
               />
             ))}
           </ol>

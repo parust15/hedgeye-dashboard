@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
 import { useEtfReRank } from '../lib/useEtfReRank'
+import { useTickerFocus } from '../lib/TickerContext'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { shortenAssetClass } from '../lib/assetClass'
 import { StatusChip } from './StatusChip'
@@ -278,7 +279,7 @@ function rerankTintClass(delta) {
   return n > 0 ? 'rerank-row-up' : 'rerank-row-down'
 }
 
-function RerankRow({ row, proInfo, onSelect }) {
+function RerankRow({ row, proInfo, onSelect, onFocus }) {
   const tintClass = rerankTintClass(row.delta_1w)
   const assetClass = shortenAssetClass(proInfo?.asset_class) ?? null
   const { dateLabel, days } = parseAdded(proInfo?.date_added)
@@ -298,7 +299,19 @@ function RerankRow({ row, proInfo, onSelect }) {
     >
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-rank">{row.rank}</span>
-      <span className="rerank-ticker">{row.ticker}</span>
+      <button
+        type="button"
+        className="rerank-ticker tt-ticker-btn"
+        onClick={(e) => {
+          // Stop the row's onClick (which opens EtfInfoModal). The
+          // ticker button is the cross-tab peek path; the rest of the
+          // row stays the existing InfoModal path.
+          e.stopPropagation()
+          onFocus?.(row.ticker)
+        }}
+      >
+        {row.ticker}
+      </button>
       <span className="rerank-asset" title={assetClass ?? ''}>
         {assetClass ?? <span className="rerank-cell-missing">—</span>}
       </span>
@@ -344,6 +357,13 @@ export function EtfReRankPanel() {
   const [selectedTicker, setSelectedTicker] = useState(null)
   const openInfoModal = (ticker) => setSelectedTicker(ticker)
   const closeInfoModal = () => setSelectedTicker(null)
+
+  // Ticker-text-only click goes to the cross-tab peek modal. Row click
+  // still goes to the existing EtfInfoModal — the two surfaces coexist
+  // because they serve different intents (in-tab ETF detail vs. cross-
+  // tab view of the same ticker everywhere else).
+  const { focusTicker } = useTickerFocus()
+  const onFocus = (ticker) => focusTicker(ticker, { source: 'etf-re-rank' })
 
   // Sort + search state. Persisted to localStorage so users return to
   // their previous view. Both controls only affect the main list; the
@@ -500,6 +520,7 @@ export function EtfReRankPanel() {
                 row={r}
                 proInfo={proLookup.get(r.ticker)}
                 onSelect={openInfoModal}
+                onFocus={onFocus}
               />
             ))}
           </ol>

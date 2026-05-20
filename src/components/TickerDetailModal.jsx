@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTickerDetail } from '../lib/useTickerDetail'
 import { useTickerSummary } from '../lib/useTickerSummary'
+import { CrossLevelPeek } from './CrossLevelPeek'
 
 const MAX_CONVICTION = 75
 
@@ -68,9 +69,23 @@ function ModalConvictionBar({ score }) {
   )
 }
 
-export function TickerDetailModal({ position, onClose }) {
-  const { notes, top5History, status } = useTickerDetail(position?.ticker ?? null)
-  const { summary } = useTickerSummary(position?.ticker ?? null)
+// Modal accepts EITHER the legacy `position` prop (RR + Call's call-info
+// flow) OR the new `focus` prop ({ ticker, source }, from TickerContext).
+// Existing callers continue to work unchanged. When only `focus` is
+// supplied, the modal renders <CrossLevelPeek> as the body instead of
+// the call-info layout (since panels other than Call don't carry the
+// per-ticker call data the legacy body needs).
+//
+// onJumpTab is invoked when a peek tile is clicked. The App sets the
+// active tab; the modal closes itself separately.
+export function TickerDetailModal({ position, focus, onClose, onJumpTab }) {
+  // Prefer `position` for the data hooks (legacy callers). If only
+  // `focus` is provided, hooks run against focus.ticker so the cross-
+  // level peek can still surface analyst notes / Top 5 history when
+  // available — that's useful context across any source panel.
+  const ticker = position?.ticker ?? focus?.ticker ?? null
+  const { notes, top5History, status } = useTickerDetail(ticker)
+  const { summary } = useTickerSummary(ticker)
 
   // Close on Escape.
   useEffect(() => {
@@ -81,7 +96,48 @@ export function TickerDetailModal({ position, onClose }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  if (!position) return null
+  if (!position && !focus) return null
+
+  // === Focus-only mode: cross-tab peek ===
+  // No `position` prop = caller is one of the non-Call panels that
+  // doesn't carry call-info data. Render the peek body anchored to
+  // focus.source so the peek omits the current tab.
+  if (!position && focus) {
+    return (
+      <div
+        className="modal-backdrop"
+        onClick={onClose}
+        role="presentation"
+      >
+        <div
+          className="modal-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ticker-modal-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+          <header className="modal-head">
+            <div className="modal-head-row1">
+              <h2 id="ticker-modal-title" className="modal-company">
+                {focus.ticker}
+              </h2>
+            </div>
+          </header>
+          <CrossLevelPeek
+            ticker={focus.ticker}
+            currentTab={focus.source}
+            onJumpTab={(tabId) => {
+              onJumpTab?.(tabId)
+              onClose()
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   // Most recent note (signal_date === today's call) — promoted to its own
   // "TODAY'S ANALYST NOTE" section if present.
