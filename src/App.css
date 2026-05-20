@@ -5830,14 +5830,24 @@ body,
 
 /* Range bar cells inside the row — full width of their grid slot,
    centered alignment, min-width 0 so the bar can shrink when the
-   panel narrows. */
+   panel narrows. The .posbar-wrap child must be width:100% explicitly
+   because it's a flex item with no intrinsic width (collapses to 0
+   without this rule). Same fix applies to the ETF Pro Plus range
+   cell which also wraps a posbar in a flex slot. */
 .tt-ii-range,
-.tt-momo-range {
+.tt-momo-range,
+.tt-etfpp-range {
   display: flex;
   align-items: center;
   width: 100%;
   min-width: 0;
   padding: 0 8px;
+}
+
+.tt-ii-range .posbar-wrap,
+.tt-momo-range .posbar-wrap,
+.tt-etfpp-range .posbar-wrap {
+  width: 100%;
 }
 
 /* --- Shared cells: date, days pill, dim placeholder ---------------- */
