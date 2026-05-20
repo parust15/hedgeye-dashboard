@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { CosmosShader } from './CosmosShader'
 import { useIsMobile } from '../lib/useIsMobile'
+// STATE_TINTS comes from the canonical rangeState module so this
+// component, RangeStateBadge, and chartTheme all read the same RGB
+// values for the 5 range_state buckets. Local table previously here
+// was the source of the color drift the sync spec calls out.
+import { STATE_TINTS } from '../lib/rangeState'
 
-const STATE_TINTS = {
-  'HH/HL':     { r: 34,  g: 197, b: 94  },
-  'LH/LL':     { r: 239, g: 68,  b: 68  },
-  'HH/LL':     { r: 245, g: 158, b: 11  },
-  'LH/HL':     { r: 96,  g: 165, b: 250 },
-  'unchanged': { r: 156, g: 163, b: 175 },
-}
 const NEUTRAL = STATE_TINTS.unchanged
 
 function dominantState(tickers) {

@@ -12,6 +12,8 @@ import {
 import { supabase } from '../lib/supabase'
 import { CHART_COLORS, rangeFill } from '../lib/chartTheme'
 import { formatNumber } from '../lib/format'
+import { RangeStateBadge } from './RangeStateBadge'
+import { RANGE_STATE_TOKEN, RANGE_STATES } from '../lib/rangeState'
 
 // Module-level cache of fetched 10-day histories, keyed by ticker. The cache
 // is intentionally process-lifetime — collapsing and re-expanding the same
@@ -19,46 +21,20 @@ import { formatNumber } from '../lib/format'
 // is sufficient since signal_date data is daily and stable.
 const chartHistoryCache = new Map()
 
-function SolidSwatch({ color }) {
-  return <span className="legend-swatch solid" style={{ background: color }} />
-}
-
-function HatchSwatch({ stroke }) {
-  return (
-    <svg className="legend-swatch" width="14" height="14" aria-hidden="true">
-      <rect width="14" height="14" fill="rgba(255,255,255,0.04)" />
-      <path
-        d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2 M0,14 l14,-14"
-        stroke={stroke}
-        strokeWidth="1.5"
-      />
-    </svg>
-  )
-}
-
+// Chart legend — uses RangeStateBadge so the badge color, label text,
+// and ordering all derive from RANGE_STATE_TOKEN. Replaces the prior
+// hand-built SolidSwatch + HatchSwatch + legend-label set which had
+// two visible drifts: LH/HL compression was painted green (should be
+// blue) and HH/LL expansion was painted red (should be amber).
 function ChartLegend() {
   return (
     <div className="chart-legend">
-      <span className="legend-item">
-        <SolidSwatch color="rgba(34,197,94,0.6)" />
-        <span className="legend-label">HH/HL bullish</span>
-      </span>
-      <span className="legend-item">
-        <HatchSwatch stroke="rgba(34,197,94,0.85)" />
-        <span className="legend-label">LH/HL compression</span>
-      </span>
-      <span className="legend-item">
-        <SolidSwatch color="rgba(239,68,68,0.6)" />
-        <span className="legend-label">LH/LL bearish</span>
-      </span>
-      <span className="legend-item">
-        <HatchSwatch stroke="rgba(239,68,68,0.85)" />
-        <span className="legend-label">HH/LL expansion</span>
-      </span>
-      <span className="legend-item">
-        <SolidSwatch color="rgba(156,163,175,0.45)" />
-        <span className="legend-label">unchanged</span>
-      </span>
+      {RANGE_STATES.map((state) => (
+        <span key={state} className="legend-item">
+          <RangeStateBadge state={state} size="sm" />
+          <span className="legend-label">{RANGE_STATE_TOKEN[state].label}</span>
+        </span>
+      ))}
     </div>
   )
 }
@@ -266,17 +242,26 @@ export function ExpandedChart({ ticker, display }) {
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={closeData} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <defs>
+            {/* Pattern strokes use the canonical token colors:
+                LH/HL (compression) → BLUE rgba(96,165,250)
+                HH/LL (expansion)   → AMBER rgba(245,158,11)
+                Previously these were inverted (compression used bull
+                green; expansion used bear red), which the chartTheme
+                rangeFill() rewrite also addresses by switching the
+                ReferenceArea fills to solid token-derived rgba. The
+                pattern defs are kept here so any future caller that
+                wants the striped look uses the correct base color. */}
             <pattern id="pattern-lhhl" patternUnits="userSpaceOnUse" width="8" height="8">
               <path
                 d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2"
-                stroke="rgba(34,197,94,0.55)"
+                stroke="rgba(96,165,250,0.55)"
                 strokeWidth="1.5"
               />
             </pattern>
             <pattern id="pattern-hhll" patternUnits="userSpaceOnUse" width="8" height="8">
               <path
                 d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2"
-                stroke="rgba(239,68,68,0.55)"
+                stroke="rgba(245,158,11,0.55)"
                 strokeWidth="1.5"
               />
             </pattern>

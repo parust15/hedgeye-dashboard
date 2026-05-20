@@ -8,6 +8,7 @@ import { VixBucketBadge } from './VixBucketPill'
 // Re-exported below so any external import of `PositionBarWithTooltip`
 // from this file keeps working.
 import { PositionBarWithTooltip } from './PositionBar'
+import { RangeStateBadge } from './RangeStateBadge'
 export { PositionBarWithTooltip }
 
 // Code-split the recharts-heavy chart so it isn't part of the initial
@@ -217,7 +218,7 @@ export function SignalCard({
         <div>
           <dt>Range</dt>
           <dd className="range-state">
-            {row.range_state ?? '—'}
+            <RangeStateBadge state={row.range_state} size="sm" />
             <WidthDeltaPct row={row} />
           </dd>
         </div>
