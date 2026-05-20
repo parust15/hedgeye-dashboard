@@ -69,21 +69,24 @@ function ModalConvictionBar({ score }) {
   )
 }
 
-// Modal accepts EITHER the legacy `position` prop (RR + Call's call-info
-// flow) OR the new `focus` prop ({ ticker, source }, from TickerContext).
-// Existing callers continue to work unchanged. When only `focus` is
-// supplied, the modal renders <CrossLevelPeek> as the body instead of
-// the call-info layout (since panels other than Call don't carry the
-// per-ticker call data the legacy body needs).
+// Single modal entry point — driven by the TickerContext `focus`
+// shape: { ticker, source, payload? }.
 //
-// onJumpTab is invoked when a peek tile is clicked. The App sets the
+// If focus.payload is present, the caller (RR / The Call) has handed
+// us a full position record and we render the legacy call-info body
+// (analyst notes, conviction bar, Top 5 history, AI summary).
+// Otherwise we render <CrossLevelPeek> anchored to focus.source so
+// the peek omits the originating tab.
+//
+// onJumpTab fires when a peek tile is clicked. The App sets the
 // active tab; the modal closes itself separately.
-export function TickerDetailModal({ position, focus, onClose, onJumpTab }) {
-  // Prefer `position` for the data hooks (legacy callers). If only
-  // `focus` is provided, hooks run against focus.ticker so the cross-
-  // level peek can still surface analyst notes / Top 5 history when
-  // available — that's useful context across any source panel.
-  const ticker = position?.ticker ?? focus?.ticker ?? null
+export function TickerDetailModal({ focus, onClose, onJumpTab }) {
+  const ticker = focus?.ticker ?? null
+  // `position` is just a local alias for focus.payload — kept so the
+  // legacy body below reads identically to the old `position`-prop
+  // version (renaming every position.* reference would inflate the
+  // diff for zero behavior gain).
+  const position = focus?.payload ?? null
   const { notes, top5History, status } = useTickerDetail(ticker)
   const { summary } = useTickerSummary(ticker)
 
@@ -96,13 +99,13 @@ export function TickerDetailModal({ position, focus, onClose, onJumpTab }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  if (!position && !focus) return null
+  if (!focus) return null
 
-  // === Focus-only mode: cross-tab peek ===
-  // No `position` prop = caller is one of the non-Call panels that
-  // doesn't carry call-info data. Render the peek body anchored to
+  // === Peek mode ===
+  // No payload = caller is one of the non-Call panels that doesn't
+  // carry call-info data. Render the cross-tab peek body anchored to
   // focus.source so the peek omits the current tab.
-  if (!position && focus) {
+  if (!position) {
     return (
       <div
         className="modal-backdrop"
@@ -166,7 +169,7 @@ export function TickerDetailModal({ position, focus, onClose, onJumpTab }) {
         </button>
 
         <header className="modal-head">
-          {position.source === 'risk-ranges' && (
+          {focus.source === 'risk-ranges' && (
             <div className="modal-source-label" aria-label="Call info overlay">
               CALL INFO — {position.ticker}
             </div>

@@ -2,13 +2,18 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 // App-wide ticker focus state. Replaces the modal-state prop drilling
 // from App.jsx → RR/Call/etc. that grew brittle as more panels needed
-// drill-in. Any panel can call focusTicker(ticker, { source }) to open
-// the TickerDetailModal anchored to a known tab — the modal uses
-// `source` to render a cross-tab peek that omits the originating tab.
+// drill-in. Any panel can call focusTicker(ticker, opts) to open the
+// TickerDetailModal anchored to a known tab.
 //
-// Shape: focus = { ticker, source } | null
+// Shape: focus = { ticker, source, payload? } | null
 //   - source: a tab id from VALID_TABS (e.g. 'risk-ranges'). The peek
-//     hides this slot since "you're already here."
+//     view hides this slot since "you're already here."
+//   - payload: optional caller-supplied data record. RR + The Call
+//     pass their full position row here so TickerDetailModal can
+//     render the legacy call-info body (analyst notes, conviction
+//     bar, Top 5 history) when a rich payload is present. Other
+//     panels (MOMO, SS, II, ETF Re-Rank) omit payload — the modal
+//     renders the cross-tab peek view as a fallback.
 
 const TickerContext = createContext(null)
 
@@ -19,6 +24,7 @@ export function TickerProvider({ children }) {
     setFocus({
       ticker,
       source: opts.source ?? 'unknown',
+      payload: opts.payload ?? null,
     })
   }, [])
   const unfocus = useCallback(() => setFocus(null), [])

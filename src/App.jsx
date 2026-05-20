@@ -45,13 +45,12 @@ function loadInitialTab() {
 function AppBody() {
   const [activeTab, setActiveTab] = useState(loadInitialTab)
 
-  // Modal state lifted to App so RR + The Call can open the ticker
-  // detail modal from anywhere. modalPosition carries call-info data
-  // (the legacy modal body). The new TickerContext focus carries the
-  // peek mode (any panel can call focusTicker to open the cross-tab
-  // peek without supplying a position record).
-  const [modalPosition, setModalPosition] = useState(null)
-  const { focus, unfocus } = useTickerFocus()
+  // Modal state is owned by TickerContext. RR + The Call pass a full
+  // position row via focusTicker(ticker, { source, payload: position })
+  // — TickerDetailModal reads focus.payload to render the legacy
+  // call-info body. Other panels omit payload; the modal falls back
+  // to the cross-tab peek body.
+  const { focus, focusTicker, unfocus } = useTickerFocus()
 
   // One-shot all-tickers fetch lives here so both panels share the same
   // Map<ticker, allTickersRow> without double-querying Supabase. RR uses
@@ -104,21 +103,34 @@ function AppBody() {
     }
   }, [activeTab])
 
-  // Open the ticker modal IN PLACE — the active tab does not change. RR's
-  // "VIEW CALL INFO" button uses this so the user can peek at call data
-  // without losing their Risk Ranges context. The caller tags the
-  // position object with source='risk-ranges' so the modal renders a
-  // "CALL INFO — TICKER" overlay header.
-  const openTickerModal = useCallback((position) => {
-    setModalPosition(position)
-  }, [])
+  // Modal open adapters — one per panel that passes a full position
+  // record. Each adapter tags focus.source so TickerDetailModal renders
+  // the right overlay label (RR shows "CALL INFO — TICKER"; The Call
+  // shows the bare ticker since the user IS on The Call). The position
+  // rides along as focus.payload so the modal renders the legacy
+  // call-info body (analyst notes / Top 5 history / conviction bar).
+  const openFromRr = useCallback(
+    (position) => {
+      if (!position?.ticker) return
+      focusTicker(position.ticker, {
+        source: 'risk-ranges',
+        payload: position,
+      })
+    },
+    [focusTicker]
+  )
+  const openFromCall = useCallback(
+    (position) => {
+      if (!position?.ticker) return
+      focusTicker(position.ticker, {
+        source: 'the-call',
+        payload: position,
+      })
+    },
+    [focusTicker]
+  )
 
-  const closeModal = useCallback(() => {
-    // Close both modal paths — either could be open depending on the
-    // caller (RR/Call use modalPosition; other panels use focus).
-    setModalPosition(null)
-    unfocus()
-  }, [unfocus])
+  const closeModal = useCallback(() => unfocus(), [unfocus])
 
   // CrossLevelPeek tile click → switch active tab + close the modal.
   const handleJumpTab = useCallback((tabId) => {
@@ -144,12 +156,6 @@ function AppBody() {
     )
   }
 
-  // Either modal source open? Both can technically be open, but at any
-  // given moment only one source path was clicked, so this short-circuit
-  // is safe — modalPosition takes precedence when both are set (e.g. if
-  // a focus call somehow lingers after a position-based open).
-  const modalIsOpen = modalPosition || focus
-
   return (
     <div className="app">
       <AmbientBackground tickers={signalTickers} />
@@ -160,7 +166,7 @@ function AppBody() {
       {activeTab === 'risk-ranges' && (
         <RiskRangesPanel
           allTickersByTicker={allTickersByTicker}
-          onViewCall={openTickerModal}
+          onViewCall={openFromRr}
           vixBucket={vixBucket}
         />
       )}
@@ -168,7 +174,7 @@ function AppBody() {
         <TheCallPanel
           allTickers={allTickers}
           allTickersByTicker={allTickersByTicker}
-          onOpenModal={setModalPosition}
+          onOpenModal={openFromCall}
         />
       )}
       {activeTab === 'etf-pro-plus' && <EtfProPlusPanel />}
@@ -177,9 +183,8 @@ function AppBody() {
       {activeTab === 'signal-strength' && <SignalStrengthPanel />}
       {activeTab === 'investing-ideas' && <InvestingIdeasPanel />}
       {activeTab === 'momo' && <MomoTrackerPanel />}
-      {modalIsOpen && (
+      {focus && (
         <TickerDetailModal
-          position={modalPosition}
           focus={focus}
           onClose={closeModal}
           onJumpTab={handleJumpTab}
