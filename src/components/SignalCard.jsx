@@ -28,15 +28,12 @@ function CountUpNumber({ value, format = formatNumber }) {
   return <>{format(tweened)}</>
 }
 
-// Map trend to Call's .position-pill chrome so the RR pill uses the same
-// CSS rules as Call's PositionTypePill. The label text stays BULLISH/
-// BEARISH/NEUTRAL (it's trend data, not portfolio direction) — only the
-// chrome unifies.
-function trendPillClass(trend) {
-  if (trend === 'BULLISH') return 'position-pill position-long'
-  if (trend === 'BEARISH') return 'position-pill position-short'
-  return 'position-pill position-neutral'
-}
+// trendPillClass removed — RR no longer uses the position-pill
+// chrome for the trend display. BiasTimeframePill (timeframe="trend")
+// is the visual now: color carries direction, text is the timeframe
+// label. The .position-pill rules remain in App.css since The Call's
+// PositionTypePill still uses them in cards where position_type ≠
+// trend (e.g. legacy modal callers).
 
 // Direction modifier on .cc-head-id wrapper drives the ticker text tint
 // via the existing .cc-head-id.direction-X .cc-ticker rule.
@@ -187,23 +184,19 @@ export function SignalCard({
             <div className="cc-name">{row.display_name || row.name}</div>
           ) : null}
         </div>
-        {/* Pill + optional VixBucketBadge sit as direct children of
-            .cc-head — matches PositionCard's shape so .cc-head's flex
-            row aligns pills identically across both tabs. */}
-        <span className={trendPillClass(row.trend)}>{row.trend ?? '—'}</span>
+        {/* TREND pill — color carries direction (green=bullish,
+            red=bearish), text is the timeframe label. Replaces the
+            old text-only "BULLISH"/"BEARISH" pill that duplicated
+            the direction word redundantly with the color. */}
+        <BiasTimeframePill timeframe="trend" bias={row.trend} size="md" />
         {vixBucket && <VixBucketBadge data={vixBucket} />}
       </header>
 
       <LivePriceBlock display={display} />
 
-      {(setup || change || row.trend) && (
+      {(setup || change) && (
         <div className="cc-accent-row">
           <SetupBadge setup={setup} />
-          {/* TREND timeframe pill — adjacent to SetupBadge. Setup is
-              the trade-zone signal (near-buy/near-sell); the trend
-              pill is the 3-month directional view. Two separate
-              dimensions, both visible. Renders only if trend is set. */}
-          <BiasTimeframePill timeframe="trend" bias={row.trend} size="sm" />
           <TrendChangeBadge change={change} />
         </div>
       )}

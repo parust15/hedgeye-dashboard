@@ -640,7 +640,13 @@ export function MomoTrackerPanel() {
             <span className="rerank-ticker">TICKER</span>
             <span className="tt-trend-head">TREND</span>
             <span className="tt-trade-head">TRADE</span>
-            <span className="tt-range-head">RANGE</span>
+            {/* Three-span spatial header: LRR over bar's left endpoint,
+                RANGE centered, TRR over right endpoint. */}
+            <span className="tt-range-head">
+              <span>LRR</span>
+              <span>RANGE</span>
+              <span>TRR</span>
+            </span>
             <span className="tt-price">PREV CLOSE</span>
             <span className="tt-price">LRR</span>
             <span className="tt-price">TRR</span>

@@ -191,10 +191,10 @@ function changeClass(change) {
 
 // --- subcomponents ---
 
-function PositionTypePill({ type }) {
-  const cls = `position-pill position-${(type ?? 'neutral').toLowerCase()}`
-  return <span className={cls}>{type ?? 'NEUTRAL'}</span>
-}
+// PositionTypePill removed from this file — the card header now uses
+// BiasTimeframePill (timeframe="trend") directly. TickerDetailModal
+// still has its own PositionTypePill for the legacy call-info modal
+// body; that one stays unaffected.
 
 function ChangeStatusBadge({ row }) {
   if (row.change_status === 'ADDED') {
@@ -362,14 +362,12 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false, extra
           <div className="cc-ticker">{row.ticker}</div>
           {row.company_name && <div className="cc-name">{row.company_name}</div>}
         </div>
-        {/* Position pill carries position-type semantic (LONG/SHORT/
-            NEUTRAL — what kind of position Hedgeye has on); the
-            timeframe pill carries direction (color) under a TREND
-            label (3-month view). They're shown together so the user
-            sees "Hedgeye is LONG and this is a TREND signal" as a
-            single visual unit. */}
-        <PositionTypePill type={row.position_type} />
-        <BiasTimeframePill timeframe="trend" bias={row.position_type} size="sm" />
+        {/* TREND pill — color carries direction (LONG→green=BULLISH,
+            SHORT→red=BEARISH, NEUTRAL→grey), text is the timeframe
+            label. Dropped the parallel "LONG"/"SHORT" PositionTypePill
+            that previously sat alongside — same info in two pills was
+            redundant per user direction. */}
+        <BiasTimeframePill timeframe="trend" bias={row.position_type} size="md" />
       </header>
       {hasAccent && (
         <div className="cc-accent-row">

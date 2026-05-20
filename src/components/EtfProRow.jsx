@@ -93,8 +93,12 @@ export function EtfProRowHead() {
       <span className="rerank-ticker">{LABEL.column.ticker}</span>
       <span className="tt-trend-head">{LABEL.column.trend}</span>
       <span className="rerank-asset">{LABEL.column.assetClass}</span>
+      {/* Three-span spatial header: LRR over bar's left endpoint,
+          RANGE centered, TRR over right endpoint. Matches II + MOMO. */}
       <span className="tt-range-head">
-        {LABEL.column.lrr} ←——— {LABEL.column.range} ———→ {LABEL.column.trr}
+        <span>{LABEL.column.lrr}</span>
+        <span>{LABEL.column.range}</span>
+        <span>{LABEL.column.trr}</span>
       </span>
       <span className="tt-price">{LABEL.column.lrr}</span>
       <span className="tt-price">{LABEL.column.trr}</span>

@@ -6207,18 +6207,23 @@ body,
 }
 
 .investing-ideas-panel .rerank-list-head .tt-range-head,
-.momo-panel.rerank-panel .rerank-list-head .tt-range-head {
+.momo-panel.rerank-panel .rerank-list-head .tt-range-head,
+.etf-pro-plus-panel .rerank-list-head .tt-range-head {
   font-family: var(--sans);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1px;
   color: var(--text-dim);
   text-transform: uppercase;
-  text-align: center;
-  justify-self: end;
+  /* Spatial header: LRR sits over the bar's left endpoint, RANGE
+     centered, TRR over the right endpoint. Same flex layout the row
+     cell uses so the label positions track the bar's actual width. */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
-  max-width: 120px;
-  padding: 0 4px;
+  padding: 0 8px;
+  gap: 4px;
 }
 
 /* Range CHIP variant (used in II + MOMO dual top boxes) — small

@@ -507,7 +507,15 @@ export function InvestingIdeasPanel() {
             <span className="rerank-rank tt-ii-pos">{LABEL.column.pos}</span>
             <span className="rerank-ticker">{LABEL.column.ticker}</span>
             <span className="rerank-asset">{LABEL.column.sector}</span>
-            <span className="tt-range-head">{LABEL.column.range}</span>
+            {/* Three-span spatial header: LRR over bar's left
+                endpoint, RANGE centered, TRR over bar's right
+                endpoint. .tt-range-head's flex layout distributes
+                them via space-between. */}
+            <span className="tt-range-head">
+              <span>{LABEL.column.lrr}</span>
+              <span>{LABEL.column.range}</span>
+              <span>{LABEL.column.trr}</span>
+            </span>
             <span className="tt-price">{LABEL.column.prevClose}</span>
             <span className="tt-price">{LABEL.column.lrr}</span>
             <span className="tt-price">{LABEL.column.trr}</span>
