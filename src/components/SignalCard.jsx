@@ -9,6 +9,7 @@ import { VixBucketBadge } from './VixBucketPill'
 // from this file keeps working.
 import { PositionBarWithTooltip } from './PositionBar'
 import { RangeStateBadge } from './RangeStateBadge'
+import { BiasTimeframePill } from './BiasTimeframePill'
 export { PositionBarWithTooltip }
 
 // Code-split the recharts-heavy chart so it isn't part of the initial
@@ -195,9 +196,14 @@ export function SignalCard({
 
       <LivePriceBlock display={display} />
 
-      {(setup || change) && (
+      {(setup || change || row.trend) && (
         <div className="cc-accent-row">
           <SetupBadge setup={setup} />
+          {/* TREND timeframe pill — adjacent to SetupBadge. Setup is
+              the trade-zone signal (near-buy/near-sell); the trend
+              pill is the 3-month directional view. Two separate
+              dimensions, both visible. Renders only if trend is set. */}
+          <BiasTimeframePill timeframe="trend" bias={row.trend} size="sm" />
           <TrendChangeBadge change={change} />
         </div>
       )}

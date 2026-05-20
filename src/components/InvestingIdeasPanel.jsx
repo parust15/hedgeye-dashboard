@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LABEL } from '../lib/labels'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { useTickerFocus } from '../lib/TickerContext'
+import { BiasTimeframePill } from './BiasTimeframePill'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
@@ -175,13 +176,17 @@ function TopBox({ title, tone, rows }) {
 }
 
 // === Side pill ========================================================
+// Replaced the bespoke L/S round pill with the shared BiasTimeframePill
+// so direction-via-color is consistent across the dashboard. The pill
+// shows "TREND" since side IS the timeframe-trend signal for an Idea
+// (long-only or short-only book per the newsletter). The original
+// L/S circle pill chrome (.tt-side / .tt-side-long / .tt-side-short)
+// is kept in CSS for any future caller — not used here anymore.
 function SidePill({ side }) {
-  const isLong = side === 'long'
-  return (
-    <span className={`tt-side ${isLong ? 'tt-side-long' : 'tt-side-short'}`}>
-      {isLong ? 'L' : 'S'}
-    </span>
-  )
+  // Normalize 'long' / 'short' → BiasTimeframePill's bias vocabulary,
+  // which it auto-maps to the green/red tone.
+  const bias = side === 'long' ? 'BULLISH' : side === 'short' ? 'BEARISH' : null
+  return <BiasTimeframePill timeframe="trend" bias={bias} size="sm" />
 }
 
 // === Single full-table row + expansion ================================

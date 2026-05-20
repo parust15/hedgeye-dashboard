@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LABEL } from '../lib/labels'
 import { supabase } from '../lib/supabase'
+import { BiasTimeframePill } from './BiasTimeframePill'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
 import { useWeeklyTop5 } from '../lib/useWeeklyTop5'
@@ -361,7 +362,14 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false, extra
           <div className="cc-ticker">{row.ticker}</div>
           {row.company_name && <div className="cc-name">{row.company_name}</div>}
         </div>
+        {/* Position pill carries position-type semantic (LONG/SHORT/
+            NEUTRAL — what kind of position Hedgeye has on); the
+            timeframe pill carries direction (color) under a TREND
+            label (3-month view). They're shown together so the user
+            sees "Hedgeye is LONG and this is a TREND signal" as a
+            single visual unit. */}
         <PositionTypePill type={row.position_type} />
+        <BiasTimeframePill timeframe="trend" bias={row.position_type} size="sm" />
       </header>
       {hasAccent && (
         <div className="cc-accent-row">

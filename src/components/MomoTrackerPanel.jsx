@@ -5,6 +5,7 @@ import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { MiniRangeBar } from './InvestingIdeasPanel'
+import { BiasTimeframePill } from './BiasTimeframePill'
 import { formatPrice } from '../lib/format'
 import { useTickerFocus } from '../lib/TickerContext'
 
@@ -172,38 +173,18 @@ function Mag7Chip({ pct }) {
   )
 }
 
-// TREND vs TRADE chip. Two separate pills so the user always knows
-// which signal is which — never collapsed into a single ambiguous
-// "BIAS" chip. The pill's green/red color is the BULLISH/BEARISH
-// signal; the only text inside is the source label (TREND / TRADE)
-// since the value would be redundant with the color.
-//
-// kind: 'trend' | 'trade'
-// bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null
-function BiasChip({ kind, bias }) {
-  if (!bias) return null
-  const b = bias.toUpperCase()
-  const tone = b === 'BULLISH' ? 'tt-bias-pos'
-    : b === 'BEARISH' ? 'tt-bias-neg'
-    : 'tt-bias-neutral'
-  const label = kind === 'trend' ? 'TREND' : 'TRADE'
-  // a11y: title + aria-label restore the bias word for screen readers
-  // and on-hover tooltip since the visual layer relies on color alone.
-  const fullLabel = `${label}: ${b}`
-  return (
-    <span
-      className={`tt-bias tt-bias-labeled ${tone}`}
-      title={fullLabel}
-      aria-label={fullLabel}
-    >
-      {label}
-    </span>
-  )
+// TrendChip + TradeChip → BiasTimeframePill (Task 5 consolidation).
+// The local BiasChip helper is gone — the shared primitive carries
+// the same tone-mapping logic, the same title/aria-label a11y
+// behavior, and the same visual chrome. Component-local wrappers
+// kept for call-site clarity ("TrendChip" reads better than
+// "BiasTimeframePill timeframe='trend'" inline).
+function TrendChip({ bias }) {
+  return <BiasTimeframePill timeframe="trend" bias={bias} />
 }
-
-// Convenience wrappers for clarity at call sites.
-function TrendChip({ bias }) { return <BiasChip kind="trend" bias={bias} /> }
-function TradeChip({ bias }) { return <BiasChip kind="trade" bias={bias} /> }
+function TradeChip({ bias }) {
+  return <BiasTimeframePill timeframe="trade" bias={bias} />
+}
 
 
 function PctChip({ pct }) {
