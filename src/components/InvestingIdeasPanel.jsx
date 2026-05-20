@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { LABEL } from '../lib/labels'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
@@ -145,10 +146,10 @@ function TopBox({ title, tone, rows }) {
         <>
           {/* Column header row matches the data grid template below. */}
           <div className="tt-mover-head tt-ii-mover-row" aria-hidden="true">
-            <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
-            <span className="tt-mover-head-cell">SECTOR</span>
-            <span className="tt-mover-head-cell">PREV CLOSE</span>
-            <span className="tt-mover-head-cell">RANGE</span>
+            <span className="tt-mover-head-cell tt-mover-head-ticker">{LABEL.column.ticker}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.sector}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.prevClose}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.range}</span>
           </div>
           <ul className="rerank-movers-list">
             {rows.map((r) => (
@@ -459,14 +460,14 @@ export function InvestingIdeasPanel() {
           </section>
 
           <div className="rerank-list-head tt-ii-row" aria-hidden="true">
-            <span className="tt-side-head">SIDE</span>
-            <span className="rerank-rank tt-ii-pos">POS</span>
-            <span className="rerank-ticker">TICKER</span>
-            <span className="rerank-asset">SECTOR</span>
-            <span className="tt-price">PREV CLOSE</span>
-            <span className="tt-price">LRR</span>
-            <span className="tt-price">TRR</span>
-            <span className="tt-range-head">RANGE</span>
+            <span className="tt-side-head">{LABEL.column.side}</span>
+            <span className="rerank-rank tt-ii-pos">{LABEL.column.pos}</span>
+            <span className="rerank-ticker">{LABEL.column.ticker}</span>
+            <span className="rerank-asset">{LABEL.column.sector}</span>
+            <span className="tt-price">{LABEL.column.prevClose}</span>
+            <span className="tt-price">{LABEL.column.lrr}</span>
+            <span className="tt-price">{LABEL.column.trr}</span>
+            <span className="tt-range-head">{LABEL.column.range}</span>
           </div>
 
           <ol className="rerank-list">

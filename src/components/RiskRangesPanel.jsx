@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { LABEL } from '../lib/labels'
 import { useMarketState } from '../lib/marketState'
 import { useLivePrices } from '../lib/livePrices'
 import { getPriceDisplay } from '../lib/priceDisplay'
@@ -99,10 +100,10 @@ function loadInitialTrendFilter() {
 }
 
 const TREND_FILTERS = [
-  { id: 'ALL', label: 'ALL TRENDS' },
-  { id: 'BULLISH', label: 'BULLISH' },
-  { id: 'BEARISH', label: 'BEARISH' },
-  { id: 'NEUTRAL', label: 'NEUTRAL' },
+  { id: 'ALL', label: `${LABEL.filter.all} TRENDS` },
+  { id: 'BULLISH', label: LABEL.filter.bullish },
+  { id: 'BEARISH', label: LABEL.filter.bearish },
+  { id: 'NEUTRAL', label: LABEL.filter.neutral },
 ]
 
 export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {

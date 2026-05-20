@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { LABEL } from '../lib/labels'
 import { useEtfReRank } from '../lib/useEtfReRank'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { shortenAssetClass } from '../lib/assetClass'
@@ -177,9 +178,9 @@ function MoversStrip({ rows, proLookup, onSelect }) {
                 data rows below so each label sits dead-center over its
                 values. TICKER is left-aligned to match its data cell. */}
             <div className="tt-mover-head rerank-movers-row" aria-hidden="true">
-              <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
-              <span className="tt-mover-head-cell">ASSET</span>
-              <span className="tt-mover-head-cell">RANK</span>
+              <span className="tt-mover-head-cell tt-mover-head-ticker">{LABEL.column.ticker}</span>
+              <span className="tt-mover-head-cell">{LABEL.column.asset}</span>
+              <span className="tt-mover-head-cell">{LABEL.column.rank}</span>
               <span className="tt-mover-head-cell">1W Δ</span>
             </div>
             <ul className="rerank-movers-list">
@@ -220,9 +221,9 @@ function MoversStrip({ rows, proLookup, onSelect }) {
         ) : (
           <>
             <div className="tt-mover-head rerank-movers-row" aria-hidden="true">
-              <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
-              <span className="tt-mover-head-cell">ASSET</span>
-              <span className="tt-mover-head-cell">RANK</span>
+              <span className="tt-mover-head-cell tt-mover-head-ticker">{LABEL.column.ticker}</span>
+              <span className="tt-mover-head-cell">{LABEL.column.asset}</span>
+              <span className="tt-mover-head-cell">{LABEL.column.rank}</span>
               <span className="tt-mover-head-cell">1W Δ</span>
             </div>
             <ul className="rerank-movers-list">
@@ -483,11 +484,11 @@ export function EtfReRankPanel() {
               rows use, so cells line up perfectly. The two middle
               cells (asset class + added) collapse on mobile. */}
           <div className="rerank-list-head" aria-hidden="true">
-            <span className="rerank-rank">RANK</span>
-            <span className="rerank-ticker">TICKER</span>
-            <span className="rerank-asset">ASSET CLASS</span>
-            <span className="rerank-added">ADDED</span>
-            <span className="rerank-days">DAYS</span>
+            <span className="rerank-rank">{LABEL.column.rank}</span>
+            <span className="rerank-ticker">{LABEL.column.ticker}</span>
+            <span className="rerank-asset">{LABEL.column.assetClass}</span>
+            <span className="rerank-added">{LABEL.column.dateAdded}</span>
+            <span className="rerank-days">{LABEL.column.daysOnList}</span>
             <span className="rerank-delta-head">1W Δ</span>
             <span className="rerank-delta-head">1M Δ</span>
           </div>

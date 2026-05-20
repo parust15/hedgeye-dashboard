@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LABEL } from '../lib/labels'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { SignalCard } from './SignalCard'
 import { SortControl } from './SortControl'
@@ -21,9 +22,13 @@ const VALID_VIEWS = ['all', 'setups']
 const VALID_DIRECTIONS = ['ALL', 'BULLISH', 'BEARISH']
 
 const DIRECTION_FILTERS = [
-  { id: 'ALL', label: 'ALL DIRECTIONS' },
-  { id: 'BULLISH', label: 'BULLISH' },
-  { id: 'BEARISH', label: 'BEARISH' },
+  { id: 'ALL', label: `${LABEL.filter.all} DIRECTIONS` },
+  { id: 'BULLISH', label: LABEL.filter.bullish },
+  { id: 'BEARISH', label: LABEL.filter.bearish },
+  // NEUTRAL omitted intentionally — hedgeye_etf_pro_current_v has only
+  // BULLISH (29 rows) and BEARISH (11 rows) per UNVERIFIED #2 query
+  // on 2026-05-19. Add a NEUTRAL chip here if/when the view starts
+  // emitting NEUTRAL direction values.
 ]
 
 // --- Sort fields (mirrors RR's SortControl contract) ----------------------

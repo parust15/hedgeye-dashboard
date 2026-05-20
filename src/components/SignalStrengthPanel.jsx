@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { LABEL } from '../lib/labels'
 import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
@@ -99,10 +100,10 @@ function TopBox({ title, tone, rows }) {
               data rows so each label sits dead-center over its values.
               TICKER is left-aligned to match its data cell. */}
           <div className="tt-mover-head tt-ss-mover-row" aria-hidden="true">
-            <span className="tt-mover-head-cell tt-mover-head-ticker">TICKER</span>
-            <span className="tt-mover-head-cell">PRICE</span>
-            <span className="tt-mover-head-cell">ADDED</span>
-            <span className="tt-mover-head-cell">TENURE</span>
+            <span className="tt-mover-head-cell tt-mover-head-ticker">{LABEL.column.ticker}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.price}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.dateAdded}</span>
+            <span className="tt-mover-head-cell">{LABEL.column.daysOnList}</span>
           </div>
           <ul className="rerank-movers-list">
             {rows.map((r) => {
@@ -311,12 +312,12 @@ export function SignalStrengthPanel() {
           </section>
 
           <div className="rerank-list-head tt-ss-row" aria-hidden="true">
-            <span className="rerank-rank">POS</span>
-            <span className="rerank-ticker">TICKER</span>
-            <span className="tt-price">PRICE</span>
+            <span className="rerank-rank">{LABEL.column.pos}</span>
+            <span className="rerank-ticker">{LABEL.column.ticker}</span>
+            <span className="tt-price">{LABEL.column.price}</span>
             <span className="rerank-asset" />
-            <span className="tt-date">DATE ADDED</span>
-            <span className="tt-days">DAYS ON LIST</span>
+            <span className="tt-date">{LABEL.column.dateAdded}</span>
+            <span className="tt-days">{LABEL.column.daysOnList}</span>
             <span className="tt-newhead">NEW</span>
           </div>
 

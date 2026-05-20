@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { LABEL } from '../lib/labels'
 import { supabase } from '../lib/supabase'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
@@ -131,10 +132,10 @@ const isReturning = (row) =>
   row.change_status === 'ADDED' && (row.top5_appearances_90d ?? 0) >= 2
 
 const POSITION_FILTERS = [
-  { id: 'ALL', label: 'ALL' },
-  { id: 'LONG', label: 'LONG' },
-  { id: 'SHORT', label: 'SHORT' },
-  { id: 'NEUTRAL', label: 'NEUTRAL' },
+  { id: 'ALL', label: LABEL.filter.all },
+  { id: 'LONG', label: LABEL.filter.long },
+  { id: 'SHORT', label: LABEL.filter.short },
+  { id: 'NEUTRAL', label: LABEL.filter.neutral },
 ]
 
 // Tier sort: FLIPPED first → RETURNING → ADDED (new, not returning) →
