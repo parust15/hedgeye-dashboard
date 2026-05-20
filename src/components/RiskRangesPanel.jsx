@@ -14,6 +14,7 @@ import {
   effectivePct,
   hasLivePrice,
   getSetup,
+  numCmp,
 } from '../lib/range'
 import { SignalCard } from './SignalCard'
 import { SortControl } from './SortControl'
@@ -78,16 +79,7 @@ function rangeWidthPct(row) {
   return ((sell - buy) / close) * 100
 }
 
-// Generic numeric comparator with nulls-last. Direction is applied to the
-// number compare; nulls always go to the bottom regardless of dir.
-function numCmp(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
+// numCmp imported from src/lib/range.js (was a local copy).
 
 function loadInitialTrendFilter() {
   try {

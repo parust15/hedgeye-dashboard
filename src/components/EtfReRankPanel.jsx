@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
+import { parseAdded } from '../lib/format'
+import { numCmp } from '../lib/range'
 import { useEtfReRank } from '../lib/useEtfReRank'
 import { useTickerFocus } from '../lib/TickerContext'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
@@ -59,35 +61,9 @@ function loadInitialSearch() {
   }
 }
 
-// Numeric compare with nulls-last regardless of direction.
-function numCmp(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
-
-// Parses an ISO YYYY-MM-DD into the two display values the row needs:
-// the formatted date ("Mar 6, 2025") and the integer day count since
-// then. Returns nulls when input is missing/malformed so the cells can
-// render the muted "—" placeholder.
-function parseAdded(isoDate) {
-  if (!isoDate) return { dateLabel: null, days: null }
-  const [y, m, d] = isoDate.split('-').map(Number)
-  if (!y || !m || !d) return { dateLabel: null, days: null }
-  const then = new Date(y, m - 1, d)
-  const now = new Date()
-  const dayMs = 24 * 60 * 60 * 1000
-  const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / dayMs))
-  const dateLabel = then.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-  return { dateLabel, days }
-}
+// numCmp + parseAdded imported from src/lib/range.js + src/lib/format.js
+// (the post-cleanup canonical helpers). Local copies that lived here
+// were byte-identical to the ones in SignalStrengthPanel.
 
 // Single delta chip used by both the main list and the movers strip.
 // Variants:

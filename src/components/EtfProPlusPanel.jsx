@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LABEL } from '../lib/labels'
+import { priceInRangePct, numCmp } from '../lib/range'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
 import { EtfProRow, EtfProRowHead } from './EtfProRow'
 import { SortControl } from './SortControl'
@@ -151,25 +152,9 @@ function toSignalRow(etf) {
   }
 }
 
-// Position-in-range pct for distance-to-LRR / distance-to-TRR sorts.
-function priceInRangePct(row) {
-  const lrr = Number(row.buy_trade)
-  const trr = Number(row.sell_trade)
-  const px = Number(row.prev_close)
-  if (!Number.isFinite(lrr) || !Number.isFinite(trr) || !Number.isFinite(px)) return null
-  if (trr - lrr === 0) return null
-  return (px - lrr) / (trr - lrr)
-}
-
-// Generic nulls-last numeric comparator (matches RR's `numCmp`).
-function numCmp(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
+// priceInRangePct + numCmp are imported from src/lib/range.js — the
+// post-cleanup canonical helpers. The local copies that lived here
+// were byte-identical to 4 other panels.
 
 // --- Panel ----------------------------------------------------------------
 

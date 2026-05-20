@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LABEL } from '../lib/labels'
+import { numCmp } from '../lib/range'
 import { supabase } from '../lib/supabase'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { useCallPositions } from '../lib/useCallPositions'
@@ -74,15 +75,8 @@ function loadInitialCallSortDir() {
   return 'asc'
 }
 
-// Numeric compare with nulls-last (regardless of direction).
-function numCmpNullsLast(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
+// numCmp imported from src/lib/range.js (previously a local
+// numCmpNullsLast; bodies were identical, just the name differed).
 
 function loadInitialCallView() {
   try {
@@ -857,7 +851,7 @@ export function TheCallPanel({ allTickers, allTickersByTicker, onOpenModal }) {
         case 'days_held': {
           const da = Number(a.consecutive_days)
           const db = Number(b.consecutive_days)
-          cmp = numCmpNullsLast(da, db, sortDir)
+          cmp = numCmp(da, db, sortDir)
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
         default:

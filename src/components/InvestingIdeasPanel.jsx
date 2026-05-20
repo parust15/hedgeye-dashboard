@@ -9,6 +9,7 @@ import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { formatPrice } from '../lib/format'
+import { priceInRangePct, numCmp } from '../lib/range'
 
 const SKELETON_ROWS = 12
 
@@ -57,27 +58,10 @@ function loadInitialSearch() {
   }
 }
 
-// Position-in-range pct (0 = at low_end, 1 = at top_end). Null when
-// any input is missing or the span is zero. Guards Number(null)===0.
-function priceInRangePct(row) {
-  if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
-  const px = Number(row.prev_close)
-  const lo = Number(row.low_end)
-  const hi = Number(row.top_end)
-  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-  const span = hi - lo
-  if (span === 0) return null
-  return (px - lo) / span
-}
-
-function numCmp(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
+// II rows use low_end / top_end / prev_close field names — pass the
+// override into the canonical priceInRangePct (default expects
+// buy_trade / sell_trade as on hedgeye_signals_v).
+const II_RANGE_FIELDS = { lowKey: 'low_end', highKey: 'top_end' }
 
 // "May 18, 2026" — used in the header chip + section labels.
 function formatLong(iso) {
@@ -211,16 +195,7 @@ function IdeaRow({ row, isOpen, onToggle, onFocus }) {
               signal_date: undefined,
             }}
             display={null}
-            markerPct={(() => {
-              if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
-              const px = Number(row.prev_close)
-              const lo = Number(row.low_end)
-              const hi = Number(row.top_end)
-              if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-              const span = hi - lo
-              if (span === 0) return null
-              return (px - lo) / span
-            })()}
+            markerPct={priceInRangePct(row, II_RANGE_FIELDS)}
             ghostPct={null}
             zone={null}
           />
@@ -371,12 +346,12 @@ export function InvestingIdeasPanel() {
         }
         case 'dist_low':
           // Distance to LRR = position pct (0 = at LRR). Smaller = closer.
-          cmp = numCmp(priceInRangePct(a), priceInRangePct(b), sortDir)
+          cmp = numCmp(priceInRangePct(a, II_RANGE_FIELDS), priceInRangePct(b, II_RANGE_FIELDS), sortDir)
           return cmp !== 0 ? cmp : tieBreak(a, b)
         case 'dist_high': {
           // Distance to TRR = 1 - position pct. Smaller = closer to TRR.
-          const pa = priceInRangePct(a)
-          const pb = priceInRangePct(b)
+          const pa = priceInRangePct(a, II_RANGE_FIELDS)
+          const pb = priceInRangePct(b, II_RANGE_FIELDS)
           cmp = numCmp(
             pa == null ? null : 1 - pa,
             pb == null ? null : 1 - pb,

@@ -1,5 +1,6 @@
 import { formatPrice } from '../lib/format'
 import { LABEL } from '../lib/labels'
+import { priceInRangePct } from '../lib/range'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 
@@ -22,19 +23,6 @@ import { PositionBarWithTooltip } from './PositionBar'
 // PositionBar's tooltip already expects buy_trade / sell_trade /
 // prev_close, so we pass row through directly — no shim needed.
 
-function markerPct(row) {
-  if (row.prev_close == null || row.buy_trade == null || row.sell_trade == null) {
-    return null
-  }
-  const px = Number(row.prev_close)
-  const lo = Number(row.buy_trade)
-  const hi = Number(row.sell_trade)
-  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-  const span = hi - lo
-  if (span === 0) return null
-  return (px - lo) / span
-}
-
 function rowTint(trend) {
   if (trend === 'BULLISH') return 'rerank-row-up'
   if (trend === 'BEARISH') return 'rerank-row-down'
@@ -43,7 +31,10 @@ function rowTint(trend) {
 
 export function EtfProRow({ row, onOpenInfo }) {
   const tintClass = rowTint(row.trend)
-  const pct = markerPct(row)
+  // EtfProRow consumes the post-toSignalRow shape (buy_trade /
+  // sell_trade / prev_close) so the canonical priceInRangePct
+  // defaults work without overrides.
+  const pct = priceInRangePct(row)
 
   return (
     <li

@@ -12,22 +12,58 @@ export const LIVE_NEAR_SELL = 0.95
 export const LONG_SETUP_PCT = 0.20
 export const SHORT_SETUP_PCT = 0.80
 
-// Where prev_close sits in the [buy_trade, sell_trade] range. Returns a
-// number 0..1 (un-clamped — values outside the range are still meaningful)
-// or null if the row doesn't carry enough data to compute.
+// Where a price sits in a numeric range. Returns a number 0..1
+// (un-clamped — values outside the range are still meaningful) or
+// null if the row doesn't carry enough data to compute.
+//
+// The default field names match `hedgeye_signals_v` (buy_trade /
+// sell_trade / prev_close). Pass `fields` to point at different
+// keys: II + MOMO rows use low_end / top_end / prev_close, for
+// example, and the panel can call
+// `priceInRangePct(row, { lowKey: 'low_end', highKey: 'top_end' })`
+// instead of building a shim row.
 //
 // We check for nullish BEFORE Number() because Number(null) silently
-// coerces to 0 — without the explicit guard, a missing buy_trade column
-// from Supabase would be treated as 0 and produce a nonsense pct.
-export function rangePct(row) {
-  if (row.buy_trade == null || row.sell_trade == null || row.prev_close == null) return null
-  const buy = Number(row.buy_trade)
-  const sell = Number(row.sell_trade)
-  const close = Number(row.prev_close)
-  if (!Number.isFinite(buy) || !Number.isFinite(sell) || !Number.isFinite(close)) return null
-  const span = sell - buy
+// coerces to 0 — without the explicit guard, a missing buy_trade
+// column from Supabase would be treated as 0 and produce a nonsense
+// pct. This is the documented CLAUDE.md footgun.
+export function priceInRangePct(row, fields = {}) {
+  const lowKey = fields.lowKey ?? 'buy_trade'
+  const highKey = fields.highKey ?? 'sell_trade'
+  const priceKey = fields.priceKey ?? 'prev_close'
+  const lo = row[lowKey]
+  const hi = row[highKey]
+  const px = row[priceKey]
+  if (lo == null || hi == null || px == null) return null
+  const loN = Number(lo)
+  const hiN = Number(hi)
+  const pxN = Number(px)
+  if (!Number.isFinite(loN) || !Number.isFinite(hiN) || !Number.isFinite(pxN)) return null
+  const span = hiN - loN
   if (span === 0) return null
-  return (close - buy) / span
+  return (pxN - loN) / span
+}
+
+// Legacy alias for the original buy_trade/sell_trade callers. Kept so
+// PositionBar, positionBarFor, effectivePct, and the range.test.js
+// suite read identically. New callers should prefer `priceInRangePct`
+// for clarity.
+export function rangePct(row) {
+  return priceInRangePct(row)
+}
+
+// Numeric comparator for Array.prototype.sort with nulls-last semantics
+// regardless of direction. Extracted from 5+ panel-local copies that
+// all had byte-identical bodies (TheCallPanel's `numCmpNullsLast` is
+// the same function — renamed for symmetry). Used by every sort
+// dropdown that compares a numeric field across rows.
+export function numCmp(a, b, dir) {
+  const aNull = a == null || !Number.isFinite(a)
+  const bNull = b == null || !Number.isFinite(b)
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  return dir === 'asc' ? a - b : b - a
 }
 
 // Resolve the pct used by zone/setup logic: live if available, else prev-close.

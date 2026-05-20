@@ -11,6 +11,7 @@ import { TickerSearch } from './TickerSearch'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { formatPrice } from '../lib/format'
+import { priceInRangePct, numCmp } from '../lib/range'
 import { useTickerFocus } from '../lib/TickerContext'
 
 const SKELETON_ROWS = 9
@@ -66,25 +67,9 @@ function loadInitialSearch() {
   }
 }
 
-function priceInRangePct(row) {
-  if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
-  const px = Number(row.prev_close)
-  const lo = Number(row.low_end)
-  const hi = Number(row.top_end)
-  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-  const span = hi - lo
-  if (span === 0) return null
-  return (px - lo) / span
-}
-
-function numCmp(a, b, dir) {
-  const aNull = a == null || !Number.isFinite(a)
-  const bNull = b == null || !Number.isFinite(b)
-  if (aNull && bNull) return 0
-  if (aNull) return 1
-  if (bNull) return -1
-  return dir === 'asc' ? a - b : b - a
-}
+// MOMO rows use low_end / top_end / prev_close field names — pass the
+// override into the canonical priceInRangePct.
+const MOMO_RANGE_FIELDS = { lowKey: 'low_end', highKey: 'top_end' }
 
 // "May 18, 2026 · 8:15 am" — header date chip format.
 function formatHeader(iso) {
@@ -338,16 +323,7 @@ function MomoRow({ row, onFocus }) {
     prev_close: row.prev_close,
     signal_date: undefined,
   }
-  const pct = (() => {
-    if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
-    const px = Number(row.prev_close)
-    const lo = Number(row.low_end)
-    const hi = Number(row.top_end)
-    if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-    const span = hi - lo
-    if (span === 0) return null
-    return (px - lo) / span
-  })()
+  const pct = priceInRangePct(row, MOMO_RANGE_FIELDS)
   return (
     <li className={`rerank-row tt-momo-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
@@ -510,11 +486,11 @@ export function MomoTrackerPanel() {
           cmp = a.ticker.localeCompare(b.ticker)
           return sortDir === 'asc' ? cmp : -cmp
         case 'dist_low':
-          cmp = numCmp(priceInRangePct(a), priceInRangePct(b), sortDir)
+          cmp = numCmp(priceInRangePct(a, MOMO_RANGE_FIELDS), priceInRangePct(b, MOMO_RANGE_FIELDS), sortDir)
           return cmp !== 0 ? cmp : tieBreak(a, b)
         case 'dist_high': {
-          const pa = priceInRangePct(a)
-          const pb = priceInRangePct(b)
+          const pa = priceInRangePct(a, MOMO_RANGE_FIELDS)
+          const pb = priceInRangePct(b, MOMO_RANGE_FIELDS)
           cmp = numCmp(
             pa == null ? null : 1 - pa,
             pb == null ? null : 1 - pb,

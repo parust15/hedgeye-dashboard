@@ -4,7 +4,7 @@ import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
-import { formatPrice } from '../lib/format'
+import { formatPrice, parseAdded } from '../lib/format'
 import { useTickerFocus } from '../lib/TickerContext'
 
 const SKELETON_ROWS = 20
@@ -53,25 +53,8 @@ function loadInitialSearch() {
   }
 }
 
-// Returns the formatted date label + integer day-count since `isoDate`.
-// Mirrors EtfReRankPanel.parseAdded — kept local so the SS panel doesn't
-// reach into Re-Rank's internals (and so its formatting can drift later
-// without breaking Re-Rank).
-function parseAdded(isoDate) {
-  if (!isoDate) return { dateLabel: null, days: null }
-  const [y, m, d] = isoDate.split('-').map(Number)
-  if (!y || !m || !d) return { dateLabel: null, days: null }
-  const then = new Date(y, m - 1, d)
-  const now = new Date()
-  const dayMs = 24 * 60 * 60 * 1000
-  const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / dayMs))
-  const dateLabel = then.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-  return { dateLabel, days }
-}
+// parseAdded imported from src/lib/format.js — the canonical helper.
+// The previous local copy was byte-identical to EtfReRankPanel's.
 
 function snapshotLabel(snapshotAt) {
   if (!snapshotAt) return null

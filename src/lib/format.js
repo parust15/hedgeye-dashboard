@@ -30,3 +30,26 @@ export function formatTime(iso) {
     hour12: true,
   })
 }
+
+// Parse an ISO YYYY-MM-DD into both the formatted date label
+// ("Mar 6, 2025") AND the integer day count since that date — the two
+// derived values every "date added" cell needs. Returns nulls when
+// input is missing/malformed so callers can render the muted "—".
+//
+// Was duplicated verbatim in EtfReRankPanel + SignalStrengthPanel
+// before consolidation.
+export function parseAdded(isoDate) {
+  if (!isoDate) return { dateLabel: null, days: null }
+  const [y, m, d] = isoDate.split('-').map(Number)
+  if (!y || !m || !d) return { dateLabel: null, days: null }
+  const then = new Date(y, m - 1, d)
+  const now = new Date()
+  const dayMs = 24 * 60 * 60 * 1000
+  const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / dayMs))
+  const dateLabel = then.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+  return { dateLabel, days }
+}
