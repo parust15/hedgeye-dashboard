@@ -6638,3 +6638,201 @@ body,
   .tt-feed-link { padding: 5px 10px; font-size: 11px; }
 }
 
+/* ====================================================================
+   Primitives (sync-primitives branch)
+   Styles for RangeStateBadge, CrossLevelPeek, PanelHeading, the size
+   variants of BiasTimeframePill, and the EtfProRow grid template.
+   Appended (not modified) so existing rules stay intact.
+   ==================================================================== */
+
+/* --- RangeStateBadge -------------------------------------------- */
+.range-state-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-badge);
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(var(--state-rgb, 156, 163, 175), 0.18);
+  color: rgb(var(--state-rgb, 156, 163, 175));
+  border: 1px solid rgba(var(--state-rgb, 156, 163, 175), 0.4);
+  white-space: nowrap;
+}
+.range-state-badge.size-sm { padding: 1px 4px; font-size: 10px; }
+.range-state-badge.state-empty {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* --- BiasTimeframePill size variants ---------------------------- */
+/* The base .tt-bias / .tt-bias-labeled / .tt-bias-pos|neg|neutral
+   rules already exist higher in this stylesheet — these just add
+   sm / md / lg width tuning so callers can pick the right scale. */
+.tt-bias.size-sm { font-size: 10px; padding: 1px 5px; }
+.tt-bias.size-md { font-size: 11px; padding: 2px 7px; }
+.tt-bias.size-lg { font-size: 12px; padding: 3px 9px; font-weight: 600; }
+
+/* --- CrossLevelPeek -------------------------------------------- */
+.cross-level-peek {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cross-level-peek-head {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.cross-level-peek-head strong {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text-strong);
+  margin-right: 6px;
+}
+
+.cross-level-peek-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.peek-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.peek-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.peek-tile-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.peek-tile-metric {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.peek-tile-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.peek-tile-value-empty {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+@media (max-width: 720px) {
+  .cross-level-peek-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --- PanelHeading (primitive landed, not yet wired) ----------- */
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-heading-left {
+  min-width: 0;
+}
+
+.panel-heading-kicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.panel-heading-title {
+  margin: 0;
+  letter-spacing: -0.4px;
+  color: var(--text-strong);
+}
+
+.panel-heading-title.level-1 { font-size: 26px; }
+.panel-heading-title.level-2 { font-size: 20px; }
+.panel-heading-title.level-3 { font-size: 16px; }
+
+.panel-heading-sub {
+  margin: 6px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.panel-heading-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- EtfProRow grid -------------------------------------------- */
+/* TICKER | TREND | ASSET | RANGE BAR (flex) | LRR | TRR | PREV CLOSE
+   The bar sits in the flex slot so it's the visual anchor; LRR/TRR
+   stay as small numeric columns to the right per the hybrid Task 6
+   resolution. */
+.etf-pro-plus-panel .tt-etfpp-row,
+.etf-pro-plus-panel .rerank-list-head.tt-etfpp-row {
+  grid-template-columns:
+    minmax(80px, auto)    /* ticker         */
+    96px                  /* trend pill     */
+    minmax(120px, 1fr)    /* asset class    */
+    minmax(160px, 2fr)    /* range bar      */
+    80px                  /* LRR            */
+    80px                  /* TRR            */
+    96px;                 /* prev close     */
+}
+
+.tt-etfpp-range {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .etf-pro-plus-panel .tt-etfpp-row,
+  .etf-pro-plus-panel .rerank-list-head.tt-etfpp-row {
+    grid-template-columns:
+      minmax(70px, auto) 80px minmax(60px, 1fr) 80px;
+  }
+  .etf-pro-plus-panel .rerank-asset,
+  .etf-pro-plus-panel .tt-etfpp-range,
+  .etf-pro-plus-panel .tt-price:nth-of-type(1),
+  .etf-pro-plus-panel .tt-price:nth-of-type(2) {
+    display: none;
+  }
+}
+
