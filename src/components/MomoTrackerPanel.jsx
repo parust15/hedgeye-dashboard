@@ -177,18 +177,11 @@ function Mag7Chip({ pct }) {
   )
 }
 
-// TrendChip + TradeChip → BiasTimeframePill (Task 5 consolidation).
-// The local BiasChip helper is gone — the shared primitive carries
-// the same tone-mapping logic, the same title/aria-label a11y
-// behavior, and the same visual chrome. Component-local wrappers
-// kept for call-site clarity ("TrendChip" reads better than
-// "BiasTimeframePill timeframe='trend'" inline).
-function TrendChip({ bias }) {
-  return <BiasTimeframePill timeframe="trend" bias={bias} />
-}
-function TradeChip({ bias }) {
-  return <BiasTimeframePill timeframe="trade" bias={bias} />
-}
+// Local TrendChip/TradeChip wrappers removed in the cleanup pass —
+// call sites now use <BiasTimeframePill timeframe="trend|trade" .../>
+// inline. The original BiasChip → split into TrendChip+TradeChip dance
+// from Tasks 5 + 16 was about getting to a single shared primitive;
+// once we got there the wrappers stopped earning their indirection.
 
 
 function PctChip({ pct }) {
@@ -298,8 +291,8 @@ function GainersLosersBox({ title, tone, rows, isLoser }) {
               return (
                 <li key={r.ticker} className="rerank-movers-row tt-momo-mover-row">
                   <span className="rerank-movers-ticker">{r.ticker}</span>
-                  <span className="tt-mover-cell-c"><TrendChip bias={r.trend_bias} /></span>
-                  <span className="tt-mover-cell-c"><TradeChip bias={r.trade_bias} /></span>
+                  <span className="tt-mover-cell-c"><BiasTimeframePill timeframe="trend" bias={r.trend_bias} /></span>
+                  <span className="tt-mover-cell-c"><BiasTimeframePill timeframe="trade" bias={r.trade_bias} /></span>
                   <span className="tt-price tt-mover-cell-c">{price}</span>
                   <span className="tt-mover-cell-c">
                     <span
@@ -370,8 +363,8 @@ function MomoRow({ row, onFocus }) {
           empty cells render nothing rather than a "—" placeholder
           so the eye reads "this signal isn't tagged" not "we tried
           and got nothing." */}
-      <span className="tt-trend-cell"><TrendChip bias={row.trend_bias} /></span>
-      <span className="tt-trade-cell"><TradeChip bias={row.trade_bias} /></span>
+      <span className="tt-trend-cell"><BiasTimeframePill timeframe="trend" bias={row.trend_bias} /></span>
+      <span className="tt-trade-cell"><BiasTimeframePill timeframe="trade" bias={row.trade_bias} /></span>
       {/* Range bar — the row's visual anchor (Task 6 hybrid). Takes
           the flex-grow slot where the asset spacer used to live so
           it reads as the centerpiece. Numeric LRR/TRR/PREV CLOSE

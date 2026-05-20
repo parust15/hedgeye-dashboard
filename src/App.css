@@ -6670,8 +6670,8 @@ body,
 
 /* ====================================================================
    Primitives (sync-primitives branch)
-   Styles for RangeStateBadge, CrossLevelPeek, PanelHeading, the size
-   variants of BiasTimeframePill, and the EtfProRow grid template.
+   Styles for RangeStateBadge, CrossLevelPeek, the size variants of
+   BiasTimeframePill, and the EtfProRow grid template.
    Appended (not modified) so existing rules stay intact.
    ==================================================================== */
 
@@ -6804,53 +6804,6 @@ body,
   .cross-level-peek-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* --- PanelHeading (primitive landed, not yet wired) ----------- */
-.panel-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.panel-heading-left {
-  min-width: 0;
-}
-
-.panel-heading-kicker {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 4px;
-}
-
-.panel-heading-title {
-  margin: 0;
-  letter-spacing: -0.4px;
-  color: var(--text-strong);
-}
-
-.panel-heading-title.level-1 { font-size: 26px; }
-.panel-heading-title.level-2 { font-size: 20px; }
-.panel-heading-title.level-3 { font-size: 16px; }
-
-.panel-heading-sub {
-  margin: 6px 0 0;
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
-.panel-heading-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
 }
 
 /* --- EtfProRow grid -------------------------------------------- */

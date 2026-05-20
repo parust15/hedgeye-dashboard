@@ -23,10 +23,11 @@ export const CHART_COLORS = {
 }
 
 // Build a token-rgba helper so each ReferenceArea fill uses the same
-// RGB the badge / ambient backdrop / chart legend pull from.
+// RGB the badge / ambient backdrop / chart legend pull from. The
+// state keys below are hard-coded constants, so a missing-state
+// fallback is dead code — leaving it would just lie about safety.
 function tokenRgba(state, alpha) {
-  const rgb = RANGE_STATE_TOKEN[state]?.rgb ?? RANGE_STATE_TOKEN.unchanged.rgb
-  return `rgba(${rgb}, ${alpha})`
+  return `rgba(${RANGE_STATE_TOKEN[state].rgb}, ${alpha})`
 }
 
 // Per-state ReferenceArea fill. HH/HL (bullish) + LH/LL (bearish)

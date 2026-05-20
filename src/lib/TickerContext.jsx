@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
 // App-wide ticker focus state. Replaces the modal-state prop drilling
 // from App.jsx → RR/Call/etc. that grew brittle as more panels needed
@@ -6,12 +6,9 @@ import { createContext, useCallback, useContext, useState } from 'react'
 // the TickerDetailModal anchored to a known tab — the modal uses
 // `source` to render a cross-tab peek that omits the originating tab.
 //
-// Shape: focus = { ticker, source, payload? } | null
+// Shape: focus = { ticker, source } | null
 //   - source: a tab id from VALID_TABS (e.g. 'risk-ranges'). The peek
 //     hides this slot since "you're already here."
-//   - payload: optional caller-supplied data (e.g. RR rows already in
-//     hand). The legacy `position` prop on TickerDetailModal continues
-//     to work in parallel — see TASK 4 for the additive prop story.
 
 const TickerContext = createContext(null)
 
@@ -22,12 +19,22 @@ export function TickerProvider({ children }) {
     setFocus({
       ticker,
       source: opts.source ?? 'unknown',
-      payload: opts.payload ?? null,
     })
   }, [])
   const unfocus = useCallback(() => setFocus(null), [])
+
+  // Memoize the value so consumers don't re-render on every Provider
+  // re-render. With three stable identities (focus is the only thing
+  // that changes), this caps the re-render fanout to genuine focus
+  // changes — meaningful because every panel registers as a consumer
+  // via useTickerFocus().
+  const value = useMemo(
+    () => ({ focus, focusTicker, unfocus }),
+    [focus, focusTicker, unfocus]
+  )
+
   return (
-    <TickerContext.Provider value={{ focus, focusTicker, unfocus }}>
+    <TickerContext.Provider value={value}>
       {children}
     </TickerContext.Provider>
   )

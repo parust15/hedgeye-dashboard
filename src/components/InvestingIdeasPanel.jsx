@@ -91,50 +91,12 @@ function formatLong(iso) {
   })
 }
 
-// Range marker fraction (0..1) of prev_close inside [low_end, top_end].
-// Null whenever any input is missing or the span is zero. The bar UI
-// clamps to [0, 1] separately — this just returns the raw fraction.
-function markerPct(prevClose, lowEnd, topEnd) {
-  if (prevClose == null || lowEnd == null || topEnd == null) return null
-  const px = Number(prevClose)
-  const lo = Number(lowEnd)
-  const hi = Number(topEnd)
-  if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
-  const span = hi - lo
-  if (span === 0) return null
-  return (px - lo) / span
-}
-
-// Inline ~120px range bar shared by all three new panels. Reuses the
-// `.posbar` / `.posbar-track` / `.posbar-marker` primitives Risk Ranges
-// already styles so the marker dot + zone gradient + tick rhythm are
-// pixel-identical with the RR cards. Wrapped in `.tt-range` so we can
-// constrain width without leaking into the RR styles.
-export function MiniRangeBar({ prevClose, lowEnd, topEnd, ariaLabel }) {
-  const pct = markerPct(prevClose, lowEnd, topEnd)
-  if (pct == null) {
-    return (
-      <div className="tt-range" aria-label={ariaLabel}>
-        <div className="posbar disabled">
-          <div className="posbar-track" />
-        </div>
-      </div>
-    )
-  }
-  const clamped = Math.max(0, Math.min(1, pct))
-  return (
-    <div className="tt-range" aria-label={ariaLabel}>
-      <div className="posbar mid">
-        <div className="posbar-track" />
-        <div
-          className="posbar-marker"
-          style={{ left: `${clamped * 100}%` }}
-          aria-label={`Position ${(clamped * 100).toFixed(0)}% of range`}
-        />
-      </div>
-    </div>
-  )
-}
+// MiniRangeBar + its private markerPct(prevClose, lowEnd, topEnd) helper
+// were deleted in the post-sync-primitives cleanup — both lost their
+// last consumer once Task 6's hybrid layout switched II + MOMO main
+// tables to PositionBarWithTooltip. The file-level priceInRangePct(row)
+// below is the one helper still in use (powers the dist_low / dist_high
+// sort comparators).
 
 // === Dual top boxes ===================================================
 function TopBox({ title, tone, rows }) {
