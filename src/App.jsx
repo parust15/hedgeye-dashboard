@@ -15,25 +15,16 @@ import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
 import { TickerProvider, useTickerFocus } from './lib/TickerContext'
+import { TAB_ID_SET } from './lib/tabs'
 import { supabase } from './lib/supabase'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
-const VALID_TABS = [
-  'risk-ranges',
-  'the-call',
-  'etf-pro-plus',
-  'etf-re-rank',
-  'macro-show',
-  'signal-strength',
-  'investing-ideas',
-  'momo',
-]
 
 function loadInitialTab() {
   try {
     const raw = localStorage.getItem(ACTIVE_TAB_KEY)
-    if (raw && VALID_TABS.includes(raw)) return raw
+    if (raw && TAB_ID_SET.has(raw)) return raw
   } catch (err) {
     console.warn('Failed to read activeTab from localStorage:', err)
   }
@@ -134,7 +125,7 @@ function AppBody() {
 
   // CrossLevelPeek tile click → switch active tab + close the modal.
   const handleJumpTab = useCallback((tabId) => {
-    if (VALID_TABS.includes(tabId)) setActiveTab(tabId)
+    if (TAB_ID_SET.has(tabId)) setActiveTab(tabId)
   }, [])
 
   // ?tabsPreview=1 short-circuits the dashboard and renders the

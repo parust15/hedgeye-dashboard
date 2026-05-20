@@ -12,6 +12,7 @@ import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { formatPrice } from '../lib/format'
 import { priceInRangePct, numCmp } from '../lib/range'
+import { safeHttpUrl } from '../lib/url'
 import { useTickerFocus } from '../lib/TickerContext'
 
 const SKELETON_ROWS = 9
@@ -120,15 +121,22 @@ function chartLabel(key) {
   }
   return key
 }
+// Build the ordered chart list and gate each entry through safeHttpUrl.
+// The url ends up as <img src> in both the thumbnail strip and the
+// modal lightbox; guarding here means a row with a non-http URL
+// silently drops out instead of polluting either render path.
 function orderedCharts(chartImageUrls) {
   if (!chartImageUrls) return []
   const seen = new Set()
   const out = []
+  const push = (key) => {
+    const safe = safeHttpUrl(chartImageUrls[key])
+    if (!safe) return
+    out.push({ key, url: safe })
+    seen.add(key)
+  }
   for (const key of CHART_PRIORITY) {
-    if (chartImageUrls[key]) {
-      out.push({ key, url: chartImageUrls[key] })
-      seen.add(key)
-    }
+    if (chartImageUrls[key]) push(key)
   }
   const quads = Object.keys(chartImageUrls)
     .filter((k) => k.startsWith('quad_') && !seen.has(k))
@@ -138,7 +146,7 @@ function orderedCharts(chartImageUrls) {
     .sort()
   for (const k of [...quads, ...pairs]) {
     if (out.length >= MAX_CHARTS) break
-    out.push({ key: k, url: chartImageUrls[k] })
+    push(k)
   }
   return out.slice(0, MAX_CHARTS)
 }
@@ -478,8 +486,8 @@ export function MomoTrackerPanel() {
   // Filter then sort for the main 9-row table.
   const visibleStocks = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = q ? stocks.filter((r) => r.ticker?.toLowerCase().includes(q)) : stocks
-    const sorted = list.slice()
+    const filtered = q ? stocks.filter((r) => r.ticker?.toLowerCase().includes(q)) : stocks
+    const sorted = filtered.slice()
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
     sorted.sort((a, b) => {
       let cmp
@@ -571,9 +579,9 @@ export function MomoTrackerPanel() {
               onChange={handleSortChange}
               ariaLabel="MOMO sort"
             />
-            {meta?.feedItemUrl && (
+            {safeHttpUrl(meta?.feedItemUrl) && (
               <a
-                href={meta.feedItemUrl}
+                href={safeHttpUrl(meta?.feedItemUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tt-feed-link"

@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LABEL } from '../lib/labels'
+import { safeHttpUrl } from '../lib/url'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { useTickerFocus } from '../lib/TickerContext'
 import { BiasTimeframePill } from './BiasTimeframePill'
@@ -313,14 +314,14 @@ export function InvestingIdeasPanel() {
   // Filter then sort.
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = q
+    const filtered = q
       ? allRows.filter((r) => {
           if (r.ticker?.toLowerCase().includes(q)) return true
           if (r.sector?.toLowerCase().includes(q)) return true
           return false
         })
       : allRows
-    const sorted = list.slice()
+    const sorted = filtered.slice()
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
     sorted.sort((a, b) => {
       let cmp
@@ -411,9 +412,9 @@ export function InvestingIdeasPanel() {
               onChange={handleSortChange}
               ariaLabel="Investing Ideas sort"
             />
-            {meta?.feedItemUrl && (
+            {safeHttpUrl(meta?.feedItemUrl) && (
               <a
-                href={meta.feedItemUrl}
+                href={safeHttpUrl(meta?.feedItemUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tt-feed-link"

@@ -77,4 +77,12 @@ describe('BiasTimeframePill', () => {
     render(<BiasTimeframePill timeframe="trend" bias="BULLISH" size={size} />)
     expect(screen.getByText('TREND')).toHaveClass(`size-${size}`)
   })
+
+  it('renders nothing for an unknown timeframe', () => {
+    // Guards against typos / new-timeframe-without-adding-to-map
+    // bugs. Silently absent is better than a mystery label like
+    // "TRENT" showing on screen.
+    const { container } = render(<BiasTimeframePill timeframe="trent" bias="BULLISH" />)
+    expect(container).toBeEmptyDOMElement()
+  })
 })

@@ -209,11 +209,21 @@ export function SignalStrengthPanel() {
     }
   }, [rows])
 
+  // Canonical POS lookup (oldest = 1). Built once from rows so the
+  // render loop is O(1) per row instead of O(n) via rows.indexOf —
+  // matters because the table renders all 72 rows on every search
+  // keystroke, and indexOf inside the .map was previously O(n²).
+  const posByTicker = useMemo(() => {
+    const m = new Map()
+    rows.forEach((r, i) => m.set(r.ticker, i + 1))
+    return m
+  }, [rows])
+
   // Filter then sort for the main table.
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = q ? rows.filter((r) => r.ticker?.toLowerCase().includes(q)) : rows
-    const sorted = list.slice()
+    const filtered = q ? rows.filter((r) => r.ticker?.toLowerCase().includes(q)) : rows
+    const sorted = filtered.slice()
     const tieBreak = (a, b) => a.ticker.localeCompare(b.ticker)
     sorted.sort((a, b) => {
       let cmp
@@ -325,7 +335,7 @@ export function SignalStrengthPanel() {
               // compute it from the source `rows` order, not the
               // visible order, so re-sorting doesn't renumber the
               // tickers.
-              const pos = rows.indexOf(r) + 1
+              const pos = posByTicker.get(r.ticker) ?? 0
               return <SignalRow key={r.ticker} row={r} pos={pos} onFocus={onFocus} />
             })}
           </ol>
