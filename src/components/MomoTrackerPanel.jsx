@@ -4,8 +4,12 @@ import { useMomoTracker } from '../lib/useMomoTracker'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
-import { MiniRangeBar } from './InvestingIdeasPanel'
+// MiniRangeBar import removed — Task 6 hybrid uses PositionBarWithTooltip
+// as the flex-grow range visual in the main table. Top-box gainers/losers
+// boxes no longer render an inline range bar either (their layout was
+// already trimmed in Task 21 to TICKER · TREND · TRADE · PRICE · 1W).
 import { BiasTimeframePill } from './BiasTimeframePill'
+import { PositionBarWithTooltip } from './PositionBar'
 import { formatPrice } from '../lib/format'
 import { useTickerFocus } from '../lib/TickerContext'
 
@@ -331,6 +335,26 @@ function rowTint(pct) {
 
 function MomoRow({ row, onFocus }) {
   const tintClass = rowTint(row.pct_change_1w)
+  // PositionBarWithTooltip expects buy_trade / sell_trade / prev_close.
+  // The MOMO row uses low_end / top_end / prev_close — same concept,
+  // different field names. Shim once at the boundary.
+  const posbarRow = {
+    ticker: row.ticker,
+    buy_trade: row.low_end,
+    sell_trade: row.top_end,
+    prev_close: row.prev_close,
+    signal_date: undefined,
+  }
+  const pct = (() => {
+    if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
+    const px = Number(row.prev_close)
+    const lo = Number(row.low_end)
+    const hi = Number(row.top_end)
+    if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
+    const span = hi - lo
+    if (span === 0) return null
+    return (px - lo) / span
+  })()
   return (
     <li className={`rerank-row tt-momo-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
@@ -348,16 +372,22 @@ function MomoRow({ row, onFocus }) {
           and got nothing." */}
       <span className="tt-trend-cell"><TrendChip bias={row.trend_bias} /></span>
       <span className="tt-trade-cell"><TradeChip bias={row.trade_bias} /></span>
-      <span className="rerank-asset" aria-hidden="true" />
+      {/* Range bar — the row's visual anchor (Task 6 hybrid). Takes
+          the flex-grow slot where the asset spacer used to live so
+          it reads as the centerpiece. Numeric LRR/TRR/PREV CLOSE
+          stay to the right for quick scanning. */}
+      <span className="tt-momo-range">
+        <PositionBarWithTooltip
+          row={posbarRow}
+          display={null}
+          markerPct={pct}
+          ghostPct={null}
+          zone={null}
+        />
+      </span>
       <span className="tt-price">{formatPrice(row.prev_close)}</span>
       <span className="tt-price tt-price-dim">{formatPrice(row.low_end)}</span>
       <span className="tt-price tt-price-dim">{formatPrice(row.top_end)}</span>
-      <MiniRangeBar
-        prevClose={row.prev_close}
-        lowEnd={row.low_end}
-        topEnd={row.top_end}
-        ariaLabel={`${row.ticker} range`}
-      />
       <span className="tt-earn-cell"><EarningsCell row={row} /></span>
       <PctChip pct={row.pct_change_1w} />
     </li>
@@ -610,11 +640,10 @@ export function MomoTrackerPanel() {
             <span className="rerank-ticker">TICKER</span>
             <span className="tt-trend-head">TREND</span>
             <span className="tt-trade-head">TRADE</span>
-            <span className="rerank-asset" />
+            <span className="tt-range-head">RANGE</span>
             <span className="tt-price">PREV CLOSE</span>
             <span className="tt-price">LRR</span>
             <span className="tt-price">TRR</span>
-            <span className="tt-range-head">RANGE</span>
             <span className="tt-earn-head">EARNINGS</span>
             <span className="tt-pct-head">1W Δ</span>
           </div>

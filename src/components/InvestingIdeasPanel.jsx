@@ -4,6 +4,7 @@ import { LABEL } from '../lib/labels'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { useTickerFocus } from '../lib/TickerContext'
 import { BiasTimeframePill } from './BiasTimeframePill'
+import { PositionBarWithTooltip } from './PositionBar'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
@@ -234,15 +235,37 @@ function IdeaRow({ row, isOpen, onToggle, onFocus }) {
         <span className="rerank-asset" title={row.sector ?? ''}>
           {row.sector ?? <span className="tt-cell-dim">—</span>}
         </span>
+        {/* Range bar — visual anchor (Task 6 hybrid). PositionBarWithTooltip
+            expects buy_trade/sell_trade/prev_close; we shim once with the
+            II row's low_end/top_end equivalents. Numeric LRR/TRR/PREV CLOSE
+            stay to the right for quick scanning. */}
+        <span className="tt-ii-range">
+          <PositionBarWithTooltip
+            row={{
+              ticker: row.ticker,
+              buy_trade: row.low_end,
+              sell_trade: row.top_end,
+              prev_close: row.prev_close,
+              signal_date: undefined,
+            }}
+            display={null}
+            markerPct={(() => {
+              if (row.prev_close == null || row.low_end == null || row.top_end == null) return null
+              const px = Number(row.prev_close)
+              const lo = Number(row.low_end)
+              const hi = Number(row.top_end)
+              if (!Number.isFinite(px) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null
+              const span = hi - lo
+              if (span === 0) return null
+              return (px - lo) / span
+            })()}
+            ghostPct={null}
+            zone={null}
+          />
+        </span>
         <span className="tt-price">{formatPrice(row.prev_close)}</span>
         <span className="tt-price tt-price-dim">{formatPrice(row.low_end)}</span>
         <span className="tt-price tt-price-dim">{formatPrice(row.top_end)}</span>
-        <MiniRangeBar
-          prevClose={row.prev_close}
-          lowEnd={row.low_end}
-          topEnd={row.top_end}
-          ariaLabel={`${row.ticker} range`}
-        />
       </li>
 
       <AnimatePresence initial={false}>
@@ -484,10 +507,10 @@ export function InvestingIdeasPanel() {
             <span className="rerank-rank tt-ii-pos">{LABEL.column.pos}</span>
             <span className="rerank-ticker">{LABEL.column.ticker}</span>
             <span className="rerank-asset">{LABEL.column.sector}</span>
+            <span className="tt-range-head">{LABEL.column.range}</span>
             <span className="tt-price">{LABEL.column.prevClose}</span>
             <span className="tt-price">{LABEL.column.lrr}</span>
             <span className="tt-price">{LABEL.column.trr}</span>
-            <span className="tt-range-head">{LABEL.column.range}</span>
           </div>
 
           <ol className="rerank-list">

@@ -5791,38 +5791,53 @@ body,
     80px;                 /* new chip   */
 }
 
-/* Investing Ideas: SIDE | POS | TICKER | SECTOR | PREV | LRR | TRR | RANGE */
+/* Investing Ideas: SIDE | POS | TICKER | SECTOR | RANGE(flex) | PREV | LRR | TRR
+   Task 6 hybrid — RANGE bar becomes the visual anchor in a flex-grow
+   slot; LRR / TRR / PREV CLOSE numeric columns kept to the right
+   for fast scanning. The old RANGE pill column is removed. */
 .investing-ideas-panel .rerank-list-head,
 .investing-ideas-panel .rerank-row.tt-ii-row {
   grid-template-columns:
-    48px                  /* side L/S pill */
-    48px                  /* pos          */
-    minmax(70px, auto)    /* ticker       */
-    minmax(120px, 1fr)    /* sector       */
-    96px                  /* prev close   */
-    84px                  /* LRR          */
-    84px                  /* TRR          */
-    130px;                /* range bar    */
+    48px                  /* side L/S pill   */
+    48px                  /* pos             */
+    minmax(70px, auto)    /* ticker          */
+    minmax(100px, 1fr)    /* sector          */
+    minmax(180px, 2fr)    /* range bar (flex)*/
+    96px                  /* prev close      */
+    84px                  /* LRR             */
+    84px;                 /* TRR             */
 }
 
-/* MOMO: TICKER | TREND | TRADE | (blank flex) | PREV | LRR | TRR | RANGE | EARN | 1W Δ
-   TREND + TRADE are intentionally two separate columns — the design
-   feature is that the user can see disagreement (MSFT today: TREND
-   BEARISH, TRADE BULLISH). Width 130px each is enough for the
-   labeled pill `TREND: BEARISH`. */
+/* MOMO: TICKER | TREND | TRADE | RANGE(flex) | PREV | LRR | TRR | EARN | 1W Δ
+   Task 6 hybrid — same shape as II's row. TREND + TRADE remain two
+   separate columns so disagreement (e.g. MSFT TREND BEARISH +
+   TRADE BULLISH) reads cleanly. The old separate RANGE pill column
+   and the blank-asset spacer are both gone; the bar takes their
+   combined slot in flex-grow form. */
 .momo-panel.rerank-panel .rerank-list-head,
 .momo-panel.rerank-panel .rerank-row.tt-momo-row {
   grid-template-columns:
-    minmax(80px, auto)    /* ticker     */
-    130px                 /* trend      */
-    130px                 /* trade      */
-    minmax(20px, 1fr)     /* spacer     */
-    96px                  /* prev close */
-    80px                  /* LRR        */
-    80px                  /* TRR        */
-    130px                 /* range bar  */
-    110px                 /* earnings   */
-    88px;                 /* 1W Δ       */
+    minmax(80px, auto)    /* ticker          */
+    130px                 /* trend           */
+    130px                 /* trade           */
+    minmax(180px, 2fr)    /* range bar (flex)*/
+    96px                  /* prev close      */
+    80px                  /* LRR             */
+    80px                  /* TRR             */
+    110px                 /* earnings        */
+    88px;                 /* 1W Δ            */
+}
+
+/* Range bar cells inside the row — full width of their grid slot,
+   centered alignment, min-width 0 so the bar can shrink when the
+   panel narrows. */
+.tt-ii-range,
+.tt-momo-range {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
 }
 
 /* --- Shared cells: date, days pill, dim placeholder ---------------- */
@@ -6595,9 +6610,10 @@ body,
   .signal-strength-panel .rerank-list-head .rerank-asset {
     display: none;
   }
+  /* II mobile (Task 6 hybrid grid): SIDE | POS | TICKER | RANGE | PREV CLOSE */
   .investing-ideas-panel .rerank-list-head,
   .investing-ideas-panel .rerank-row.tt-ii-row {
-    grid-template-columns: 40px 40px minmax(60px, auto) 80px 110px;
+    grid-template-columns: 40px 40px minmax(60px, auto) 1fr 90px;
   }
   .investing-ideas-panel .rerank-asset,
   .investing-ideas-panel .rerank-list-head .rerank-asset,
@@ -6605,12 +6621,11 @@ body,
   .investing-ideas-panel .tt-price:nth-of-type(3) {
     display: none;
   }
+  /* MOMO mobile (Task 6 hybrid grid): TICKER | RANGE | PREV CLOSE | 1W Δ */
   .momo-panel.rerank-panel .rerank-list-head,
   .momo-panel.rerank-panel .rerank-row.tt-momo-row {
-    grid-template-columns: minmax(70px, auto) 1fr 110px 80px;
+    grid-template-columns: minmax(70px, auto) 1fr 90px 80px;
   }
-  .momo-panel.rerank-panel .rerank-asset,
-  .momo-panel.rerank-panel .rerank-list-head .rerank-asset,
   .momo-panel.rerank-panel .tt-price:nth-of-type(2),
   .momo-panel.rerank-panel .tt-price:nth-of-type(3),
   .momo-panel.rerank-panel .tt-trend-cell,
