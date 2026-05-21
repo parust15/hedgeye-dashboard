@@ -6859,7 +6859,11 @@ body,
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   overflow: hidden;
-  background: var(--bg-elev);
+  /* Matches the dashboard's translucent flat-surface convention
+     (same rgba used by .tt-ribbon and .tt-ii-expand-body) so the
+     cosmos ambient shows through, instead of being a fully opaque
+     panel that floats above it. */
+  background: rgba(20, 23, 31, 0.55);
 }
 
 .all-time-list-head,
