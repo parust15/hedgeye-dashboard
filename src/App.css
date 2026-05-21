@@ -6844,3 +6844,96 @@ body,
   }
 }
 
+/* ===================================================================
+   All Time scan list (CallAllTimeView redesign)
+   Stripped 3-column row list: ticker | company name | last seen.
+   No directional color, no position pills, no badges — single line
+   per ticker, tight density. The .all-time-card / .atc-* / .all-time-
+   grid styles further up in this file are now unused (left in place
+   for a future cleanup sweep; no live consumer renders them).
+   =================================================================== */
+
+.all-time-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+
+.all-time-list-head,
+.all-time-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+}
+
+.all-time-list-head {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.all-time-row {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.all-time-row:first-of-type {
+  border-top: 0;
+}
+
+.all-time-row:hover,
+.all-time-row:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+.all-time-ticker {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-strong);
+  letter-spacing: 0.2px;
+}
+
+.all-time-company {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.all-time-date {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .all-time-list-head,
+  .all-time-row {
+    grid-template-columns: 80px minmax(0, 1fr) 70px;
+    gap: 10px;
+    padding: 7px 10px;
+  }
+}
+
