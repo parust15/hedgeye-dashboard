@@ -3,7 +3,10 @@ import { useTickerDetail } from '../lib/useTickerDetail'
 import { useTickerSummary } from '../lib/useTickerSummary'
 import { CrossLevelPeek } from './CrossLevelPeek'
 
-const MAX_CONVICTION = 75
+// ModalConvictionBar + MAX_CONVICTION removed — the conviction rating
+// + "X appearances 90d" badges are no longer surfaced in the modal
+// header. The full company info body (AI summary, thesis, analyst
+// notes, Top 5 history) is what carries the actionable detail.
 
 // Color map for the AI-summary status badges. Each badge is a small
 // uppercase pill rendered with one of four tones — green/grey/amber/red
@@ -54,19 +57,6 @@ function formatNoteDate(iso) {
 function PositionTypePill({ type }) {
   const cls = `position-pill position-${(type ?? 'neutral').toLowerCase()}`
   return <span className={cls}>{type ?? 'NEUTRAL'}</span>
-}
-
-function ModalConvictionBar({ score }) {
-  const safe = Number.isFinite(Number(score)) ? Number(score) : 0
-  const pct = Math.max(0, Math.min(1, safe / MAX_CONVICTION)) * 100
-  return (
-    <div className="modal-conviction">
-      <div className="conviction-bar">
-        <div className="conviction-bar-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="conviction-score">{safe}</span>
-    </div>
-  )
 }
 
 // Single modal entry point — driven by the TickerContext `focus`
@@ -182,14 +172,8 @@ export function TickerDetailModal({ focus, onClose, onJumpTab }) {
             <PositionTypePill type={position.position_type} />
           </div>
           <div className="modal-head-row2">
-            <ModalConvictionBar score={position.conviction_score} />
             {position.consecutive_days > 1 && (
               <span className="modal-meta">{position.consecutive_days} days streak</span>
-            )}
-            {position.top5_appearances_90d > 0 && (
-              <span className="modal-meta">
-                {position.top5_appearances_90d} appearances 90d
-              </span>
             )}
           </div>
         </header>

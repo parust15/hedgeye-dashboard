@@ -77,11 +77,25 @@ export function CallAllTimeView({ search, setSearch, ...ignored }) {
     })
   }, [rows, search])
 
-  function openPeek(ticker) {
-    // No payload — the All Time row doesn't carry the call-info data
-    // the legacy modal body needs; opening as a cross-tab peek instead
-    // gives the user the multi-panel view of this ticker.
-    focusTicker(ticker, { source: 'the-call' })
+  function openCompanyInfo(row) {
+    // Open the full company-info modal — AI summary, thesis, analyst
+    // notes, Top 5 history. The modal's own data hooks (useTickerDetail
+    // + useTickerSummary) fetch on ticker change; we only need to seed
+    // it with a payload so the modal renders the legacy body (vs. the
+    // cross-panel peek shell). The All Time row carries enough to
+    // populate the header (ticker + company name); the rest of the
+    // body fills in once the hooks resolve.
+    focusTicker(row.ticker, {
+      source: 'the-call',
+      payload: {
+        ticker: row.ticker,
+        company_name: row.company_name,
+        // signal_date isn't on the row — leaving it undefined means
+        // the "TODAY'S NOTE" section won't fire (it gates on
+        // signal_date match), but historical notes + AI summary
+        // still render in full.
+      },
+    })
   }
 
   return (
@@ -138,7 +152,7 @@ export function CallAllTimeView({ search, setSearch, ...ignored }) {
               type="button"
               role="row"
               className="all-time-row"
-              onClick={() => openPeek(r.ticker)}
+              onClick={() => openCompanyInfo(r)}
             >
               <span role="cell" className="all-time-ticker">{r.ticker}</span>
               <span role="cell" className="all-time-company">{r.company_name ?? '—'}</span>
