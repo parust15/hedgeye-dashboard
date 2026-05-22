@@ -4,6 +4,7 @@ import { LABEL } from '../lib/labels'
 import { priceInRangePct } from '../lib/range'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
+import { PriceCell } from './PriceCell'
 
 // Row component for ETF Pro Plus. Mirrors the SS / II / MOMO row
 // pattern (single .rerank-row li with grid layout) so the panel reads
@@ -30,7 +31,12 @@ function rowTint(trend) {
   return 'rerank-row-neutral'
 }
 
-export const EtfProRow = memo(function EtfProRow({ row, shortLabel = '', onOpenInfo }) {
+export const EtfProRow = memo(function EtfProRow({
+  row,
+  shortLabel = '',
+  display,
+  onOpenInfo,
+}) {
   const tintClass = rowTint(row.trend)
   // EtfProRow consumes the post-toSignalRow shape (buy_trade /
   // sell_trade / prev_close) so the canonical priceInRangePct
@@ -67,11 +73,12 @@ export const EtfProRow = memo(function EtfProRow({ row, shortLabel = '', onOpenI
       </span>
       {/* PositionBar — visual anchor. LRR / TRR pulled from
           buy_trade / sell_trade; range_state badge intentionally
-          absent (no source column). */}
+          absent (no source column). `display` adds the live marker
+          when there's a quote (Change 5). */}
       <span className="tt-etfpp-range">
         <PositionBarWithTooltip
           row={row}
-          display={null}
+          display={display}
           markerPct={pct}
           ghostPct={null}
           zone={null}
@@ -79,7 +86,9 @@ export const EtfProRow = memo(function EtfProRow({ row, shortLabel = '', onOpenI
       </span>
       <span className="tt-price">{formatPrice(row.buy_trade)}</span>
       <span className="tt-price">{formatPrice(row.sell_trade)}</span>
-      <span className="tt-price">{formatPrice(row.prev_close)}</span>
+      {/* Price cell prefers live when available, falls back to
+          recent_price (= prev_close on this row shape). */}
+      <PriceCell prevClose={row.prev_close} display={display} />
     </li>
   )
 })
@@ -102,7 +111,9 @@ export function EtfProRowHead() {
       </span>
       <span className="tt-price">{LABEL.column.lrr}</span>
       <span className="tt-price">{LABEL.column.trr}</span>
-      <span className="tt-price">{LABEL.column.prevClose}</span>
+      {/* "Price" not "Prev close" — cell now prefers live quote when
+          one exists (PriceCell). */}
+      <span className="tt-price">Price</span>
     </div>
   )
 }

@@ -1,14 +1,29 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
-const OPEN_POLL_MS = 30_000
-const CLOSED_POLL_MS = 5 * 60_000
+const DEFAULT_OPEN_POLL_MS = 30_000
+const DEFAULT_CLOSED_POLL_MS = 5 * 60_000
 
 /**
  * Returns a Map<ticker, livePrice> of the latest rows in `live_prices`.
- * Polls every 30s when the market is open, every 5min otherwise.
+ *
+ * Poll cadence:
+ *   - Defaults: 30s open / 5min closed — used by RR + Call's
+ *     LivePriceBlock surfaces (fast-changing dashboards).
+ *   - openPollMs override: II + ETF Pro Plus pass 15 * 60 * 1000 because
+ *     their range bars + side-by-side prev/live price tiles don't need
+ *     tick-by-tick freshness, and a 15-minute cadence matches the
+ *     `quoted_at` staleness threshold the priceDisplay layer uses.
+ *
+ * closedPollMs is intentionally left at the 5min default in every caller —
+ * outside market hours, the source data doesn't move, so polling less
+ * often than the stale threshold is fine and saves request volume.
  */
-export function useLivePrices(isMarketOpen) {
+export function useLivePrices(
+  isMarketOpen,
+  openPollMs = DEFAULT_OPEN_POLL_MS,
+  closedPollMs = DEFAULT_CLOSED_POLL_MS
+) {
   const [byTicker, setByTicker] = useState(() => new Map())
 
   useEffect(() => {
@@ -31,13 +46,13 @@ export function useLivePrices(isMarketOpen) {
       setByTicker(next)
     }
     load()
-    const ms = isMarketOpen ? OPEN_POLL_MS : CLOSED_POLL_MS
+    const ms = isMarketOpen ? openPollMs : closedPollMs
     const id = setInterval(load, ms)
     return () => {
       cancelled = true
       clearInterval(id)
     }
-  }, [isMarketOpen])
+  }, [isMarketOpen, openPollMs, closedPollMs])
 
   return byTicker
 }

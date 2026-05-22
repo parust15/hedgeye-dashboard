@@ -4,13 +4,23 @@ import { LABEL } from '../lib/labels'
 import { safeHttpUrl } from '../lib/url'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
 import { useTickerFocus } from '../lib/TickerContext'
+import { useMarketState } from '../lib/marketState'
+import { useLivePrices } from '../lib/livePrices'
+import { getPriceDisplay } from '../lib/priceDisplay'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
+import { PriceCell } from './PriceCell'
+import { quoteChip } from '../lib/quoteFresh'
 import { formatPrice } from '../lib/format'
 import { priceInRangePct, numCmp } from '../lib/range'
+
+// 15-minute open-poll cadence per spec — II is a weekly book, so a
+// tick-by-tick refresh would just spend request budget for no
+// information gain. The closed-market default (5min) is kept.
+const II_LIVE_POLL_MS = 15 * 60 * 1000
 
 const SKELETON_ROWS = 12
 
@@ -64,6 +74,9 @@ function loadInitialSearch() {
 // buy_trade / sell_trade as on hedgeye_signals_v).
 const II_RANGE_FIELDS = { lowKey: 'low_end', highKey: 'top_end' }
 
+// PriceCell + quoteChip live in ./PriceCell so EPP can reuse the same
+// helpers — see Change 5 of the May spec.
+
 // "May 18, 2026" — used in the header chip + section labels.
 function formatLong(iso) {
   if (!iso) return null
@@ -84,7 +97,7 @@ function formatLong(iso) {
 // sort comparators).
 
 // === Dual top boxes ===================================================
-function TopBox({ title, tone, rows }) {
+function TopBox({ title, tone, rows, displays }) {
   const toneClass = tone === 'top' ? 'rerank-movers-top' : 'rerank-movers-bottom'
   return (
     <div className={`rerank-movers-card ${toneClass}`}>
@@ -94,11 +107,13 @@ function TopBox({ title, tone, rows }) {
         <div className="rerank-movers-empty">No data yet.</div>
       ) : (
         <>
-          {/* Column header row matches the data grid template below. */}
+          {/* Column header row matches the data grid template below.
+              "Price" replaces "Prev close" because the cell now prefers
+              live when available — see PriceCell. */}
           <div className="tt-mover-head tt-ii-mover-row" aria-hidden="true">
             <span className="tt-mover-head-cell tt-mover-head-ticker">{LABEL.column.ticker}</span>
             <span className="tt-mover-head-cell">{LABEL.column.sector}</span>
-            <span className="tt-mover-head-cell">{LABEL.column.prevClose}</span>
+            <span className="tt-mover-head-cell">Price</span>
             <span className="tt-mover-head-cell">{LABEL.column.range}</span>
           </div>
           <ul className="rerank-movers-list">
@@ -108,7 +123,9 @@ function TopBox({ title, tone, rows }) {
                 <span className="rerank-movers-asset tt-mover-cell-c" title={r.sector ?? ''}>
                   {r.sector ?? '—'}
                 </span>
-                <span className="tt-price tt-mover-cell-c">{formatPrice(r.prev_close)}</span>
+                <span className="tt-mover-cell-c">
+                  <PriceCell prevClose={r.prev_close} display={displays?.get(r.ticker)} />
+                </span>
                 <span className="tt-mover-cell-c">
                   <span className="tt-range-chip">
                     {formatPrice(r.low_end)} – {formatPrice(r.top_end)}
@@ -138,7 +155,7 @@ function SidePill({ side }) {
 }
 
 // === Single full-table row + expansion ================================
-const IdeaRow = memo(function IdeaRow({ row, isOpen, onToggle, onFocus }) {
+const IdeaRow = memo(function IdeaRow({ row, isOpen, onToggle, onFocus, display }) {
   const isLong = row.side === 'long'
   const tintClass = isLong ? 'rerank-row-up' : 'rerank-row-down'
   // The bullets array can be empty/null for tickers whose writeup uses
@@ -195,13 +212,13 @@ const IdeaRow = memo(function IdeaRow({ row, isOpen, onToggle, onFocus }) {
               prev_close: row.prev_close,
               signal_date: undefined,
             }}
-            display={null}
+            display={display}
             markerPct={priceInRangePct(row, II_RANGE_FIELDS)}
             ghostPct={null}
             zone={null}
           />
         </span>
-        <span className="tt-price">{formatPrice(row.prev_close)}</span>
+        <PriceCell prevClose={row.prev_close} display={display} />
         <span className="tt-price tt-price-dim">{formatPrice(row.low_end)}</span>
         <span className="tt-price tt-price-dim">{formatPrice(row.top_end)}</span>
       </li>
@@ -270,6 +287,14 @@ export function InvestingIdeasPanel() {
     [focusTicker]
   )
 
+  // Live quotes — 15-min market-hours cadence (II is a weekly book).
+  // The market state + livePrices fetch must be at the top of the
+  // component so the hook order stays stable across re-renders; the
+  // displays/latestQuotedAt computations that depend on `allRows` live
+  // further below, after allRows is declared.
+  const market = useMarketState()
+  const livePrices = useLivePrices(market.isOpen, II_LIVE_POLL_MS)
+
   const [sortField, setSortField] = useState(loadInitialSortField)
   const [sortDir, setSortDir] = useState(loadInitialSortDir)
   const [search, setSearch] = useState(loadInitialSearch)
@@ -310,6 +335,37 @@ export function InvestingIdeasPanel() {
   // Full list: longs first, then shorts. Both arrays are already
   // position-ASC sorted by the hook.
   const allRows = useMemo(() => [...longs, ...shorts], [longs, shorts])
+
+  // Per-ticker priceDisplay. The shim swaps low_end/top_end into the
+  // canonical buy_trade/sell_trade slots so getPriceDisplay's livePct
+  // calc lands in the right [0, 1] zone for II's range bar.
+  const displays = useMemo(() => {
+    const m = new Map()
+    for (const r of allRows) {
+      const signalShim = {
+        buy_trade: r.low_end,
+        sell_trade: r.top_end,
+        prev_close: r.prev_close,
+      }
+      m.set(r.ticker, getPriceDisplay(signalShim, livePrices.get(r.ticker), market.isOpen))
+    }
+    return m
+  }, [allRows, livePrices, market.isOpen])
+
+  // Max quoted_at across displayed tickers — header chip's HH:MM stamp.
+  // Spec calls for `quoted_at` specifically (not `updated_at`); both
+  // columns exist on live_prices but `quoted_at` is the wall-clock the
+  // exchange reported, which is what the user wants surfaced.
+  const latestQuotedAt = useMemo(() => {
+    let max = null
+    for (const r of allRows) {
+      const lp = livePrices.get(r.ticker)
+      if (!lp?.quoted_at) continue
+      if (!max || lp.quoted_at > max) max = lp.quoted_at
+    }
+    return max
+  }, [allRows, livePrices])
+  const quotesChip = quoteChip(displays, latestQuotedAt, market.isOpen)
 
   // Filter then sort.
   const visibleRows = useMemo(() => {
@@ -391,6 +447,13 @@ export function InvestingIdeasPanel() {
                 dot={false}
               />
             )}
+            {status === 'ready' && quotesChip && (
+              <StatusChip
+                label={quotesChip.label}
+                value={quotesChip.value}
+                dot={false}
+              />
+            )}
             {status === 'empty' && (
               <StatusChip label="Week of" value="No data yet" dot={false} />
             )}
@@ -441,8 +504,8 @@ export function InvestingIdeasPanel() {
       {status === 'ready' && (
         <>
           <section className="rerank-movers" aria-label="Top long and short ideas">
-            <TopBox title="5 LONGS" tone="top" rows={topLongs} />
-            <TopBox title="5 SHORTS" tone="bottom" rows={topShorts} />
+            <TopBox title="5 LONGS" tone="top" rows={topLongs} displays={displays} />
+            <TopBox title="5 SHORTS" tone="bottom" rows={topShorts} displays={displays} />
           </section>
 
           <div className="rerank-list-head tt-ii-row" aria-hidden="true">
@@ -459,7 +522,10 @@ export function InvestingIdeasPanel() {
               <span>{LABEL.column.range}</span>
               <span>{LABEL.column.trr}</span>
             </span>
-            <span className="tt-price">{LABEL.column.prevClose}</span>
+            {/* "Price" replaces "Prev close" because the cell now
+                prefers live when available (falls back to prev_close
+                via PriceCell). */}
+            <span className="tt-price">Price</span>
             <span className="tt-price">{LABEL.column.lrr}</span>
             <span className="tt-price">{LABEL.column.trr}</span>
           </div>
@@ -472,6 +538,7 @@ export function InvestingIdeasPanel() {
                 isOpen={openTicker === r.ticker}
                 onToggle={toggleOpen}
                 onFocus={onFocus}
+                display={displays.get(r.ticker)}
               />
             ))}
           </ol>

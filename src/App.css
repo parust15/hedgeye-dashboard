@@ -6180,6 +6180,17 @@ body,
 
 .tt-price-dim { color: var(--text-dim); }
 
+/* Live / stale freshness tones for PriceCell (Change 5).
+   - Live  → full-strength text + subtle weight bump so the live quote
+            visually outranks the static neighbors (LRR / TRR).
+   - Stale → dim text to flag that the quote crossed the 15-min
+            staleness threshold even though the panel is still polling.
+   Tones are intentionally restrained: PriceCell shares the .tt-price
+   slot with the static prev_close render, so a flashy color shift
+   would create a distracting micro-animation on every poll cycle. */
+.tt-price-live { font-weight: 600; }
+.tt-price-stale { color: var(--text-dim); }
+
 /* Header price labels mirror the dim header treatment elsewhere. */
 .investing-ideas-panel .rerank-list-head .tt-price,
 .momo-panel.rerank-panel .rerank-list-head .tt-price {

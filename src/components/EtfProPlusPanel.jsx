@@ -3,13 +3,21 @@ import { supabase } from '../lib/supabase'
 import { LABEL } from '../lib/labels'
 import { priceInRangePct, numCmp } from '../lib/range'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
+import { useMarketState } from '../lib/marketState'
+import { useLivePrices } from '../lib/livePrices'
+import { getPriceDisplay } from '../lib/priceDisplay'
 import { EtfProRow, EtfProRowHead } from './EtfProRow'
 import { SortControl } from './SortControl'
 import { CategoryFilter } from './CategoryFilter'
 import { StatusChip } from './StatusChip'
 import { EtfInfoModal } from './EtfInfoModal'
+import { quoteChip } from '../lib/quoteFresh'
 import { shortenAssetClass } from '../lib/assetClass'
 import { getSetup } from '../lib/range'
+
+// 15-min market-hours poll cadence per spec — ETF Pro Plus is a weekly
+// book, so the same reasoning as II applies (see InvestingIdeasPanel).
+const EPP_LIVE_POLL_MS = 15 * 60 * 1000
 
 // --- localStorage keys (per CLAUDE.md: dashboard.<feature>) ----------------
 const SEARCH_KEY = 'dashboard.etfSearch'
@@ -288,6 +296,33 @@ export function EtfProPlusPanel() {
   // --- Transform rows once at the panel boundary --------------------------
   const transformedRows = useMemo(() => rows.map(toSignalRow), [rows])
 
+  // Live quotes — 15-min market-hours cadence (EPP is a weekly book,
+  // same reasoning as II). transformedRows already shimmies to
+  // buy_trade/sell_trade/prev_close, so getPriceDisplay can consume
+  // each row directly with no further mapping.
+  const market = useMarketState()
+  const livePrices = useLivePrices(market.isOpen, EPP_LIVE_POLL_MS)
+  const displays = useMemo(() => {
+    const m = new Map()
+    for (const r of transformedRows) {
+      m.set(r.ticker, getPriceDisplay(r, livePrices.get(r.ticker), market.isOpen))
+    }
+    return m
+  }, [transformedRows, livePrices, market.isOpen])
+  // Max quoted_at across the EPP universe — drives the header chip's
+  // HH:MM stamp. Spec is explicit that the timestamp must come from
+  // `quoted_at`, not `updated_at`.
+  const latestQuotedAt = useMemo(() => {
+    let max = null
+    for (const r of transformedRows) {
+      const lp = livePrices.get(r.ticker)
+      if (!lp?.quoted_at) continue
+      if (!max || lp.quoted_at > max) max = lp.quoted_at
+    }
+    return max
+  }, [transformedRows, livePrices])
+  const quotesChip = quoteChip(displays, latestQuotedAt, market.isOpen)
+
   // --- Asset-class chip data (mirrors RR's category chips) ----------------
   const assetClasses = useMemo(() => {
     const set = new Set()
@@ -436,6 +471,13 @@ export function EtfProPlusPanel() {
             {status === 'ready' && (
               <StatusChip label="Positions" value={rows.length} dot={false} />
             )}
+            {status === 'ready' && quotesChip && (
+              <StatusChip
+                label={quotesChip.label}
+                value={quotesChip.value}
+                dot={false}
+              />
+            )}
             {status === 'empty' && (
               <StatusChip label="Snapshot" value="No data yet" dot={false} />
             )}
@@ -574,6 +616,7 @@ export function EtfProPlusPanel() {
                 key={r.ticker}
                 row={r}
                 shortLabel={shortLabelByTicker.get(r.ticker) ?? ''}
+                display={displays.get(r.ticker)}
                 onOpenInfo={openInfoModal}
               />
             ))}
