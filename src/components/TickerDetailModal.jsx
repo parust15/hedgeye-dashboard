@@ -195,9 +195,12 @@ export function TickerDetailModal({ focus, onClose, onJumpTab }) {
               <PositionTypePill type={summary.position_type ?? position.position_type} />
               <SummaryBadge value={summary.data_freshness} label="Freshness" />
             </div>
-            {summary.core_thesis && (
-              <h3 className="modal-summary-thesis">{summary.core_thesis}</h3>
-            )}
+            {/* core_thesis intentionally NOT rendered — the bold
+                headline was the primary chrome of the AI summary
+                section but the `summary` paragraph below covers the
+                same ground in plain prose. Field stays in the API
+                shape (still selected by useTickerSummary) so
+                downstream consumers / tests can read it. */}
             {summary.summary && (
               <p className="modal-summary-body">{summary.summary}</p>
             )}
