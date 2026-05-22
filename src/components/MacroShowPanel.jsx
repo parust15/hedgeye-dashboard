@@ -3,6 +3,7 @@ import { useMacroShow } from '../lib/useMacroShow'
 import { MacroDayCard } from './MacroDayCard'
 import { StatusChip } from './StatusChip'
 import { readJsonbStringArray } from '../lib/jsonbArray'
+import { truncateAtSentinel } from '../lib/macroBullets'
 
 const SKELETON_DAY_COUNT = 6
 
@@ -97,8 +98,10 @@ function colorizeTickers(text, matcher) {
 function SynthesisCard({ synthesis }) {
   // Derive bullets + callouts BEFORE any early return so the hook
   // call order below is stable per Rules of Hooks. Defaults to empty
-  // arrays when synthesis is missing.
-  const bullets = readJsonbStringArray(synthesis?.synthesis_bullets)
+  // arrays when synthesis is missing. Bullets are truncated at the
+  // first sentinel string (defense in depth — backend parser already
+  // strips Hedgeye email footers, this catches anything that slips).
+  const bullets = readJsonbStringArray(synthesis?.synthesis_bullets).map(truncateAtSentinel)
   const { bullish, bearish } = readCallouts(synthesis?.ticker_callouts)
 
   // Compile the ticker matcher once and reuse across all bullets —

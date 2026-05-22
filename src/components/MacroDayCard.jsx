@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { readJsonbArray, readJsonbStringArray } from '../lib/jsonbArray'
+import { truncateAtSentinel } from '../lib/macroBullets'
 
 // "Friday, May 15" formatter for the card header. ISO date string in,
 // localized string out. Uses local zone — signal_date is date-only so
@@ -48,14 +49,19 @@ function TickerChipRow({ label, tickers, kind }) {
 export function MacroDayCard({ day, defaultExpanded = false }) {
   const [open, setOpen] = useState(defaultExpanded)
 
-  const top3 = readJsonbArray(day.top3)
-  const tldr = readJsonbStringArray(day.llm_tldr_bullets)
+  // Truncate-at-sentinel applied to every free-text field — defense
+  // in depth in case a Hedgeye email footer slipped past the backend
+  // parser. See truncateAtSentinel in lib/macroBullets.
+  const top3 = readJsonbArray(day.top3).map((entry) =>
+    entry?.body ? { ...entry, body: truncateAtSentinel(entry.body) } : entry
+  )
+  const tldr = readJsonbStringArray(day.llm_tldr_bullets).map(truncateAtSentinel)
   const bullish = Array.isArray(day.bullish_tickers) ? day.bullish_tickers : []
   const bearish = Array.isArray(day.bearish_tickers) ? day.bearish_tickers : []
   const hasPositions = bullish.length > 0 || bearish.length > 0
-  const summary = day.main_summary_text || null
-  const intro = day.intro_headline || null
-  const ranges = day.immediate_ranges || null
+  const summary = day.main_summary_text ? truncateAtSentinel(day.main_summary_text) : null
+  const intro = day.intro_headline ? truncateAtSentinel(day.intro_headline) : null
+  const ranges = day.immediate_ranges ? truncateAtSentinel(day.immediate_ranges) : null
 
   // Themes shown in the collapsed header — small inline pill list.
   // Pulled from top3.theme so the user can scan what each day covers
