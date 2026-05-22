@@ -62,18 +62,38 @@ function loadInitialDirectionFilter() {
   return 'ALL'
 }
 
+// Asset-class filter persistence — new contract:
+//   stored value | meaning
+//   --------------+-----------------------------------------------------
+//   missing       | null   → no filter applied (initial / Select all)
+//   "null"        | null   → no filter applied (explicit Select all)
+//   "[]"          | null   → BACKWARD COMPAT: old code wrote empty array
+//                            to mean "show all" — keep honoring it as
+//                            null so existing users don't reload into a
+//                            zero-row screen
+//   "[a, b, ...]" | Set    → explicit selection (subset)
+// Once the user clicks Deselect all post-deploy, the value persists as
+// "null" with no array distinction needed for the new "show nothing"
+// case — that state is transient by design (the panel renders no rows
+// until the user starts checking categories, at which point it becomes
+// a non-empty Set).
 function loadInitialAssetClasses() {
   try {
     const raw = localStorage.getItem(ASSET_CLASS_KEY)
-    if (!raw) return new Set()
+    if (!raw) return null
     const parsed = JSON.parse(raw)
+    if (parsed === null) return null
     if (Array.isArray(parsed)) {
-      return new Set(parsed.filter((s) => typeof s === 'string'))
+      const labels = parsed.filter((s) => typeof s === 'string')
+      // Backward compat: legacy empty array == "show all" in the old
+      // contract. Map to null so behavior matches.
+      if (labels.length === 0) return null
+      return new Set(labels)
     }
   } catch (err) {
     console.warn('Failed to read etfAssetClasses from localStorage:', err)
   }
-  return new Set()
+  return null
 }
 
 function loadInitialSearch() {
@@ -215,7 +235,10 @@ export function EtfProPlusPanel() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(ASSET_CLASS_KEY, JSON.stringify([...activeAssetClasses]))
+      // null === "no filter" sentinel; spreading null would throw.
+      const payload =
+        activeAssetClasses === null ? null : [...activeAssetClasses]
+      localStorage.setItem(ASSET_CLASS_KEY, JSON.stringify(payload))
     } catch (err) {
       console.warn('Failed to persist etfAssetClasses:', err)
     }
@@ -329,7 +352,12 @@ export function EtfProPlusPanel() {
     if (view === 'setups') {
       list = list.filter((r) => getSetup(r, null) !== null)
     }
-    if (activeAssetClasses.size > 0) {
+    // Asset-class filter:
+    //   null  → no filter (show all categories) — skip entirely
+    //   Set   → explicit selection; empty Set is the Deselect-all state
+    //           (show nothing — Set().has() is always false, so the
+    //           filter naturally drops every row).
+    if (activeAssetClasses !== null) {
       list = list.filter((r) => r.category && activeAssetClasses.has(r.category))
     }
     if (directionFilter !== 'ALL') {

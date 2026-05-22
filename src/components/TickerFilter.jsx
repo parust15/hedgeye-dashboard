@@ -169,7 +169,7 @@ export function TickerFilter({
             />
             <div className="ticker-popover-actions">
               <button type="button" onClick={selectAll}>Select all</button>
-              <button type="button" onClick={clearAll}>Clear</button>
+              <button type="button" onClick={clearAll}>Deselect all</button>
             </div>
           </div>
           <div className="ticker-popover-body">

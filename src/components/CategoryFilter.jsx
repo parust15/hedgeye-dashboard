@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 
 // Popover dropdown that replaces the row of asset-class chips. Behavior
-// matches TickerFilter: button → popover with checkboxes + Reset/Clear.
+// matches TickerFilter: button → popover with checkboxes + Select all /
+// Deselect all.
 //
-// Panel-side semantic: `activeLabels` is the set of category labels the
-// user wants visible. An EMPTY set means "show all" — that's how the
-// panel's existing filter logic distinguishes "no filter applied" from
-// "filter applied with zero matches". We preserve that contract by
-// collapsing back to an empty set whenever every category is selected.
+// Panel contract for `activeLabels`:
+//   - null              → "no filter applied", panel shows all rows
+//   - Set<string>       → explicit selection; panel shows only rows whose
+//                         category label is in the Set. An empty Set is
+//                         an EXPLICIT "show nothing" — distinct from null.
+// This split is what lets "Deselect all" mean something different from
+// "Select all": the old single-empty-set contract conflated the two.
+//
+// Buttons:
+//   - Select all   → onChange(null)
+//   - Deselect all → onChange(new Set())
 //
 // Props:
 //   options: Array<{ label, count }>
-//   activeLabels: Set<string>
-//   onChange(nextSet)
+//   activeLabels: null | Set<string>
+//   onChange(next: null | Set<string>)
 export function CategoryFilter({ options, activeLabels, onChange }) {
   const [open, setOpen] = useState(false)
   const popoverRef = useRef(null)
@@ -37,18 +44,20 @@ export function CategoryFilter({ options, activeLabels, onChange }) {
   }, [open])
 
   const total = options.length
-  const allActive = activeLabels.size === 0
-  const selectedCount = allActive ? total : activeLabels.size
-  const buttonLabel = allActive
+  // `activeLabels === null` is the "all visible" mode (no filter). The
+  // size check below is only safe once we've established it's not null.
+  const allMode = activeLabels === null
+  const selectedCount = allMode ? total : activeLabels.size
+  const buttonLabel = allMode
     ? 'Categories (All)'
     : `Categories (${selectedCount}/${total})`
 
   function toggleLabel(label) {
-    // If we're in "all visible" mode (empty set), a click means
-    // "uncheck this one" — derive the start set from all labels minus
-    // the clicked one. Otherwise normal toggle.
+    // If we're in "all visible" mode (null), a click means "uncheck
+    // this one" — derive the start set from all labels minus the
+    // clicked one. Otherwise normal toggle on the existing Set.
     let next
-    if (allActive) {
+    if (allMode) {
       next = new Set(options.map((o) => o.label))
       next.delete(label)
     } else {
@@ -56,15 +65,23 @@ export function CategoryFilter({ options, activeLabels, onChange }) {
       if (next.has(label)) next.delete(label)
       else next.add(label)
     }
-    // Collapse back to "all visible" (empty set) when the user re-
-    // selects every category. Keeps the persisted state and the button
-    // label honest about whether a filter is actually applied.
-    if (next.size === total) next = new Set()
+    // Collapse back to "all visible" (null) when the user re-selects
+    // every category. Keeps the button label and panel behavior honest
+    // about whether a filter is actually applied.
+    if (next.size === total) {
+      onChange(null)
+      return
+    }
     onChange(next)
   }
 
   function selectAll() {
-    // Empty set === "All" in the panel's filter logic.
+    // null === "All (no filter applied)" in the panel's filter logic.
+    onChange(null)
+  }
+
+  function deselectAll() {
+    // Explicit empty Set === "show nothing". Distinct from null.
     onChange(new Set())
   }
 
@@ -73,12 +90,12 @@ export function CategoryFilter({ options, activeLabels, onChange }) {
       <button
         ref={buttonRef}
         type="button"
-        className={`ticker-filter-btn${!allActive ? ' has-filter' : ''}`}
+        className={`ticker-filter-btn${!allMode ? ' has-filter' : ''}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        {!allActive && <span className="ticker-filter-dot" aria-hidden="true" />}
+        {!allMode && <span className="ticker-filter-dot" aria-hidden="true" />}
         {buttonLabel}
       </button>
       {open && (
@@ -89,16 +106,23 @@ export function CategoryFilter({ options, activeLabels, onChange }) {
           aria-label="Filter categories"
         >
           <div className="ticker-popover-head">
-            <div className="ticker-popover-actions ticker-popover-actions-only">
-              <button type="button" onClick={selectAll} disabled={allActive}>
-                Reset (show all)
+            <div className="ticker-popover-actions">
+              <button type="button" onClick={selectAll} disabled={allMode}>
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={deselectAll}
+                disabled={!allMode && activeLabels.size === 0}
+              >
+                Deselect all
               </button>
             </div>
           </div>
           <div className="ticker-popover-body">
             <ul className="ticker-list category-list">
               {options.map((opt) => {
-                const checked = allActive || activeLabels.has(opt.label)
+                const checked = allMode || activeLabels.has(opt.label)
                 return (
                   <li key={opt.label} className="ticker-row">
                     <label>

@@ -103,8 +103,12 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
   // surfaces a generic message and the hook console.errors the raw detail.
   const { rows, changes, signalDate, updatedAt, status } = useDashboardData()
   const [view, setView] = useState('all') // 'all' | 'setups'
-  // Multi-select chip state: a Set of category labels. Empty set == "All" active.
-  const [activeCategories, setActiveCategories] = useState(() => new Set())
+  // Multi-select category filter state.
+  //   null            → "all visible" (no filter applied)
+  //   Set<string>     → explicit selection; empty Set is "show nothing"
+  // This split makes "Deselect all" a distinct action from "Select all"
+  // (the CategoryFilter dropdown exposes both buttons).
+  const [activeCategories, setActiveCategories] = useState(null)
   // Per-ticker visibility (Set<string>). null until first reconcile against
   // loaded rows. While null, treat as "all selected" so initial render is
   // unfiltered instead of empty.
@@ -246,8 +250,11 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
   )
 
   // Drop any active category whose chip has disappeared (e.g., data shift).
+  // Skipped entirely when in "all visible" mode (prev === null) — there's
+  // nothing to reconcile against an unfiltered view.
   useEffect(() => {
     setActiveCategories((prev) => {
+      if (prev === null) return prev
       const validLabels = new Set(visibleFilters.map((f) => f.label))
       let changed = false
       const next = new Set()
@@ -259,7 +266,9 @@ export function RiskRangesPanel({ allTickersByTicker, onViewCall, vixBucket }) {
     })
   }, [visibleFilters])
 
-  const isAllActive = activeCategories.size === 0
+  // null means "no category filter applied" (show all). An empty Set is
+  // a distinct, explicit "show nothing" — that's the Deselect-all state.
+  const isAllActive = activeCategories === null
 
   // Tickers excluded via the dropdown are filtered out of the setup count
   // too, since they're hidden everywhere on the dashboard.
