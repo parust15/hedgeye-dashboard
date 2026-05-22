@@ -15,6 +15,7 @@ import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { PriceCell } from './PriceCell'
 import { ActiveSetupRow, ActiveSetupRowHead } from './ActiveSetupRow'
+import { TrendBubble } from './TrendBubble'
 import { quoteChip } from '../lib/quoteFresh'
 import { formatPrice } from '../lib/format'
 import { priceInRangePct, numCmp, getSetup } from '../lib/range'
@@ -134,7 +135,10 @@ function TopBox({ title, tone, rows, displays }) {
           <ul className="rerank-movers-list">
             {rows.map((r) => (
               <li key={r.ticker} className="rerank-movers-row tt-ii-mover-row">
-                <span className="rerank-movers-ticker">{r.ticker}</span>
+                <span className="rerank-movers-ticker">
+                  {r.ticker}
+                  <TrendBubble ticker={r.ticker} />
+                </span>
                 <span className="rerank-movers-asset tt-mover-cell-c" title={r.sector ?? ''}>
                   {r.sector ?? '—'}
                 </span>
@@ -210,6 +214,7 @@ const IdeaRow = memo(function IdeaRow({ row, isOpen, onToggle, onFocus, display 
           }}
         >
           {row.ticker}
+          <TrendBubble ticker={row.ticker} />
         </button>
         <span className="rerank-asset" title={row.sector ?? ''}>
           {row.sector ?? <span className="tt-cell-dim">—</span>}

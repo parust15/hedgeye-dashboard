@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useTickerFocus } from '../lib/TickerContext'
+import { TrendBubble } from './TrendBubble'
 
 // "May 14" from YYYY-MM-DD. Matches the dashboard's date display
 // convention (no year, no time — the scan list is about recency).
@@ -154,7 +155,10 @@ export function CallAllTimeView({ search, setSearch, ...ignored }) {
               className="all-time-row"
               onClick={() => openCompanyInfo(r)}
             >
-              <span role="cell" className="all-time-ticker">{r.ticker}</span>
+              <span role="cell" className="all-time-ticker">
+                {r.ticker}
+                <TrendBubble ticker={r.ticker} />
+              </span>
               <span role="cell" className="all-time-company">{r.company_name ?? '—'}</span>
               <span role="cell" className="all-time-date">{formatLastSeen(r.last_note_date)}</span>
             </button>

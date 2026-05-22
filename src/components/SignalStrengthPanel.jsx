@@ -6,6 +6,7 @@ import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { formatPrice, parseAdded } from '../lib/format'
 import { useTickerFocus } from '../lib/TickerContext'
+import { TrendBubble } from './TrendBubble'
 
 const SKELETON_ROWS = 20
 
@@ -99,7 +100,10 @@ function TopBox({ title, tone, rows }) {
               const priceTxt = r.current_price == null ? '—' : formatPrice(r.current_price)
               return (
                 <li key={r.ticker} className="rerank-movers-row tt-ss-mover-row">
-                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-ticker">
+                    {r.ticker}
+                    <TrendBubble ticker={r.ticker} />
+                  </span>
                   <span className="tt-price tt-mover-cell-c">{priceTxt}</span>
                   <span className="tt-date tt-mover-cell-c">{dateLabel ?? '—'}</span>
                   <span className="tt-mover-cell-c">
@@ -138,6 +142,7 @@ const SignalRow = memo(function SignalRow({ row, pos, onFocus }) {
         onClick={() => onFocus?.(row.ticker)}
       >
         {row.ticker}
+        <TrendBubble ticker={row.ticker} />
       </button>
       <span className="tt-price">{priceTxt}</span>
       <span className="rerank-asset" aria-hidden="true" />

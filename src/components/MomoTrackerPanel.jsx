@@ -10,6 +10,7 @@ import { TickerSearch } from './TickerSearch'
 // already trimmed in Task 21 to TICKER · TREND · TRADE · PRICE · 1W).
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
+import { TrendBubble } from './TrendBubble'
 import { formatPrice } from '../lib/format'
 import { priceInRangePct, numCmp } from '../lib/range'
 import { safeHttpUrl } from '../lib/url'
@@ -283,7 +284,10 @@ function GainersLosersBox({ title, tone, rows, isLoser }) {
                 : formatPrice(r.prev_close)
               return (
                 <li key={r.ticker} className="rerank-movers-row tt-momo-mover-row">
-                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-ticker">
+                    {r.ticker}
+                    <TrendBubble ticker={r.ticker} />
+                  </span>
                   <span className="tt-mover-cell-c"><BiasTimeframePill timeframe="trend" bias={r.trend_bias} /></span>
                   <span className="tt-mover-cell-c"><BiasTimeframePill timeframe="trade" bias={r.trade_bias} /></span>
                   <span className="tt-price tt-mover-cell-c">{price}</span>
@@ -341,6 +345,7 @@ const MomoRow = memo(function MomoRow({ row, onFocus }) {
         onClick={() => onFocus?.(row.ticker)}
       >
         {row.ticker}
+        <TrendBubble ticker={row.ticker} />
       </button>
       {/* TREND + TRADE rendered as separate cells so each can sit
           under its own header label. Either may be empty/null —

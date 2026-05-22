@@ -10,6 +10,7 @@ import { VixBucketBadge } from './VixBucketPill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { RangeStateBadge } from './RangeStateBadge'
 import { BiasTimeframePill } from './BiasTimeframePill'
+import { TrendBubble } from './TrendBubble'
 export { PositionBarWithTooltip }
 
 // Code-split the recharts-heavy chart so it isn't part of the initial
@@ -179,7 +180,10 @@ export function SignalCard({
       <div className="card-bg" aria-hidden="true" />
       <header className="cc-head">
         <div className={`cc-head-id direction-${trendDirection(row.trend)}`}>
-          <div className="cc-ticker">{row.ticker}</div>
+          <div className="cc-ticker">
+            {row.ticker}
+            <TrendBubble ticker={row.ticker} />
+          </div>
           {row.display_name || row.name ? (
             <div className="cc-name">{row.display_name || row.name}</div>
           ) : null}

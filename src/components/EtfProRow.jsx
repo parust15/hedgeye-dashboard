@@ -5,6 +5,7 @@ import { priceInRangePct } from '../lib/range'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { PriceCell } from './PriceCell'
+import { TrendBubble } from './TrendBubble'
 
 // Row component for ETF Pro Plus. Mirrors the SS / II / MOMO row
 // pattern (single .rerank-row li with grid layout) so the panel reads
@@ -57,7 +58,10 @@ export const EtfProRow = memo(function EtfProRow({
       }}
     >
       <div className="card-bg" aria-hidden="true" />
-      <span className="rerank-ticker">{row.ticker}</span>
+      <span className="rerank-ticker">
+        {row.ticker}
+        <TrendBubble ticker={row.ticker} />
+      </span>
       {/* Type cell — one-word descriptor from etf_info.short_label.
           Empty when no row in etf_info / null label (per spec, no
           "—" placeholder — render literally empty so the cell reads

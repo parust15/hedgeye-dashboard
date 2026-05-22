@@ -15,6 +15,7 @@ import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
 import { TickerProvider, useTickerFocus } from './lib/TickerContext'
+import { TickerSignalStateProvider } from './lib/TickerSignalStateContext'
 import { TAB_ID_SET } from './lib/tabs'
 import { supabase } from './lib/supabase'
 import './App.css'
@@ -188,7 +189,9 @@ function AppBody() {
 export default function App() {
   return (
     <TickerProvider>
-      <AppBody />
+      <TickerSignalStateProvider>
+        <AppBody />
+      </TickerSignalStateProvider>
     </TickerProvider>
   )
 }

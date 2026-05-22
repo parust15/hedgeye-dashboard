@@ -3,6 +3,7 @@ import { formatPrice } from '../lib/format'
 import { BiasTimeframePill } from './BiasTimeframePill'
 import { PositionBarWithTooltip } from './PositionBar'
 import { PriceCell } from './PriceCell'
+import { TrendBubble } from './TrendBubble'
 
 // Active Setups row for the II "⚡ Active Setups" subtab (Change 6).
 // Sourced from hedgeye_ideas_levels (40 unique tickers across all
@@ -48,7 +49,10 @@ export const ActiveSetupRow = memo(function ActiveSetupRow({
       <span className="tt-setup-chip">
         <BiasTimeframePill timeframe="trend" bias={setupBias} size="sm" />
       </span>
-      <span className="rerank-ticker">{row.ticker}</span>
+      <span className="rerank-ticker">
+        {row.ticker}
+        <TrendBubble ticker={row.ticker} />
+      </span>
       {/* Range bar — visual anchor. Same II-flavored shim as IdeaRow:
           low_end / top_end / prev_close shoved into the buy_trade /
           sell_trade / prev_close slots PositionBar expects. */}

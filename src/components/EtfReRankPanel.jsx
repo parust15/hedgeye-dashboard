@@ -10,6 +10,7 @@ import { StatusChip } from './StatusChip'
 import { EtfInfoModal } from './EtfInfoModal'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
+import { TrendBubble } from './TrendBubble'
 
 const MOVERS_LIMIT = 5
 const SKELETON_ROWS = 20
@@ -175,7 +176,10 @@ function MoversStrip({ rows, proLookup, onSelect }) {
                     }
                   }}
                 >
-                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-ticker">
+                    {r.ticker}
+                    <TrendBubble ticker={r.ticker} />
+                  </span>
                   <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
                     {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
                   </span>
@@ -218,7 +222,10 @@ function MoversStrip({ rows, proLookup, onSelect }) {
                     }
                   }}
                 >
-                  <span className="rerank-movers-ticker">{r.ticker}</span>
+                  <span className="rerank-movers-ticker">
+                    {r.ticker}
+                    <TrendBubble ticker={r.ticker} />
+                  </span>
                   <span className="rerank-movers-asset" title={shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? ''}>
                     {shortenAssetClass(proLookup?.get(r.ticker)?.asset_class) ?? '—'}
                   </span>
@@ -287,6 +294,7 @@ const RerankRow = memo(function RerankRow({ row, proInfo, onSelect, onFocus }) {
         }}
       >
         {row.ticker}
+        <TrendBubble ticker={row.ticker} />
       </button>
       <span className="rerank-asset" title={assetClass ?? ''}>
         {assetClass ?? <span className="rerank-cell-missing">—</span>}

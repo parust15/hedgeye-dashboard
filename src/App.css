@@ -6207,6 +6207,49 @@ body,
 .tt-price-live { font-weight: 600; }
 .tt-price-stale { color: var(--text-dim); }
 
+/* --- TrendBubble (Change 3) ----------------------------------------
+   8px dot rendered inline next to a ticker symbol across every panel.
+   Color carries direction (green/red), border-style carries source:
+     - solid fill   → Risk Range (rr) drove the current trend state
+     - dashed ring  → Call drove it (rendered hollow w/ dashed border)
+     - ~50% opacity → call-sourced AND call_trend_stale=true
+
+   Sourced ONLY from ticker_signal_state_v via TickerSignalStateContext.
+   NOT bound to hedgeye_call_ticker_summaries.direction or
+   hedgeye_call_positions.position_type — the LONG/SHORT position chip
+   stays a separate concern. */
+.trend-bubble {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.trend-bubble-bullish { background: rgba(34, 197, 94, 0.85); }
+.trend-bubble-bearish { background: rgba(239, 68, 68, 0.85); }
+
+/* Call-sourced: hollow disc with a dashed ring in the trend color.
+   Transparent background + dashed border gives the "dashed" reading
+   the spec calls for, in distinct contrast to the solid RR variant. */
+.trend-bubble-call.trend-bubble-bullish {
+  background: transparent;
+  border: 1.5px dashed rgba(34, 197, 94, 0.95);
+  width: 9px;
+  height: 9px;
+}
+
+.trend-bubble-call.trend-bubble-bearish {
+  background: transparent;
+  border: 1.5px dashed rgba(239, 68, 68, 0.95);
+  width: 9px;
+  height: 9px;
+}
+
+.trend-bubble-stale { opacity: 0.5; }
+
 /* Header price labels mirror the dim header treatment elsewhere. */
 .investing-ideas-panel .rerank-list-head .tt-price,
 .momo-panel.rerank-panel .rerank-list-head .tt-price {

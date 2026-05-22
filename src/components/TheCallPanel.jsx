@@ -3,6 +3,7 @@ import { LABEL } from '../lib/labels'
 import { numCmp } from '../lib/range'
 import { supabase } from '../lib/supabase'
 import { BiasTimeframePill } from './BiasTimeframePill'
+import { TrendBubble } from './TrendBubble'
 import { useCallPositions } from '../lib/useCallPositions'
 import { useCallExtras } from '../lib/useCallExtras'
 import { useWeeklyTop5 } from '../lib/useWeeklyTop5'
@@ -353,7 +354,10 @@ function PositionCard({ row, live, rrCrossover, onOpen, highlight = false, extra
       <div className="card-bg" aria-hidden="true" />
       <header className="cc-head">
         <div className={`cc-head-id ${directionClass}`}>
-          <div className="cc-ticker">{row.ticker}</div>
+          <div className="cc-ticker">
+            {row.ticker}
+            <TrendBubble ticker={row.ticker} />
+          </div>
           {row.company_name && <div className="cc-name">{row.company_name}</div>}
         </div>
         {/* TREND pill — color carries direction (LONG→green=BULLISH,
