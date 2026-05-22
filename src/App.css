@@ -6807,20 +6807,39 @@ body,
 }
 
 /* --- EtfProRow grid -------------------------------------------- */
-/* TICKER | TREND | ASSET | RANGE BAR (flex) | LRR | TRR | PREV CLOSE
+/* TICKER | TYPE | TREND | ASSET | RANGE BAR (flex) | LRR | TRR | PREV CLOSE
    The bar sits in the flex slot so it's the visual anchor; LRR/TRR
    stay as small numeric columns to the right per the hybrid Task 6
-   resolution. */
+   resolution. Type column added Change 8 — short_label from etf_info. */
 .etf-pro-plus-panel .tt-etfpp-row,
 .etf-pro-plus-panel .rerank-list-head.tt-etfpp-row {
   grid-template-columns:
     minmax(80px, auto)    /* ticker         */
+    104px                 /* type (short_label) */
     96px                  /* trend pill     */
     minmax(120px, 1fr)    /* asset class    */
     minmax(160px, 2fr)    /* range bar      */
     80px                  /* LRR            */
     80px                  /* TRR            */
     96px;                 /* prev close     */
+}
+
+.tt-etfpp-type {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.rerank-list-head .tt-etfpp-type {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
 }
 
 .tt-etfpp-range {
@@ -6834,7 +6853,7 @@ body,
   .etf-pro-plus-panel .tt-etfpp-row,
   .etf-pro-plus-panel .rerank-list-head.tt-etfpp-row {
     grid-template-columns:
-      minmax(70px, auto) 80px minmax(60px, 1fr) 80px;
+      minmax(70px, auto) 90px 80px minmax(60px, 1fr) 80px;
   }
   .etf-pro-plus-panel .rerank-asset,
   .etf-pro-plus-panel .tt-etfpp-range,

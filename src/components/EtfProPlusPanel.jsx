@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { LABEL } from '../lib/labels'
 import { priceInRangePct, numCmp } from '../lib/range'
 import { useEtfProPlus } from '../lib/useEtfProPlus'
@@ -175,6 +176,32 @@ export function EtfProPlusPanel() {
   // tickers don't share the hedgeye_signals_v shape ExpandedChart was
   // built for. selectedTicker drives the EtfInfoModal mounted below.
   const [selectedTicker, setSelectedTicker] = useState(null)
+
+  // One-shot inline fetch of etf_info.short_label per ticker. The
+  // useEtfProPlus hook reads from hedgeye_etf_pro_current_v which
+  // doesn't carry short_label — small lookup table joined client-side
+  // via a Map<ticker, label>. Missing rows / null labels render the
+  // Type cell blank. Cheap: ~150 rows total.
+  const [shortLabelByTicker, setShortLabelByTicker] = useState(() => new Map())
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('etf_info')
+      .select('ticker, short_label')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          console.warn('EtfProPlusPanel: etf_info fetch failed:', error)
+          return
+        }
+        const m = new Map()
+        for (const r of data ?? []) {
+          if (r.ticker && r.short_label) m.set(r.ticker, r.short_label)
+        }
+        setShortLabelByTicker(m)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   // Persist each filter independently so the user's view sticks between
   // sessions, same pattern as the RR + Call panels.
@@ -515,7 +542,12 @@ export function EtfProPlusPanel() {
           <EtfProRowHead />
           <ol className="rerank-list">
             {sortedRows.map((r) => (
-              <EtfProRow key={r.ticker} row={r} onOpenInfo={openInfoModal} />
+              <EtfProRow
+                key={r.ticker}
+                row={r}
+                shortLabel={shortLabelByTicker.get(r.ticker) ?? ''}
+                onOpenInfo={openInfoModal}
+              />
             ))}
           </ol>
         </>

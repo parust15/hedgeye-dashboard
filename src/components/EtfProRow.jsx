@@ -30,7 +30,7 @@ function rowTint(trend) {
   return 'rerank-row-neutral'
 }
 
-export const EtfProRow = memo(function EtfProRow({ row, onOpenInfo }) {
+export const EtfProRow = memo(function EtfProRow({ row, shortLabel = '', onOpenInfo }) {
   const tintClass = rowTint(row.trend)
   // EtfProRow consumes the post-toSignalRow shape (buy_trade /
   // sell_trade / prev_close) so the canonical priceInRangePct
@@ -52,6 +52,13 @@ export const EtfProRow = memo(function EtfProRow({ row, onOpenInfo }) {
     >
       <div className="card-bg" aria-hidden="true" />
       <span className="rerank-ticker">{row.ticker}</span>
+      {/* Type cell — one-word descriptor from etf_info.short_label.
+          Empty when no row in etf_info / null label (per spec, no
+          "—" placeholder — render literally empty so the cell reads
+          as "no data" not "we tried and missed"). */}
+      <span className="tt-etfpp-type" title={shortLabel || undefined}>
+        {shortLabel}
+      </span>
       <span className="tt-trend-cell">
         <BiasTimeframePill timeframe="trend" bias={row.trend} size="sm" />
       </span>
@@ -83,6 +90,7 @@ export function EtfProRowHead() {
   return (
     <div className="rerank-list-head tt-etfpp-row" aria-hidden="true">
       <span className="rerank-ticker">{LABEL.column.ticker}</span>
+      <span className="tt-etfpp-type">Type</span>
       <span className="tt-trend-head">{LABEL.column.trend}</span>
       <span className="rerank-asset">{LABEL.column.assetClass}</span>
       {/* Three-span spatial header: LRR over bar's left endpoint,
