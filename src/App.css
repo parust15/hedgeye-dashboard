@@ -5808,6 +5808,22 @@ body,
     84px;                 /* TRR             */
 }
 
+/* Active Setups subtab (Change 6): SETUP | TICKER | RANGE(flex) | PRICE | LRR | TRR
+   Narrower than tt-ii-row — levels rows don't carry sector / position
+   / thesis, so we drop the SIDE pill, POS, and SECTOR cells and let
+   the range bar claim the freed width. Same row chrome (rerank-row +
+   .card-bg) so visual rhythm matches the All Ideas view. */
+.investing-ideas-panel .rerank-list-head.tt-ii-setup-row,
+.investing-ideas-panel .rerank-row.tt-ii-setup-row {
+  grid-template-columns:
+    72px                  /* setup chip      */
+    minmax(70px, auto)    /* ticker          */
+    minmax(220px, 2fr)    /* range bar (flex)*/
+    96px                  /* price (live)    */
+    84px                  /* LRR             */
+    84px;                 /* TRR             */
+}
+
 /* MOMO: TICKER | TREND | TRADE | RANGE(flex) | PREV | LRR | TRR | EARN | 1W Δ
    Task 6 hybrid — same shape as II's row. TREND + TRADE remain two
    separate columns so disagreement (e.g. MSFT TREND BEARISH +

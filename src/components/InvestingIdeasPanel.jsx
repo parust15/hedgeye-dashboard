@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LABEL } from '../lib/labels'
 import { safeHttpUrl } from '../lib/url'
 import { useInvestingIdeas } from '../lib/useInvestingIdeas'
+import { useIdeasLevels } from '../lib/useIdeasLevels'
 import { useTickerFocus } from '../lib/TickerContext'
 import { useMarketState } from '../lib/marketState'
 import { useLivePrices } from '../lib/livePrices'
@@ -13,9 +14,23 @@ import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
 import { PriceCell } from './PriceCell'
+import { ActiveSetupRow, ActiveSetupRowHead } from './ActiveSetupRow'
 import { quoteChip } from '../lib/quoteFresh'
 import { formatPrice } from '../lib/format'
-import { priceInRangePct, numCmp } from '../lib/range'
+import { priceInRangePct, numCmp, getSetup } from '../lib/range'
+
+const VIEW_KEY = 'dashboard.iiView'
+const VALID_VIEWS = ['all', 'setups']
+
+function loadInitialView() {
+  try {
+    const raw = localStorage.getItem(VIEW_KEY)
+    if (raw && VALID_VIEWS.includes(raw)) return raw
+  } catch (err) {
+    console.warn('Failed to read iiView from localStorage:', err)
+  }
+  return 'all'
+}
 
 // 15-minute open-poll cadence per spec — II is a weekly book, so a
 // tick-by-tick refresh would just spend request budget for no
@@ -280,12 +295,25 @@ function IdeasSkeleton() {
 
 export function InvestingIdeasPanel() {
   const { longs, shorts, meta, status } = useInvestingIdeas()
+  // hedgeye_ideas_levels is the broader 40-ticker universe used by the
+  // Active Setups subtab (Change 6). Single fetch on mount, separate
+  // status from the newsletter hook so each loads independently.
+  const { rows: levelsRows, status: levelsStatus } = useIdeasLevels()
   const [openTicker, setOpenTicker] = useState(null)
+  const [view, setView] = useState(loadInitialView)
   const { focusTicker } = useTickerFocus()
   const onFocus = useCallback(
     (ticker) => focusTicker(ticker, { source: 'investing-ideas' }),
     [focusTicker]
   )
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view)
+    } catch (err) {
+      console.warn('Failed to persist iiView to localStorage:', err)
+    }
+  }, [view])
 
   // Live quotes — 15-min market-hours cadence (II is a weekly book).
   // The market state + livePrices fetch must be at the top of the
@@ -366,6 +394,63 @@ export function InvestingIdeasPanel() {
     return max
   }, [allRows, livePrices])
   const quotesChip = quoteChip(displays, latestQuotedAt, market.isOpen)
+
+  // === Active Setups (Change 6) ======================================
+  // Source: hedgeye_ideas_levels (40 unique tickers across all
+  // historical messages). Shim each levels row into the SignalCard-ish
+  // shape getSetup expects (trend, buy_trade, sell_trade, prev_close),
+  // build a parallel displays Map keyed off the same shim, then filter
+  // to rows where getSetup() returns non-null.
+  //
+  // Sort: closest-to-threshold first within each setup type — LONGs
+  // sort by ascending markerPct (closer to LRR = 0), SHORTs by
+  // descending markerPct (closer to TRR = 1). Same convention RR uses.
+  const setupDisplays = useMemo(() => {
+    const m = new Map()
+    for (const r of levelsRows) {
+      const trend = r.side === 'long' ? 'BULLISH' : r.side === 'short' ? 'BEARISH' : null
+      if (!trend) continue
+      const shim = {
+        trend,
+        buy_trade: r.low_end,
+        sell_trade: r.top_end,
+        prev_close: r.prev_close,
+      }
+      m.set(r.ticker, getPriceDisplay(shim, livePrices.get(r.ticker), market.isOpen))
+    }
+    return m
+  }, [levelsRows, livePrices, market.isOpen])
+
+  const setupRows = useMemo(() => {
+    const out = []
+    for (const r of levelsRows) {
+      const trend = r.side === 'long' ? 'BULLISH' : r.side === 'short' ? 'BEARISH' : null
+      if (!trend) continue
+      const shim = {
+        ticker: r.ticker,
+        side: r.side,
+        trend,
+        buy_trade: r.low_end,
+        sell_trade: r.top_end,
+        prev_close: r.prev_close,
+      }
+      const display = setupDisplays.get(r.ticker)
+      const setup = getSetup(shim, display)
+      if (!setup) continue
+      const markerPct = priceInRangePct(shim)
+      out.push({ ...shim, setup, markerPct })
+    }
+    // LONGs first (ascending markerPct = closest to LRR first), then
+    // SHORTs (descending markerPct = closest to TRR first). Matches RR.
+    out.sort((a, b) => {
+      if (a.setup !== b.setup) return a.setup === 'LONG' ? -1 : 1
+      if (a.setup === 'LONG') return (a.markerPct ?? 0) - (b.markerPct ?? 0)
+      return (b.markerPct ?? 0) - (a.markerPct ?? 0)
+    })
+    return out
+  }, [levelsRows, setupDisplays])
+
+  const setupCount = setupRows.length
 
   // Filter then sort.
   const visibleRows = useMemo(() => {
@@ -503,49 +588,117 @@ export function InvestingIdeasPanel() {
 
       {status === 'ready' && (
         <>
-          <section className="rerank-movers" aria-label="Top long and short ideas">
-            <TopBox title="5 LONGS" tone="top" rows={topLongs} displays={displays} />
-            <TopBox title="5 SHORTS" tone="bottom" rows={topShorts} displays={displays} />
-          </section>
+          {/* View toggle (Change 6) — mirrors EPP's "All ETFs" /
+              "⚡ Active Setups" pattern. Setups source from
+              hedgeye_ideas_levels (40-ticker history) not the latest
+              newsletter's 17, so the count can exceed the All-view
+              total. */}
+          <nav className="view-tabs" role="tablist" aria-label="Investing Ideas view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'all'}
+              className={`view-tab${view === 'all' ? ' active' : ''}`}
+              onClick={() => setView('all')}
+            >
+              All ideas
+              <span className="view-tab-count">{allRows.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'setups'}
+              className={`view-tab${view === 'setups' ? ' active' : ''}`}
+              onClick={() => setView('setups')}
+            >
+              ⚡ Active Setups
+              <span className="view-tab-count">
+                {levelsStatus === 'ready' ? setupCount : '…'}
+              </span>
+            </button>
+          </nav>
 
-          <div className="rerank-list-head tt-ii-row" aria-hidden="true">
-            <span className="tt-side-head">{LABEL.column.side}</span>
-            <span className="rerank-rank tt-ii-pos">{LABEL.column.pos}</span>
-            <span className="rerank-ticker">{LABEL.column.ticker}</span>
-            <span className="rerank-asset">{LABEL.column.sector}</span>
-            {/* Three-span spatial header: LRR over bar's left
-                endpoint, RANGE centered, TRR over bar's right
-                endpoint. .tt-range-head's flex layout distributes
-                them via space-between. */}
-            <span className="tt-range-head">
-              <span>{LABEL.column.lrr}</span>
-              <span>{LABEL.column.range}</span>
-              <span>{LABEL.column.trr}</span>
-            </span>
-            {/* "Price" replaces "Prev close" because the cell now
-                prefers live when available (falls back to prev_close
-                via PriceCell). */}
-            <span className="tt-price">Price</span>
-            <span className="tt-price">{LABEL.column.lrr}</span>
-            <span className="tt-price">{LABEL.column.trr}</span>
-          </div>
+          {view === 'all' && (
+            <>
+              <section className="rerank-movers" aria-label="Top long and short ideas">
+                <TopBox title="5 LONGS" tone="top" rows={topLongs} displays={displays} />
+                <TopBox title="5 SHORTS" tone="bottom" rows={topShorts} displays={displays} />
+              </section>
 
-          <ol className="rerank-list">
-            {visibleRows.map((r) => (
-              <IdeaRow
-                key={`${r.side}-${r.position}-${r.ticker}`}
-                row={r}
-                isOpen={openTicker === r.ticker}
-                onToggle={toggleOpen}
-                onFocus={onFocus}
-                display={displays.get(r.ticker)}
-              />
-            ))}
-          </ol>
-          {visibleRows.length === 0 && search.trim() && (
-            <div className="state">
-              No tickers match &quot;{search.trim()}&quot;.
-            </div>
+              <div className="rerank-list-head tt-ii-row" aria-hidden="true">
+                <span className="tt-side-head">{LABEL.column.side}</span>
+                <span className="rerank-rank tt-ii-pos">{LABEL.column.pos}</span>
+                <span className="rerank-ticker">{LABEL.column.ticker}</span>
+                <span className="rerank-asset">{LABEL.column.sector}</span>
+                {/* Three-span spatial header: LRR over bar's left
+                    endpoint, RANGE centered, TRR over bar's right
+                    endpoint. .tt-range-head's flex layout distributes
+                    them via space-between. */}
+                <span className="tt-range-head">
+                  <span>{LABEL.column.lrr}</span>
+                  <span>{LABEL.column.range}</span>
+                  <span>{LABEL.column.trr}</span>
+                </span>
+                {/* "Price" replaces "Prev close" because the cell now
+                    prefers live when available (falls back to prev_close
+                    via PriceCell). */}
+                <span className="tt-price">Price</span>
+                <span className="tt-price">{LABEL.column.lrr}</span>
+                <span className="tt-price">{LABEL.column.trr}</span>
+              </div>
+
+              <ol className="rerank-list">
+                {visibleRows.map((r) => (
+                  <IdeaRow
+                    key={`${r.side}-${r.position}-${r.ticker}`}
+                    row={r}
+                    isOpen={openTicker === r.ticker}
+                    onToggle={toggleOpen}
+                    onFocus={onFocus}
+                    display={displays.get(r.ticker)}
+                  />
+                ))}
+              </ol>
+              {visibleRows.length === 0 && search.trim() && (
+                <div className="state">
+                  No tickers match &quot;{search.trim()}&quot;.
+                </div>
+              )}
+            </>
+          )}
+
+          {view === 'setups' && (
+            <>
+              {levelsStatus === 'loading' && (
+                <div className="state">Loading setup candidates…</div>
+              )}
+              {levelsStatus === 'error' && (
+                <div className="state error">
+                  Could not load setup data from hedgeye_ideas_levels.
+                </div>
+              )}
+              {levelsStatus === 'ready' && setupRows.length === 0 && (
+                <div className="state state-center">
+                  No active setups right now. Setups appear when a long
+                  idea trades near its LRR or a short trades near its TRR.
+                </div>
+              )}
+              {levelsStatus === 'ready' && setupRows.length > 0 && (
+                <>
+                  <ActiveSetupRowHead />
+                  <ol className="rerank-list">
+                    {setupRows.map((r) => (
+                      <ActiveSetupRow
+                        key={r.ticker}
+                        row={r}
+                        display={setupDisplays.get(r.ticker)}
+                        onFocus={onFocus}
+                      />
+                    ))}
+                  </ol>
+                </>
+              )}
+            </>
           )}
         </>
       )}
