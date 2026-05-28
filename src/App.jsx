@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { TopTabs } from './components/TopTabs'
+import { DailyBrief } from './components/DailyBrief'
 import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
 import { EtfProPlusPanel } from './components/EtfProPlusPanel'
@@ -155,6 +156,7 @@ function AppBody() {
         <TopTabs active={activeTab} onChange={setActiveTab} />
         <VixHeaderPill data={vixBucket} />
       </div>
+      {activeTab === 'daily-brief' && <DailyBrief />}
       {activeTab === 'risk-ranges' && (
         <RiskRangesPanel
           allTickersByTicker={allTickersByTicker}

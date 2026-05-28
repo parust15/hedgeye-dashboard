@@ -6,6 +6,7 @@
 // Order here is the on-screen tab order. Adding a new tab means one
 // edit to this file + (typically) a new panel render branch in App.jsx.
 export const TABS = [
+  { id: 'daily-brief',     label: 'DAILY BRIEF',  metric: 'macro regime + roadmap' },
   { id: 'risk-ranges',     label: 'RISK RANGE',   metric: 'TRR/LRR + state' },
   { id: 'the-call',        label: 'THE CALL',     metric: 'position + thesis' },
   { id: 'etf-pro-plus',    label: 'ETF PRO+',     metric: 'direction + rank' },

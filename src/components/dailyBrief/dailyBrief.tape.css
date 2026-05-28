@@ -1,0 +1,243 @@
+/* === Daily Brief — Section 2 (Tape) =================================
+   Three stacked market-data tables: sector performance, S&P index
+   impact, and USD correlations. Pure CSS, dark/mono aesthetic, tokens
+   from index.css. Numerics use the mono face + tabular-nums. */
+.db-tape-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.db-tape-block {
+  min-width: 0;
+}
+
+/* --- Shared table chrome ----------------------------------------- */
+.db-tape-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.db-tape-row {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.db-tape-row:last-child {
+  border-bottom: none;
+}
+
+.db-tape-head {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.db-tape-cell-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.db-tape-cell-num {
+  font-family: var(--mono);
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.db-tape-head .db-tape-cell-num {
+  font-size: 10px;
+}
+
+/* Number coloring. */
+.db-num-up {
+  color: var(--bull);
+}
+.db-num-down {
+  color: var(--bear);
+}
+.db-num-muted {
+  color: var(--text-dim);
+}
+
+/* Footer caption / reconciliation line. */
+.db-tape-footer {
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+/* --- Sector performance table ------------------------------------ */
+.db-sector-table .db-tape-row {
+  grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(54px, 0.7fr)) minmax(80px, 0.9fr);
+}
+
+.db-sector-name {
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-sector-ticker {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* SPY benchmark row — set off by a heavier top divider. */
+.db-sector-bench {
+  border-top: 1px solid var(--border-strong);
+  margin-top: 2px;
+}
+
+.db-tape-cell-stance {
+  text-align: right;
+}
+
+.db-stance-chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-badge);
+}
+
+.db-stance-bull {
+  color: var(--bull);
+  background: var(--bull-bg);
+}
+.db-stance-bear {
+  color: var(--bear);
+  background: var(--bear-bg);
+}
+.db-stance-neutral {
+  color: var(--neutral);
+  background: var(--neutral-bg);
+}
+
+/* --- S&P index-impact table -------------------------------------- */
+.db-impact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.db-impact-col {
+  min-width: 0;
+}
+
+.db-impact-title {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.db-impact-title-up {
+  color: var(--bull);
+}
+.db-impact-title-down {
+  color: var(--bear);
+}
+
+.db-impact-row {
+  grid-template-columns: minmax(40px, 0.7fr) minmax(0, 1.1fr) repeat(3, minmax(46px, 0.7fr));
+}
+
+.db-impact-sym {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.db-impact-sector {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-tape-head.db-impact-row .db-impact-sym,
+.db-tape-head.db-impact-row .db-impact-sector {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.db-impact-empty {
+  padding: 7px 8px;
+}
+
+/* --- USD correlation matrix -------------------------------------- */
+.db-corr-explainer {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.db-usdcorr-row {
+  grid-template-columns: minmax(0, 1.4fr) repeat(5, minmax(50px, 0.7fr));
+}
+
+.db-usdcorr-cell {
+  border-radius: var(--radius-badge);
+  padding: 3px 6px;
+  color: var(--text);
+}
+
+/* Subtle regime tints. */
+.db-corr-tint-aligned {
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--bull);
+}
+.db-corr-tint-mild-aligned {
+  background: rgba(34, 197, 94, 0.07);
+}
+.db-corr-tint-inverse {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--bear);
+}
+.db-corr-tint-mild-inverse {
+  background: rgba(239, 68, 68, 0.07);
+}
+.db-corr-tint-decoupled {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.db-corr-regime-word {
+  color: var(--text);
+}
+
+/* --- Responsive: stack the impact pair on narrow viewports ------- */
+@media (max-width: 720px) {
+  .db-impact-grid {
+    grid-template-columns: 1fr;
+  }
+}
