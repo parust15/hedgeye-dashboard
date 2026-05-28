@@ -1,140 +1,175 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
+import { useVixBucket } from '../../lib/useVixBucket'
 import { SectionShell } from './SectionShell'
+import './dailyBrief.macro.css'
 
-// Hedgeye backtested Quad playbook — which lines run in-spec under each
-// macro condition. Reference data, not fetched.
-const QUAD_PLAYBOOK = {
-  '1': {
-    name: 'Goldilocks',
-    color: '#4ade80',
-    bestSectors: ['Tech', 'Consumer Discretionary', 'Materials', 'Industrials'],
-    bestFactors: ['High Beta', 'Momentum', 'Secular Growth', 'Cyclicals'],
-    worstSectors: ['Utilities', 'REITs', 'Staples', 'Financials'],
-  },
-  '2': {
-    name: 'Reflation',
-    color: '#fbbf24',
-    bestSectors: ['Tech', 'Consumer Discretionary', 'Industrials', 'Energy/Materials'],
-    bestFactors: ['Secular Growth', 'Momentum', 'Cyclical Growth', 'Small Caps'],
-    worstSectors: ['Utilities', 'REITs', 'Staples', 'Telecom'],
-  },
-  '3': {
-    name: 'Stagflation',
-    color: '#fb923c',
-    bestSectors: ['Energy', 'Tech', 'Utilities', 'Gold/Commodities'],
-    bestFactors: ['Secular Growth', 'Momentum', 'Mid Caps', 'Low Beta'],
-    worstSectors: ['Financials', 'REITs', 'Materials', 'Consumer'],
-  },
-  '4': {
-    name: 'Deflation',
-    color: '#60a5fa',
-    bestSectors: ['Staples', 'Utilities', 'REITs', 'Health Care'],
-    bestFactors: ['Low Beta', 'Dividend Yield', 'Quality', 'Defensives'],
-    worstSectors: ['Energy', 'Tech', 'Industrials', 'Financials'],
-  },
-}
-
-const STALE_AFTER_DAYS = 5
-
-// One row per asset class line. Hardcoded watchlist.
-const WATCHLIST = [
-  {
-    group: 'Equity',
-    items: [
-      { t: 'SPX', label: 'S&P 500' },
-      { t: 'COMPQ', label: 'NASDAQ' },
-      { t: 'RUT', label: 'Russell 2000' },
-      { t: 'XLK', label: 'Tech (XLK)' },
-    ],
-  },
-  {
-    group: 'FX',
-    items: [
-      { t: 'USD', label: 'USD Index' },
-      { t: 'EUR/USD', label: 'EUR/USD' },
-      { t: 'USD/YEN', label: 'USD/JPY' },
-    ],
-  },
-  {
-    group: 'Rates & Credit',
-    items: [
-      { t: 'UST2Y', label: '2Y Yield', isYield: true },
-      { t: 'UST10Y', label: '10Y Yield', isYield: true },
-      { t: 'HYG', label: 'High Yield (HYG)' },
-    ],
-  },
-  {
-    group: 'Energy',
-    items: [
-      { t: 'WTIC', label: 'WTI Crude' },
-      { t: 'XOP', label: 'E&P (XOP)' },
-      { t: 'NATGAS', label: 'Nat Gas' },
-    ],
-  },
-  {
-    group: 'Metals',
-    items: [
-      { t: 'GOLD', label: 'Gold' },
-      { t: 'SILVER', label: 'Silver' },
-      { t: 'COPPER', label: 'Copper' },
-    ],
-  },
-  { group: 'Crypto', items: [{ t: 'BITCOIN', label: 'Bitcoin' }] },
+// Block B — macro driver lamps, grouped by asset class. Tickers absent
+// from today's signal set are simply skipped.
+const DRIVER_GROUPS = [
+  { group: 'Equities', tickers: ['SPX', 'COMPQ', 'RUT'] },
+  { group: 'Rates', tickers: ['UST10Y', 'UST2Y', 'UST30Y'] },
+  { group: 'FX / Dollar', tickers: ['USD', 'EUR/USD', 'USD/YEN'] },
+  { group: 'Commodities', tickers: ['WTIC', 'GOLD', 'COPPER'] },
+  { group: 'Crypto', tickers: ['BITCOIN'] },
 ]
 
-const VIX_MEANING = {
-  investable: '9–19 · buy dips, normal risk',
-  chop: '20–29 · trade ranges, aggressive on longs',
-  fuck: '29+ · defensive, preserve capital',
-}
+// Block C — correlation lookback windows, in display order.
+const WINDOWS = [15, 30, 90, 120, 180]
 
 // PostgREST hands numerics back as strings — parse once at the edge.
+// Guard null BEFORE Number.isFinite to avoid the Number(null)===0 trap.
 function num(x) {
   if (x == null) return null
   const n = parseFloat(x)
   return Number.isFinite(n) ? n : null
 }
 
-// Compact level display: thousands separators, up to 3 decimals.
-function fmtLevel(x) {
-  const n = num(x)
+// Thousands separators, up to 3 decimals.
+function fmtBand(n) {
   if (n == null) return '—'
   return n.toLocaleString('en-US', { maximumFractionDigits: 3 })
 }
 
-// 'YYYY-MM-DD' → whole days since, for the staleness note.
-function daysSince(iso) {
-  if (!iso) return null
-  const [y, m, d] = String(iso).split('-').map(Number)
-  if (!y || !m || !d) return null
-  const then = Date.UTC(y, m - 1, d)
-  const now = new Date()
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round((today - then) / 86400000)
+// Signed correlation to 3 decimals.
+function fmtCorr3(x) {
+  const n = num(x)
+  if (n == null) return '—'
+  return `${n >= 0 ? '+' : ''}${n.toFixed(3)}`
 }
 
-function trim(s, n) {
-  if (!s) return ''
-  return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s
+// Position of price within the LRR–TRR band, clamped 0–100. Null when
+// any input is missing so the bar can render empty.
+function rangePct(lrr, trr, price) {
+  if (lrr == null || trr == null || price == null) return null
+  if (trr <= lrr) return 50
+  return Math.min(100, Math.max(0, ((price - lrr) / (trr - lrr)) * 100))
 }
 
-// Per task spec — the work order for one watchlist line.
-function deriveAction(trend, pir, isYield) {
-  const t = (trend || '').toUpperCase()
-  const p = Number(pir)
-  if (Number.isNaN(p)) return '—'
-  if (t === 'BULLISH' && p <= 0.3)
-    return isYield ? 'Yields rising · bearish bonds' : 'BUY · near low end'
-  if (t === 'BULLISH' && p >= 0.75) return 'TRIM · near top end'
-  if (t === 'BULLISH') return 'HOLD · mid range'
-  if (t === 'BEARISH' && p <= 0.3) return 'Cover-zone · bear at low'
-  if (t === 'BEARISH' && p >= 0.75) return 'SHORT setup · overbought bear'
-  if (t === 'BEARISH') return 'AVOID long · bear mid'
-  return 'No edge · wait'
+function rangeLabel(pct) {
+  if (pct == null) return null
+  if (pct <= 25) return 'near LRR'
+  if (pct >= 75) return 'near TRR'
+  return 'mid-range'
 }
 
-function dirTone(trend) {
+// Range-bar fill/dot color by zone (explicit per spec).
+function zoneColor(pct) {
+  if (pct == null) return '#888780'
+  if (pct <= 25) return '#639922' // near LRR — green
+  if (pct >= 75) return '#BA7517' // near TRR — amber
+  return '#888780' // mid — gray
+}
+
+// VIX bucket → big-number color + label.
+function vixBucket(price) {
+  if (price == null) return { label: 'unknown', type: 'neu' }
+  if (price < 20) return { label: 'investable 9–19', type: 'pos' }
+  if (price < 29) return { label: 'chop 20–29', type: 'cau' }
+  return { label: 'defensive 29+', type: 'neg' }
+}
+
+// Per-type → token color for the VIX price number.
+const TYPE_COLOR = {
+  pos: 'var(--bull)',
+  neg: 'var(--bear)',
+  cau: 'var(--amber-light)',
+  neu: 'var(--neutral)',
+}
+
+// Right-column chip — what this ticker's reading means for the broader
+// MACRO BACKDROP (not the ticker's own direction). Label + color type
+// come entirely from this per-ticker mapping. pct guards against the
+// Number(null) coercion footgun (null <= 25 would otherwise be true).
+function macroImplication(ticker, trend, pct) {
+  // Only TRR (top of range) gates a verdict — the bar already conveys
+  // position, so the chip never restates "near LRR/TRR". pct guards
+  // against the Number(null) coercion footgun (null >= 75 → true).
+  const atTRR = pct != null && pct >= 75
+
+  switch (ticker) {
+    // VIX: inverse — low/falling vol = good backdrop
+    case 'VIX':
+      if (trend === 'BEARISH' && pct != null && pct < 50)
+        return { label: 'vol supportive', type: 'pos' }
+      if (trend === 'BEARISH') return { label: 'vol elevated', type: 'cau' }
+      if (trend === 'BULLISH') return { label: 'vol spiking', type: 'neg' }
+      return { label: 'vol neutral', type: 'neu' }
+
+    // Equities: is the trend gate helping or hurting stocks?
+    case 'SPX':
+    case 'COMPQ':
+    case 'RUT':
+      if (trend === 'BULLISH' && atTRR) return { label: 'equity at ceiling', type: 'cau' }
+      if (trend === 'BULLISH') return { label: 'equity uptrend', type: 'pos' }
+      if (trend === 'BEARISH') return { label: 'equity downtrend', type: 'neg' }
+      return { label: 'no edge', type: 'neu' }
+
+    // Rates: rising rates pressure equities + duration
+    case 'UST10Y':
+    case 'UST2Y':
+    case 'UST30Y':
+      if (trend === 'BULLISH' && atTRR) return { label: 'rate headwind', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'rate pressure', type: 'cau' }
+      if (trend === 'BEARISH') return { label: 'rate tailwind', type: 'pos' }
+      return { label: 'rates neutral', type: 'neu' }
+
+    // USD: strong dollar = headwind for risk assets
+    case 'USD':
+      if (trend === 'BULLISH' && atTRR) return { label: 'dollar headwind', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'dollar firming', type: 'cau' }
+      if (trend === 'BEARISH') return { label: 'dollar tailwind', type: 'pos' }
+      return { label: 'dollar neutral', type: 'neu' }
+
+    // FX vs USD: falling EUR/GBP = rising dollar = risk-off
+    case 'EUR/USD':
+    case 'GBP/USD':
+      if (trend === 'BEARISH') return { label: 'dollar rising', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'dollar falling', type: 'pos' }
+      return { label: 'fx neutral', type: 'neu' }
+
+    case 'USD/YEN':
+      if (trend === 'BULLISH' && atTRR) return { label: 'yen pressure', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'yen watching', type: 'cau' }
+      if (trend === 'BEARISH') return { label: 'yen stable', type: 'pos' }
+      return { label: 'yen neutral', type: 'neu' }
+
+    // Copper: Dr. Copper = growth proxy
+    case 'COPPER':
+      if (trend === 'BULLISH') return { label: 'growth signal', type: 'pos' }
+      if (trend === 'BEARISH') return { label: 'growth warning', type: 'neg' }
+      return { label: 'copper neutral', type: 'neu' }
+
+    // Oil: high = inflation risk; collapse = demand/deflation risk
+    case 'WTIC':
+    case 'BRENT':
+      if (trend === 'BULLISH' && atTRR) return { label: 'inflation risk', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'oil firming', type: 'cau' }
+      if (trend === 'BEARISH') return { label: 'deflation risk', type: 'cau' }
+      return { label: 'oil neutral', type: 'neu' }
+
+    // Gold: safe-haven bid = risk-off money moving to safety
+    case 'GOLD':
+      if (trend === 'BULLISH' && atTRR) return { label: 'safe haven bid', type: 'neg' }
+      if (trend === 'BULLISH') return { label: 'gold bid', type: 'cau' }
+      if (trend === 'BEARISH') return { label: 'no haven bid', type: 'pos' }
+      return { label: 'gold neutral', type: 'neu' }
+
+    // Bitcoin: risk-on proxy
+    case 'BITCOIN':
+      if (trend === 'BULLISH') return { label: 'risk-on signal', type: 'pos' }
+      if (trend === 'BEARISH') return { label: 'risk-off signal', type: 'neg' }
+      return { label: 'crypto neutral', type: 'neu' }
+
+    default:
+      if (trend === 'BULLISH') return { label: 'bullish', type: 'pos' }
+      if (trend === 'BEARISH') return { label: 'bearish', type: 'neg' }
+      return { label: 'neutral', type: 'neu' }
+  }
+}
+
+function trendTone(trend) {
   switch ((trend || '').toUpperCase()) {
     case 'BULLISH':
       return 'bull'
@@ -145,164 +180,322 @@ function dirTone(trend) {
   }
 }
 
-// Friendly names for correlation ticker slugs.
-const ASSET_LABEL = {
-  USD: 'USD',
-  UUP: 'USD',
-  DXY: 'USD',
-  BTC: 'Bitcoin',
-  BITCOIN: 'Bitcoin',
-  GLD: 'Gold',
-  GOLD: 'Gold',
-  SLV: 'Silver',
-  SILVER: 'Silver',
-  SPY: 'S&P 500',
-  QQQ: 'NASDAQ',
-  TLT: 'Long Bonds',
-  HYG: 'High Yield',
-  COPPER: 'Copper',
+const TREND_COLOR = {
+  bull: 'var(--bull)',
+  bear: 'var(--bear)',
+  neutral: 'var(--neutral)',
 }
 
-function assetLabel(sym) {
-  if (!sym) return ''
-  const u = String(sym).toUpperCase()
-  return ASSET_LABEL[u] ?? u.charAt(0) + u.slice(1).toLowerCase()
+// Correlation regime → number color.
+function corrColor(regime) {
+  const r = (regime || '').toLowerCase()
+  if (r === 'inverse' || r === 'mild_inverse') return 'var(--bear)'
+  if (r === 'aligned' || r === 'mild_aligned') return 'var(--bull)'
+  return 'var(--text-dim)' // decoupled
 }
 
-// Turn a correlation row into { pair, meaning, date }.
-function correlationView(row) {
-  const tickers = Array.isArray(row.tickers) ? row.tickers.filter(Boolean) : []
-  const tokens = String(row.value || '')
-    .toLowerCase()
-    .split('_')
-    .filter(Boolean)
-  const relation = tokens.includes('inverse')
-    ? 'inverse'
-    : tokens.includes('direct')
-      ? 'direct'
-      : null
+// Correlation regime → chip type. Only strong inverse/aligned color the
+// chip; mild + decoupled stay neutral (per spec).
+function regimeChipType(regime) {
+  const r = (regime || '').toLowerCase()
+  if (r === 'inverse') return 'neg'
+  if (r === 'aligned') return 'pos'
+  return 'neu'
+}
 
-  let pair
-  let assets
-  if (tickers.length >= 2) {
-    assets = [assetLabel(tickers[0]), assetLabel(tickers[1])]
-    pair = assets.join(' ↔ ')
-  } else {
-    const assetTokens = tokens.filter(
-      (t) => t !== 'inverse' && t !== 'direct' && t !== 'correlation'
-    )
-    assets = assetTokens.map(assetLabel)
-    pair = assets.join(' ↔ ') + (relation ? ` · ${relation}` : '')
+function regimeText(regime) {
+  if (!regime) return '—'
+  return regime.replace(/_/g, ' ')
+}
+
+// Latest signal_date wins; first row per ticker on that date.
+function pickLatest(rows) {
+  const latest = rows[0]?.signal_date ?? null
+  const map = {}
+  if (latest) {
+    for (const r of rows) {
+      if (r.signal_date !== latest) continue
+      if (!map[r.ticker]) map[r.ticker] = r
+    }
   }
-
-  const isUsd =
-    tickers.some((t) => ['USD', 'UUP', 'DXY'].includes(String(t).toUpperCase())) ||
-    tokens.includes('usd')
-
-  let meaning
-  if (relation === 'inverse' && isUsd) {
-    const other = assets.find((a) => a !== 'USD') ?? assets[assets.length - 1] ?? 'the pair'
-    meaning = `Inverse — rising $ pressures ${other} lower.`
-  } else {
-    meaning = trim(row.evidence_snippet, 80)
-  }
-
-  return { pair, meaning, date: row.stated_on }
+  return { map, date: latest }
 }
 
-function Evidence({ snippet }) {
-  if (!snippet) return null
+// Framer Motion height/opacity collapse, ~180ms.
+function Expand({ open, children }) {
   return (
-    <span className="db-info" title={snippet} aria-label="evidence">
-      ⓘ
-    </span>
+    <AnimatePresence initial={false}>
+      {open && (
+        <motion.div
+          key="content"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeInOut' }}
+          style={{ overflow: 'hidden' }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// The standardized gauge row — identical structure for VIX and every
+// driver. Left: ticker + price. Middle: range bar + position label.
+// Right: market-signal chip + chevron. Expands to badges + insight.
+function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
+  // VIX shows the live spot (priceOverride, from vix_current_v) so it
+  // matches the persistent header pill; everything else uses prev_close.
+  const price = priceOverride != null ? priceOverride : num(row.prev_close)
+  const lrr = num(row.buy_trade)
+  const trr = num(row.sell_trade)
+  const pct = rangePct(lrr, trr, price)
+  const rLabel = rangeLabel(pct)
+  const zc = zoneColor(pct)
+  const signal = macroImplication(row.ticker, row.trend, pct)
+  const tone = trendTone(row.trend)
+  const bucket = isVix ? vixBucket(price) : null
+  // Match the header pill's 1-decimal VIX formatting exactly.
+  const priceText = isVix ? (price != null ? price.toFixed(1) : '—') : fmtBand(price)
+
+  return (
+    <div className="dbm-row">
+      <button
+        type="button"
+        className="dbm-row-head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <div className="dbm-row-left">
+          <span className="dbm-row-ticker">{row.ticker}</span>
+          <span
+            className={`dbm-row-price${isVix ? ' dbm-row-price-vix' : ''}`}
+            style={isVix ? { color: TYPE_COLOR[bucket.type] } : undefined}
+          >
+            {priceText}
+          </span>
+        </div>
+
+        <div className="dbm-row-mid">
+          <div className="dbm-rb-track">
+            {pct != null && (
+              <div
+                className="dbm-rb-fill"
+                style={{ width: `${pct}%`, background: zc }}
+              />
+            )}
+            {pct != null && (
+              <div
+                className="dbm-rb-dot"
+                style={{ left: `${pct}%`, background: zc }}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+          <div className="dbm-rb-meta">
+            {lrr != null && (
+              <span className="dbm-rb-rr dbm-rb-rr-lrr">LRR {fmtBand(lrr)}</span>
+            )}
+            <span className="dbm-rb-label">
+              {rLabel ?? '—'} · {(row.trend || '—').toUpperCase()} trend
+            </span>
+            {trr != null && (
+              <span className="dbm-rb-rr dbm-rb-rr-trr">TRR {fmtBand(trr)}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="dbm-row-right">
+          <span className={`dbm-chip dbm-chip-${signal.type}`}>{signal.label}</span>
+          <span className={`dbm-chev${open ? ' dbm-chev-open' : ''}`} aria-hidden="true">
+            ▾
+          </span>
+        </div>
+      </button>
+
+      <Expand open={open}>
+        <div
+          className="dbm-bubble"
+          style={{ borderLeftColor: TREND_COLOR[tone] }}
+        >
+          <div className="dbm-badges">
+            <span className={`dbm-badge dbm-badge-${tone}`}>
+              {(row.trend || '—').toUpperCase()}
+            </span>
+            {rLabel && <span className="dbm-badge dbm-badge-range">{rLabel}</span>}
+            {isVix && (
+              <span className={`dbm-badge dbm-badge-${bucket.type}`}>{bucket.label}</span>
+            )}
+          </div>
+          {insight?.headline && (
+            <p className="dbm-bubble-headline">{insight.headline}</p>
+          )}
+          {insight?.detail && <p className="dbm-bubble-detail">{insight.detail}</p>}
+        </div>
+      </Expand>
+    </div>
+  )
+}
+
+// USD-correlation row — same 3-column skeleton. Middle is the 30D
+// correlation headline; expands to the full 5-window table.
+function CorrRow({ asset, open, onToggle }) {
+  const c30 = asset.cells[30]
+  const regime30 = c30?.regime
+  return (
+    <div className="dbm-row">
+      <button
+        type="button"
+        className="dbm-row-head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <div className="dbm-row-left">
+          <span className="dbm-corr-asset-label">{asset.label}</span>
+          <span className="dbm-corr-asset-ticker">{asset.ticker}</span>
+        </div>
+
+        <div className="dbm-row-mid dbm-corr-mid">
+          <span className="dbm-corr-num" style={{ color: corrColor(regime30) }}>
+            {fmtCorr3(c30?.correlation)}
+          </span>
+          <span className="dbm-corr-num-tag">30D</span>
+        </div>
+
+        <div className="dbm-row-right">
+          <span className={`dbm-chip dbm-chip-${regimeChipType(regime30)}`}>
+            {regimeText(regime30)}
+          </span>
+          <span className={`dbm-chev${open ? ' dbm-chev-open' : ''}`} aria-hidden="true">
+            ▾
+          </span>
+        </div>
+      </button>
+
+      <Expand open={open}>
+        <div className="dbm-bubble" style={{ borderLeftColor: corrColor(regime30) }}>
+          <div className="dbm-corr-wins">
+            {WINDOWS.map((w) => {
+              const cell = asset.cells[w]
+              return (
+                <div className="dbm-corr-winrow" key={w}>
+                  <span className="dbm-corr-winlabel">{w}D</span>
+                  <span
+                    className="dbm-corr-winval"
+                    style={{ color: corrColor(cell?.regime) }}
+                  >
+                    {fmtCorr3(cell?.correlation)}
+                  </span>
+                  <span className="dbm-corr-winn">n={cell?.n_obs ?? '—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Expand>
+    </div>
   )
 }
 
 export function MacroRegimeSection() {
-  // Independent per-source state so a single failed fetch leaves the
-  // other panels intact (graceful partial render).
-  const [quad, setQuad] = useState({ status: 'loading', row: null })
-  const [correlations, setCorrelations] = useState({ status: 'loading', rows: [] })
-  const [vix, setVix] = useState({ status: 'loading', row: null })
-  const [check, setCheck] = useState({ status: 'loading', map: {}, date: null })
+  const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
+  const [corr, setCorr] = useState({ status: 'loading', assets: [] })
+  const [insights, setInsights] = useState({ status: 'loading', map: {} })
+  const [open, setOpen] = useState(() => new Set())
+  // Live VIX spot — same source as the always-on header pill — so the
+  // cockpit's VIX number matches the top-right corner.
+  const { data: vixLive } = useVixBucket()
 
   useEffect(() => {
     let cancelled = false
 
     Promise.allSettled([
       supabase
-        .from('hedgeye_macro_assertions')
-        .select('*')
-        .order('stated_on', { ascending: false })
-        .order('extracted_at', { ascending: false })
-        .limit(80),
-      supabase
-        .from('hedgeye_vix_snapshots')
-        .select('vix_value, bucket, day_change, day_change_pct, snapshot_at')
-        .order('snapshot_at', { ascending: false })
-        .limit(1),
-      supabase
         .from('hedgeye_signals')
-        .select('ticker, trend, buy_trade, sell_trade, prev_close, price_in_range_pct, signal_date')
+        .select('ticker, name, trend, buy_trade, sell_trade, prev_close, signal_date')
         .order('signal_date', { ascending: false })
+        .limit(300),
+      supabase
+        .from('usd_correlations_v')
+        .select('sort_order, asset_ticker, asset_label, window_days, correlation, n_obs, regime')
+        .order('sort_order', { ascending: true })
+        .order('window_days', { ascending: true }),
+      supabase
+        .from('macro_insights')
+        .select('insight_date, block_key, headline, detail')
+        .order('insight_date', { ascending: false })
         .limit(200),
-    ]).then(([macroSettled, vixSettled, sigSettled]) => {
+    ]).then(([sigSettled, corrSettled, insSettled]) => {
       if (cancelled) return
 
-      // --- macro_assertions → monthly_quad + correlations -----------
-      if (macroSettled.status === 'fulfilled' && !macroSettled.value.error) {
-        const rows = macroSettled.value.data ?? []
-        const monthly = rows.find((r) => r.assertion_type === 'monthly_quad') ?? null
-        const seen = new Set()
-        const corr = []
-        for (const r of rows) {
-          if (r.assertion_type !== 'correlation') continue
-          if (seen.has(r.value)) continue
-          seen.add(r.value)
-          corr.push(r)
-          if (corr.length >= 5) break
-        }
-        setQuad({ status: monthly ? 'ready' : 'empty', row: monthly })
-        setCorrelations({ status: 'ready', rows: corr })
-      } else {
-        if (macroSettled.status === 'rejected')
-          console.error('MacroRegime: macro fetch rejected:', macroSettled.reason)
-        else console.error('MacroRegime: macro fetch error:', macroSettled.value.error)
-        setQuad({ status: 'error', row: null })
-        setCorrelations({ status: 'error', rows: [] })
-      }
+      let latestSignalDate = null
 
-      // --- vix_snapshots → latest 1 ---------------------------------
-      if (vixSettled.status === 'fulfilled' && !vixSettled.value.error) {
-        const row = vixSettled.value.data?.[0] ?? null
-        setVix({ status: row ? 'ready' : 'empty', row })
-      } else {
-        if (vixSettled.status === 'rejected')
-          console.error('MacroRegime: vix fetch rejected:', vixSettled.reason)
-        else console.error('MacroRegime: vix fetch error:', vixSettled.value.error)
-        setVix({ status: 'error', row: null })
-      }
-
-      // --- signals → latest date, ticker-keyed map ------------------
+      // --- hedgeye_signals → latest-date ticker map -----------------
       if (sigSettled.status === 'fulfilled' && !sigSettled.value.error) {
         const rows = sigSettled.value.data ?? []
-        const latestDate = rows[0]?.signal_date ?? null
-        const map = {}
-        for (const r of rows) {
-          if (r.signal_date !== latestDate) continue
-          if (!map[r.ticker]) map[r.ticker] = r
-        }
-        setCheck({
-          status: latestDate ? 'ready' : 'empty',
-          map,
-          date: latestDate,
-        })
+        const { map, date } = pickLatest(rows)
+        latestSignalDate = date
+        setSignals({ status: date ? 'ready' : 'empty', map, date })
       } else {
         if (sigSettled.status === 'rejected')
           console.error('MacroRegime: signals fetch rejected:', sigSettled.reason)
         else console.error('MacroRegime: signals fetch error:', sigSettled.value.error)
-        setCheck({ status: 'error', map: {}, date: null })
+        setSignals({ status: 'error', map: {}, date: null })
+      }
+
+      // --- usd_correlations_v → asset-pivoted matrix ----------------
+      if (corrSettled.status === 'fulfilled' && !corrSettled.value.error) {
+        const rows = corrSettled.value.data ?? []
+        const byAsset = new Map()
+        for (const r of rows) {
+          if (!byAsset.has(r.asset_ticker)) {
+            byAsset.set(r.asset_ticker, {
+              ticker: r.asset_ticker,
+              label: r.asset_label,
+              sort_order: r.sort_order,
+              cells: {},
+            })
+          }
+          byAsset.get(r.asset_ticker).cells[r.window_days] = {
+            correlation: r.correlation,
+            regime: r.regime,
+            n_obs: r.n_obs,
+          }
+        }
+        const assets = Array.from(byAsset.values()).sort(
+          (a, b) => a.sort_order - b.sort_order
+        )
+        setCorr({ status: assets.length ? 'ready' : 'empty', assets })
+      } else {
+        if (corrSettled.status === 'rejected')
+          console.error('MacroRegime: correlations fetch rejected:', corrSettled.reason)
+        else console.error('MacroRegime: correlations fetch error:', corrSettled.value.error)
+        setCorr({ status: 'error', assets: [] })
+      }
+
+      // --- macro_insights → block_key map for the signal's date -----
+      // Tie insights to the SAME date as the signals (per spec) so the
+      // bubble text always corresponds to today's readings. Falls back
+      // to the latest insight date if signals didn't load. Empty table
+      // → empty map → bubbles render badges only (no error).
+      if (insSettled.status === 'fulfilled' && !insSettled.value.error) {
+        const rows = insSettled.value.data ?? []
+        const targetDate = latestSignalDate ?? rows[0]?.insight_date ?? null
+        const map = {}
+        if (targetDate) {
+          for (const r of rows) {
+            if (r.insight_date !== targetDate) continue
+            if (!map[r.block_key]) map[r.block_key] = r
+          }
+        }
+        setInsights({ status: 'ready', map })
+      } else {
+        if (insSettled.status === 'rejected')
+          console.error('MacroRegime: insights fetch rejected:', insSettled.reason)
+        else console.error('MacroRegime: insights fetch error:', insSettled.value.error)
+        // Insights are decorative — fail soft to an empty map.
+        setInsights({ status: 'ready', map: {} })
       }
     })
 
@@ -311,188 +504,131 @@ export function MacroRegimeSection() {
     }
   }, [])
 
-  // --- derived view values ----------------------------------------
-  const quadRow = quad.row
-  const quadValue = quadRow?.value
-  const playbook = quadValue ? QUAD_PLAYBOOK[quadValue] : null
-  const quadAge = daysSince(quadRow?.stated_on)
-  const quadStale = quadAge != null && quadAge > STALE_AFTER_DAYS
+  const toggle = (key) =>
+    setOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
-  const vixRow = vix.row
-  const vixValue = num(vixRow?.vix_value)
-  const vixBucket = (vixRow?.bucket || '').toLowerCase()
-  const vixChange = num(vixRow?.day_change)
-  const vixPct = num(vixRow?.day_change_pct)
-  // VIX is risk-off: a FALLING VIX (negative change) is good for risk
-  // assets → green; rising → red.
-  const vixChangeTone = vixChange == null ? '' : vixChange < 0 ? 'good' : vixChange > 0 ? 'bad' : ''
-  const vixChangeText =
-    vixChange == null
-      ? null
-      : `${vixChange <= 0 ? 'Down' : 'Up'} ${Math.abs(vixChange).toFixed(2)}${
-          vixPct != null ? ` (${vixPct >= 0 ? '+' : ''}${vixPct.toFixed(1)}%)` : ''
-        }`
+  const insightMap = insights.map
+  const vixRow = signals.map.VIX
+  // Prefer the live spot; fall back to the signal's prev_close if the
+  // live view hasn't loaded.
+  const vixDisplayPrice =
+    vixLive?.vix_value != null ? vixLive.vix_value : num(vixRow?.prev_close)
+  const corrInsight = insightMap.correlations
+  const corrOpen = open.has('correlations')
 
   return (
     <SectionShell index={1} title="Macro Regime">
-      {/* Row A — Hero pair (Quad + VIX) */}
-      <div className="db-hero-grid">
-        {/* QUAD card */}
-        <div className="db-hero-card">
-          {quad.status === 'loading' && <p className="db-state">Loading Quad…</p>}
-          {quad.status === 'error' && (
-            <p className="db-state db-state-error">Quad unavailable.</p>
-          )}
-          {quad.status === 'empty' && (
-            <p className="db-state">No current Quad assertion.</p>
-          )}
-          {quad.status === 'ready' && (
-            <>
-              <div className="db-hero-top">
-                <span
-                  className="db-hero-num"
-                  style={playbook ? { color: playbook.color } : undefined}
-                >
-                  {quadValue}
-                </span>
-                <div className="db-hero-headings">
-                  <span className="db-hero-eyebrow">MONTHLY QUAD</span>
-                  <span className="db-hero-name">{playbook ? playbook.name : '—'}</span>
-                </div>
-              </div>
-              {playbook && (
-                <>
-                  <p className="db-hero-line">
-                    <span className="db-hero-label db-hero-label-good">Favored:</span>{' '}
-                    {[...playbook.bestSectors, ...playbook.bestFactors].join(', ')}
-                  </p>
-                  <p className="db-hero-line">
-                    <span className="db-hero-label db-hero-label-bad">Avoid:</span>{' '}
-                    {playbook.worstSectors.join(', ')}
-                  </p>
-                </>
-              )}
-              <div className="db-hero-meta">
-                {quadRow?.stated_on && <span>stated {quadRow.stated_on}</span>}
-                <Evidence snippet={quadRow?.evidence_snippet} />
-                {quadStale && (
-                  <span className="db-stale-note">stale · {quadAge}d</span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* VIX card */}
-        <div className="db-hero-card">
-          {vix.status === 'loading' && <p className="db-state">Loading VIX…</p>}
-          {vix.status === 'error' && (
+      <div className="dbm-stack">
+        {/* === Block A — VIX strip ================================= */}
+        <div className="dbm-block">
+          {signals.status === 'loading' && <p className="db-state">Loading VIX…</p>}
+          {signals.status === 'error' && (
             <p className="db-state db-state-error">VIX unavailable.</p>
           )}
-          {vix.status === 'empty' && <p className="db-state">No VIX snapshot yet.</p>}
-          {vix.status === 'ready' && (
-            <>
-              <div className="db-hero-top">
-                <span className="db-hero-num">
-                  {vixValue != null ? vixValue.toFixed(2) : '—'}
-                </span>
-                <div className="db-hero-headings">
-                  <span className="db-hero-eyebrow">VIX REGIME</span>
-                  <span className={`db-vix-pill db-vix-${vixBucket || 'unknown'}`}>
-                    {(vixRow?.bucket || 'unknown').toUpperCase()}
-                  </span>
-                </div>
-              </div>
-              {VIX_MEANING[vixBucket] && (
-                <p className="db-vix-meaning">{VIX_MEANING[vixBucket]}</p>
-              )}
-              {vixChangeText && (
-                <p className={`db-vix-change db-change-${vixChangeTone}`}>{vixChangeText}</p>
-              )}
-            </>
+          {(signals.status === 'ready' || signals.status === 'empty') && !vixRow && (
+            <p className="db-state">No VIX signal.</p>
+          )}
+          {vixRow && (
+            <DriverRow
+              row={vixRow}
+              insight={insightMap.vix}
+              open={open.has('vix')}
+              onToggle={() => toggle('vix')}
+              isVix
+              priceOverride={vixDisplayPrice}
+            />
           )}
         </div>
-      </div>
 
-      {/* Row B — Correlations */}
-      <div className="db-corr">
-        <span className="db-subhead">Correlations</span>
-        {correlations.status === 'loading' && <p className="db-state">Loading…</p>}
-        {correlations.status === 'error' && (
-          <p className="db-state db-state-error">Correlations unavailable.</p>
-        )}
-        {correlations.status === 'ready' && correlations.rows.length === 0 && (
-          <p className="db-state">No correlation calls.</p>
-        )}
-        {correlations.status === 'ready' && correlations.rows.length > 0 && (
-          <div className="db-corr-table">
-            <div className="db-corr-row db-corr-head">
-              <span>Pair</span>
-              <span>Meaning</span>
-              <span>Date</span>
-            </div>
-            {correlations.rows.map((r) => {
-              const v = correlationView(r)
+        {/* === Block B — Macro Drivers ============================= */}
+        <div className="dbm-block">
+          <span className="dbm-block-title">Macro Drivers</span>
+          <p className="dbm-note">Hedgeye TREND (3-month) only — no TRADE or TAIL signal.</p>
+          {signals.status === 'loading' && <p className="db-state">Loading drivers…</p>}
+          {signals.status === 'error' && (
+            <p className="db-state db-state-error">Driver signals unavailable.</p>
+          )}
+          {(signals.status === 'ready' || signals.status === 'empty') &&
+            DRIVER_GROUPS.map((grp) => {
+              const present = grp.tickers.filter((t) => signals.map[t])
+              if (present.length === 0) return null
               return (
-                <div className="db-corr-row" key={`corr-${r.id}`}>
-                  <span className="db-corr-pair">{v.pair}</span>
-                  <span className="db-corr-meaning">{v.meaning}</span>
-                  <span className="db-corr-date">{v.date}</span>
+                <div className="dbm-group" key={grp.group}>
+                  <span className="dbm-group-head">{grp.group}</span>
+                  {present.map((t) => (
+                    <DriverRow
+                      key={t}
+                      row={signals.map[t]}
+                      insight={insightMap[`driver:${t}`]}
+                      open={open.has(`driver:${t}`)}
+                      onToggle={() => toggle(`driver:${t}`)}
+                    />
+                  ))}
                 </div>
               )
             })}
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Row C — Asset-Class Checklist */}
-      <div className="db-check">
-        <span className="db-subhead">Asset-Class Checklist</span>
-        {check.status === 'loading' && <p className="db-state">Loading signals…</p>}
-        {check.status === 'error' && (
-          <p className="db-state db-state-error">Signals unavailable.</p>
-        )}
-        {(check.status === 'ready' || check.status === 'empty') &&
-          WATCHLIST.map((grp) => (
-            <div className="db-check-group" key={grp.group}>
-              <span className="db-check-group-head">{grp.group}</span>
-              {grp.items.map((item) => {
-                const row = check.map[item.t]
-                if (!row) {
-                  return (
-                    <div className="db-check-row db-check-row-muted" key={item.t}>
-                      <span className="db-check-label">{item.label}</span>
-                      <span className="db-check-dash">—</span>
-                    </div>
-                  )
-                }
-                const pir = num(row.price_in_range_pct)
-                const clamped = pir == null ? null : Math.max(0, Math.min(1, pir))
-                return (
-                  <div className="db-check-row" key={item.t}>
-                    <span className="db-check-label">{item.label}</span>
-                    <span className={`db-dir db-dir-${dirTone(row.trend)}`}>
-                      {(row.trend || '—').toUpperCase()}
-                    </span>
-                    <span className="db-check-range">
-                      {fmtLevel(row.buy_trade)} – {fmtLevel(row.sell_trade)}
-                    </span>
-                    <span className="db-bar" aria-hidden="true">
-                      {clamped != null && (
-                        <span
-                          className="db-bar-marker"
-                          style={{ left: `${clamped * 100}%` }}
-                        />
-                      )}
-                    </span>
-                    <span className="db-action">
-                      {deriveAction(row.trend, pir, item.isYield)}
-                    </span>
-                  </div>
-                )
-              })}
+        {/* === Block C — USD Correlations ========================== */}
+        <div className="dbm-block">
+          <div className="dbm-corr-header">
+            <span className="dbm-block-title dbm-corr-title">
+              Key $USD Correlations{' '}
+              <span className="dbm-corr-sub">(UUP proxy · Pearson · trading days)</span>
+            </span>
+          </div>
+
+          {corrInsight?.headline && (
+            <div className="dbm-corr-insight">
+              <button
+                type="button"
+                className="dbm-corr-insight-toggle"
+                onClick={corrInsight.detail ? () => toggle('correlations') : undefined}
+                aria-expanded={corrInsight.detail ? corrOpen : undefined}
+              >
+                <span className="dbm-insight-spark" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="dbm-corr-insight-head">{corrInsight.headline}</span>
+                {corrInsight.detail && (
+                  <span
+                    className={`dbm-chev${corrOpen ? ' dbm-chev-open' : ''}`}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                )}
+              </button>
+              {corrInsight.detail && (
+                <Expand open={corrOpen}>
+                  <p className="dbm-bubble-detail dbm-corr-insight-detail">
+                    {corrInsight.detail}
+                  </p>
+                </Expand>
+              )}
             </div>
-          ))}
+          )}
+
+          {corr.status === 'loading' && <p className="db-state">Loading correlations…</p>}
+          {corr.status === 'error' && (
+            <p className="db-state db-state-error">USD correlations unavailable.</p>
+          )}
+          {corr.status === 'empty' && <p className="db-state">No correlation data.</p>}
+          {corr.status === 'ready' &&
+            corr.assets.map((asset) => (
+              <CorrRow
+                key={asset.ticker}
+                asset={asset}
+                open={open.has(`corr:${asset.ticker}`)}
+                onToggle={() => toggle(`corr:${asset.ticker}`)}
+              />
+            ))}
+        </div>
       </div>
     </SectionShell>
   )
