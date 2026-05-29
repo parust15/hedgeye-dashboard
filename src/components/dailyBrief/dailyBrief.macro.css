@@ -22,11 +22,15 @@
   padding-top: 18px;
 }
 
+/* Sub-block titles ("MACRO DRIVERS", "KEY $USD CORRELATIONS") share the
+   Quad-header signature: mono, uppercase, bold, lifted. */
 .dbm-block-title {
   display: block;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
   color: var(--text-strong);
   margin-bottom: 10px;
 }
@@ -279,6 +283,82 @@
   color: var(--text);
 }
 
+/* === RR verdict (hedgeye_rr_verdict) — per-ticker inspection stamp ===
+   Collapsed: a full-width "stamp" line under the row head (gate-colored
+   left accent). Expanded: the .rrv-block inside the row bubble. */
+.rrv-oneliner {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid var(--neutral);
+  margin: -2px 0 4px;
+  padding: 2px 6px 4px 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+.rrv-oneliner:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.rrv-oneliner-bull {
+  border-left-color: var(--bull);
+}
+.rrv-oneliner-bear {
+  border-left-color: var(--bear);
+}
+.rrv-oneliner-neutral {
+  border-left-color: var(--neutral);
+}
+
+.rrv-stamp {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+
+.rrv-oneliner-text {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Expanded RR verdict — mechanical reads + detail inside the row bubble. */
+.rrv-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rrv-detail {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* Dim dimension prefix inside a badge ("GATE", "TRR", "MOM", "VOL"). */
+.rrv-k {
+  margin-right: 5px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* 'insufficient' read — muted, never colored as a real signal. */
+.rrv-badge-insufficient {
+  background: var(--neutral-bg);
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 /* === Block B — group labels ====================================== */
 .dbm-group {
   margin-bottom: 10px;
@@ -290,12 +370,12 @@
 .dbm-group-head {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--text-dim);
-  margin: 10px 0 2px;
+  color: var(--text-strong);
+  margin: 12px 0 4px;
 }
 
 /* === Block C — USD Correlations ================================== */
@@ -312,10 +392,11 @@
 
 .dbm-corr-sub {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-dim);
   letter-spacing: 0;
+  text-transform: none;
 }
 
 .dbm-corr-insight {

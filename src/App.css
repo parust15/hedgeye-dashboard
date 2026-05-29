@@ -7106,9 +7106,21 @@ body,
   flex-shrink: 0;
 }
 
+/* Section titles share the Quad-header signature: mono, uppercase, bold. */
 .db-section-title h2 {
-  font-size: 16px;
-  letter-spacing: 0.2px;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* Page title ("DAILY SUMMARY") — uppercase mono, matching the tab + Quads.
+   Scoped to .daily-brief so other tabs' .topbar h1 is untouched. */
+.daily-brief .topbar h1 {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .db-section-meta {
@@ -7154,15 +7166,16 @@ body,
   color: var(--amber-light);
 }
 
-/* Shared subhead for Row B / Row C blocks. */
+/* Shared subhead for Row B / Row C blocks (Tape table titles) — lifted to
+   the Quad-header signature: mono, uppercase, bold, readable. */
 .db-subhead {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-strong);
   margin-bottom: 10px;
 }
 

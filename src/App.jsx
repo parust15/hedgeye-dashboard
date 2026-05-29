@@ -11,6 +11,7 @@ import { InvestingIdeasPanel } from './components/InvestingIdeasPanel'
 import { MomoTrackerPanel } from './components/MomoTrackerPanel'
 import { TabBarPreview } from './components/preview/TabBarPreview'
 import { TickerDetailModal } from './components/TickerDetailModal'
+import { VixHeaderPill } from './components/VixBucketPill'
 import { AmbientBackground } from './components/AmbientBackground'
 import { useAllTickers } from './lib/useAllTickers'
 import { useVixBucket } from './lib/useVixBucket'
@@ -153,6 +154,9 @@ function AppBody() {
       <AmbientBackground tickers={signalTickers} />
       <div className="top-bar">
         <TopTabs active={activeTab} onChange={setActiveTab} />
+        {/* Persistent live VIX quote, top-right — shown on every tab except
+            Daily Summary, which has its own VIX strip in the cockpit. */}
+        {activeTab !== 'daily-brief' && <VixHeaderPill data={vixBucket} />}
       </div>
       {activeTab === 'daily-brief' && <DailyBrief />}
       {activeTab === 'risk-ranges' && (

@@ -255,6 +255,42 @@ const TREND_COLOR = {
   neutral: 'var(--neutral)',
 }
 
+// --- hedgeye_rr_verdict mechanical reads → badge tone/label ---------
+// gate is the trend gate (BULLISH/BEARISH/NEUTRAL).
+function rrGateTone(gate) {
+  switch ((gate || '').toUpperCase()) {
+    case 'BULLISH':
+      return 'bull'
+    case 'BEARISH':
+      return 'bear'
+    default:
+      return 'neutral'
+  }
+}
+
+// range_zone: at_lrr = buy zone (bull), at_trr = trim zone (amber/cau),
+// mid = no edge (neutral).
+function rrZoneInfo(zone) {
+  if (zone === 'at_lrr') return { tone: 'bull', label: 'buy zone' }
+  if (zone === 'at_trr') return { tone: 'cau', label: 'trim zone' }
+  return { tone: 'neutral', label: 'mid-range' }
+}
+
+// Secondary mechanical read (trr_slope / momentum / vol_state). These are
+// descriptive context, not buy/sell signals, so they stay neutral —
+// EXCEPT 'insufficient', which renders muted as "insufficient history".
+function RrStateBadge({ label, value }) {
+  const insufficient = value === 'insufficient'
+  return (
+    <span
+      className={`dbm-badge ${insufficient ? 'rrv-badge-insufficient' : 'dbm-badge-neutral'}`}
+    >
+      <span className="rrv-k">{label}</span>
+      {insufficient ? 'insufficient history' : value || '—'}
+    </span>
+  )
+}
+
 // Correlation regime → number color.
 function corrColor(regime) {
   const r = (regime || '').toLowerCase()
@@ -313,7 +349,7 @@ function Expand({ open, children }) {
 // The standardized gauge row — identical structure for VIX and every
 // driver. Left: ticker + price. Middle: range bar + position label.
 // Right: market-signal chip + chevron. Expands to badges + insight.
-function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
+function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride }) {
   // VIX shows the live spot (priceOverride, from vix_current_v) so it
   // matches the persistent header pill; everything else uses prev_close.
   const price = priceOverride != null ? priceOverride : num(row.prev_close)
@@ -323,14 +359,36 @@ function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
   const rLabel = rangeLabel(pct)
   const zc = zoneColor(pct)
   const signal = macroImplication(row.ticker, row.trend, pct)
-  // Prefer the DB-authored verdict; the chip color still comes from the
-  // local rule type. Fall back to the hardcoded label when absent.
-  const verdict = insight?.short_verdict?.trim()
-  const chipLabel = verdict || signal.label
+  // Prefer the DB-authored insight verdict for the chip; the chip color
+  // still comes from the local rule type. Fall back to the hardcoded label
+  // when absent. (Distinct from the `verdict` prop = RR inspection stamp.)
+  const insightVerdict = insight?.short_verdict?.trim()
+  const chipLabel = insightVerdict || signal.label
+  // macro_insights slices the SAME source text into headline (≤500 chars)
+  // and detail (≤2000), so the bubble used to render a truncated copy AND the
+  // full copy. When one string is a prefix of the other (same source), show
+  // only the complete one; if they're genuinely distinct, show both.
+  const insHead = insight?.headline?.trim() || ''
+  const insDetail = insight?.detail?.trim() || ''
+  const insSameSource =
+    !!insHead &&
+    !!insDetail &&
+    (insDetail.startsWith(insHead) || insHead.startsWith(insDetail))
+  const insFull = insDetail.length >= insHead.length ? insDetail : insHead
   const tone = trendTone(row.trend)
+  // VIX is inverse: a BEARISH (falling) VIX trend is risk-on and supportive
+  // for markets, while a BULLISH (rising) trend is the warning sign. Flip the
+  // accent color for VIX so the TREND badge + bubble border never contradict
+  // the "investable" reading (the badge still shows the raw Hedgeye trend).
+  const accentTone =
+    isVix && tone === 'bull' ? 'bear' : isVix && tone === 'bear' ? 'bull' : tone
   const bucket = isVix ? vixBucket(price) : null
   // Match the header pill's 1-decimal VIX formatting exactly.
   const priceText = isVix ? (price != null ? price.toFixed(1) : '—') : fmtBand(price)
+  // hedgeye_rr_verdict — this ticker's Risk Range inspection stamp (latest
+  // signal_date). Additive: absent → nothing renders.
+  const vGateTone = rrGateTone(verdict?.gate)
+  const vZone = verdict ? rrZoneInfo(verdict.range_zone) : null
 
   return (
     <div className="dbm-row">
@@ -387,29 +445,75 @@ function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
         </div>
       </button>
 
+      {/* RR verdict — collapsed "stamp" line under the row head; toggles the
+          same bubble as the head. Gate-colored left accent = read at a glance. */}
+      {verdict?.verdict_oneliner && (
+        <button
+          type="button"
+          className={`rrv-oneliner rrv-oneliner-${vGateTone}`}
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className="rrv-stamp" aria-hidden="true">
+            RR
+          </span>
+          <span className="rrv-oneliner-text">{verdict.verdict_oneliner}</span>
+        </button>
+      )}
+
       <Expand open={open}>
         <div
           className="dbm-bubble"
-          style={{ borderLeftColor: TREND_COLOR[tone] }}
+          style={{
+            borderLeftColor: TREND_COLOR[verdict ? vGateTone : accentTone],
+          }}
         >
-          <div className="dbm-badges">
-            <span className={`dbm-badge dbm-badge-${tone}`}>
-              {(row.trend || '—').toUpperCase()}
-            </span>
-            {rLabel && <span className="dbm-badge dbm-badge-range">{rLabel}</span>}
-            {isVix && (
-              <span className={`dbm-badge dbm-badge-${bucket.type}`}>{bucket.label}</span>
-            )}
-          </div>
-          {insight?.headline && (
-            <p className="dbm-bubble-headline">{insight.headline}</p>
+          {verdict ? (
+            /* RR verdict is this ticker's single read — gate/zone/slope/mom/
+               vol + detail (the collapsed oneliner sits above). */
+            <>
+              <div className="rrv-badges">
+                <span className={`dbm-badge dbm-badge-${vGateTone}`}>
+                  <span className="rrv-k">gate</span>
+                  {verdict.gate || '—'}
+                </span>
+                {vZone && (
+                  <span className={`dbm-badge dbm-badge-${vZone.tone}`}>
+                    <span className="rrv-k">zone</span>
+                    {vZone.label}
+                  </span>
+                )}
+                <RrStateBadge label="TRR" value={verdict.trr_slope} />
+                <RrStateBadge label="mom" value={verdict.momentum} />
+                <RrStateBadge label="vol" value={verdict.vol_state} />
+              </div>
+              {verdict.verdict_detail && (
+                <p className="rrv-detail">{verdict.verdict_detail}</p>
+              )}
+            </>
+          ) : (
+            /* No RR verdict for this ticker — fall back to the macro-insight
+               read + trend/range badges so the bubble is never empty. */
+            <>
+              <div className="dbm-badges">
+                <span className={`dbm-badge dbm-badge-${accentTone}`}>
+                  {(row.trend || '—').toUpperCase()}
+                </span>
+                {rLabel && <span className="dbm-badge dbm-badge-range">{rLabel}</span>}
+                {isVix && (
+                  <span className={`dbm-badge dbm-badge-${bucket.type}`}>{bucket.label}</span>
+                )}
+              </div>
+              {insSameSource ? (
+                <p className="dbm-bubble-headline">{insFull}</p>
+              ) : (
+                <>
+                  {insHead && <p className="dbm-bubble-headline">{insHead}</p>}
+                  {insDetail && <p className="dbm-bubble-detail">{insDetail}</p>}
+                </>
+              )}
+            </>
           )}
-          {/* The insight pipeline writes the same text to headline + detail,
-              so only render detail when it actually differs (no duplicate). */}
-          {insight?.detail &&
-            insight.detail.trim() !== (insight.headline || '').trim() && (
-              <p className="dbm-bubble-detail">{insight.detail}</p>
-            )}
         </div>
       </Expand>
     </div>
@@ -568,6 +672,8 @@ export function MacroRegimeSection() {
   const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
   const [corr, setCorr] = useState({ status: 'loading', assets: [] })
   const [insights, setInsights] = useState({ status: 'loading', map: {} })
+  // hedgeye_rr_verdict — latest signal_date, keyed by ticker.
+  const [verdicts, setVerdicts] = useState({ status: 'loading', map: {} })
   const [quads, setQuads] = useState({
     status: 'loading',
     monthly: null,
@@ -607,7 +713,12 @@ export function MacroRegimeSection() {
         .select('assertion_type, value, region, stance, confidence, stated_on, source_email_type, evidence_snippet')
         .in('assertion_type', ['monthly_quad', 'quarterly_quad', 'regional_quad'])
         .order('stated_on', { ascending: false }),
-    ]).then(([sigSettled, corrSettled, insSettled, quadSettled]) => {
+      supabase
+        .from('hedgeye_rr_verdict')
+        .select('ticker, verdict_oneliner, verdict_detail, gate, range_zone, price_in_range, trr_slope, momentum, vol_state, signal_date')
+        .order('signal_date', { ascending: false })
+        .limit(300),
+    ]).then(([sigSettled, corrSettled, insSettled, quadSettled, vSettled]) => {
       if (cancelled) return
 
       let latestSignalDate = null
@@ -725,6 +836,20 @@ export function MacroRegimeSection() {
           quarterlyShift: null,
           regional: [],
         })
+      }
+
+      // --- hedgeye_rr_verdict → latest-date ticker map --------------
+      // Rows arrive newest-first; pickLatest keeps only the max
+      // signal_date and keys by ticker. Verdicts are additive — fail
+      // soft to an empty map so the rows still render without them.
+      if (vSettled.status === 'fulfilled' && !vSettled.value.error) {
+        const { map } = pickLatest(vSettled.value.data ?? [])
+        setVerdicts({ status: 'ready', map })
+      } else {
+        if (vSettled.status === 'rejected')
+          console.error('MacroRegime: rr_verdict fetch rejected:', vSettled.reason)
+        else console.error('MacroRegime: rr_verdict fetch error:', vSettled.value.error)
+        setVerdicts({ status: 'ready', map: {} })
       }
     })
 
@@ -922,6 +1047,7 @@ export function MacroRegimeSection() {
             <DriverRow
               row={vixRow}
               insight={insightMap.vix}
+              verdict={verdicts.map.VIX}
               open={open.has('vix')}
               onToggle={() => toggle('vix')}
               isVix
@@ -950,6 +1076,7 @@ export function MacroRegimeSection() {
                       key={t}
                       row={signals.map[t]}
                       insight={insightMap[`driver:${t}`]}
+                      verdict={verdicts.map[t]}
                       open={open.has(`driver:${t}`)}
                       onToggle={() => toggle(`driver:${t}`)}
                     />

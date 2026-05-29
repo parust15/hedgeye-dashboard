@@ -32,8 +32,8 @@
 
 .db-tape-head {
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -58,7 +58,7 @@
 }
 
 .db-tape-head .db-tape-cell-num {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* Number coloring. */
