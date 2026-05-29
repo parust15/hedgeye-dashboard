@@ -38,83 +38,7 @@
   color: var(--text-dim);
 }
 
-/* === Morning summary bar (top of cockpit) ======================== */
-.dbm-summary {
-  border-bottom: 1px solid var(--border-strong);
-}
-
-.dbm-summary-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 12px 0;
-  cursor: pointer;
-  color: var(--text);
-}
-
-.dbm-posture {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 4px 11px;
-  border-radius: var(--radius-badge);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.dbm-posture-riskon {
-  background: var(--bull-bg);
-  color: var(--bull);
-}
-.dbm-posture-mixed-bull {
-  background: rgba(251, 191, 36, 0.14);
-  color: var(--amber-light);
-}
-.dbm-posture-mixed-bear {
-  background: rgba(251, 146, 60, 0.16);
-  color: #fb923c;
-}
-.dbm-posture-riskoff {
-  background: var(--bear-bg);
-  color: var(--bear);
-}
-.dbm-posture-neu {
-  background: var(--neutral-bg);
-  color: var(--neutral);
-}
-
-.dbm-summary-headline {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dbm-summary-detail {
-  padding: 2px 0 12px;
-}
-
-.dbm-summary-full {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text-strong);
-}
-
-.dbm-summary-themes {
-  margin: 8px 0 0;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text);
-}
+/* (Morning summary bar removed.) */
 
 /* === Standardized gauge row ====================================== */
 .dbm-row {
@@ -501,6 +425,350 @@
 }
 
 /* === Responsive ================================================== */
+/* === Quad Regime strip (first element in Section 1) ============== */
+.dbm-quad-strip {
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 16px;
+}
+
+.dbm-quad-section + .dbm-quad-section {
+  margin-top: 16px;
+}
+
+/* Collapsible section header (US / Global) — toggles its block. */
+.dbm-quad-sectitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 2px 0 10px;
+}
+.dbm-quad-sectitle .dbm-quad-blocktitle {
+  margin: 0;
+}
+.dbm-quad-sectitle .dbm-chev {
+  margin-left: auto;
+}
+
+/* Section titles — same size for US and Global. */
+.dbm-quad-blocktitle {
+  display: block;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  margin: 0 0 10px;
+}
+/* Underline only the label text — not the trailing space or note. */
+.dbm-quad-blocklabel {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.dbm-quad-globalnote {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  color: var(--text-dim);
+}
+
+/* === US Quad 2x2 grid (Quarterly/Monthly × Current/Upcoming) ===== */
+.dbm-quad-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.dbm-quad-ghead {
+  align-self: end;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  padding-bottom: 4px;
+}
+.dbm-quad-rowlabel {
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
+/* Cells (boxes) — one style for every populated/empty slot. */
+.dbm-quad-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: var(--bg-elev-2);
+}
+.dbm-quad-cell-bull,
+.dbm-quad-cell-bear {
+  cursor: pointer;
+  color: var(--text);
+}
+.dbm-quad-cell-bull {
+  border-left: 3px solid var(--bull);
+}
+.dbm-quad-cell-bear {
+  border-left: 3px solid var(--bear);
+}
+.dbm-quad-cell-bull:hover,
+.dbm-quad-cell-bear:hover {
+  background: var(--bg-elev);
+}
+.dbm-quad-cell-empty {
+  opacity: 0.5;
+}
+
+.dbm-quad-ctop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dbm-quad-cchev {
+  margin-left: auto;
+  align-self: center;
+}
+.dbm-quad-cnum {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.dbm-quad-cnum-bull {
+  color: var(--bull);
+}
+.dbm-quad-cnum-bear {
+  color: var(--bear);
+}
+.dbm-quad-cname {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.dbm-quad-cunknown {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.dbm-quad-cgip {
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+/* Growth/Inflation arrows. */
+.dbm-quad-arrow {
+  font-weight: 800;
+}
+.dbm-quad-arrow-up {
+  color: var(--bull);
+}
+.dbm-quad-arrow-down {
+  color: var(--bear);
+}
+
+/* === Quad chips + direction (shared US + Global) ================= */
+.dbm-quad-chip {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--radius-badge);
+  white-space: nowrap;
+}
+.dbm-quad-chip-bull {
+  color: var(--bull);
+  background: var(--bull-bg);
+}
+.dbm-quad-chip-bear {
+  color: var(--bear);
+  background: var(--bear-bg);
+}
+.dbm-quad-chip-neu {
+  color: var(--neutral);
+  background: var(--neutral-bg);
+}
+.dbm-quad-dir-bull {
+  color: var(--bull);
+}
+.dbm-quad-dir-bear {
+  color: var(--bear);
+}
+.dbm-quad-dir-neu {
+  color: var(--neutral);
+}
+
+/* === 4-dimension playbook (US below grid + Global inline) ======== */
+.dbm-quad-pb-wrap {
+  border-left: 2px solid var(--border-strong);
+  padding: 8px 0 4px 14px;
+  margin: 8px 0 4px;
+}
+.dbm-quad-pb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dbm-quad-pb-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.dbm-quad-pb-proof {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.dbm-quad-pb {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dbm-quad-pb-dim {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dbm-quad-pb-dimlabel {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.dbm-quad-pb-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.dbm-quad-col-head {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.dbm-quad-col-fav {
+  color: var(--bull);
+}
+.dbm-quad-col-avoid {
+  color: var(--bear);
+}
+.dbm-quad-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dbm-quad-pill {
+  font-size: 15px;
+  padding: 3px 10px;
+  border-radius: var(--radius-badge);
+}
+.dbm-quad-pill-fav {
+  color: var(--bull);
+  background: var(--bull-bg);
+}
+.dbm-quad-pill-avoid {
+  color: var(--bear);
+  background: var(--bear-bg);
+}
+
+/* === Global quads — expandable rows ============================== */
+/* Even columns so the four headers are spaced evenly; header grid and
+   row grids share the template (same container width) → aligned. */
+.dbm-quad-ghead-row,
+.dbm-quad-grow-btn {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 20px;
+  align-items: center;
+  gap: 14px;
+}
+/* Regime column (3rd) centered above its Bullish/Bearish values. */
+.dbm-quad-ghead-row > span:nth-child(3) {
+  text-align: center;
+}
+.dbm-quad-ghead-row {
+  padding: 6px 6px 8px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.dbm-quad-grow {
+  border-bottom: 1px solid var(--border);
+}
+.dbm-quad-grow:last-child {
+  border-bottom: none;
+}
+.dbm-quad-grow-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 10px 6px;
+  color: var(--text);
+}
+.dbm-quad-grow-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.dbm-quad-gregion {
+  font-size: 18px;
+  color: var(--text-strong);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dbm-quad-gdir {
+  font-family: var(--mono);
+  font-size: 15px;
+  text-align: center;
+  text-transform: capitalize;
+}
+.dbm-quad-gdate {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.dbm-quad-gchev {
+  justify-self: end;
+}
+
 @media (max-width: 720px) {
   .dbm-row-head {
     flex-wrap: wrap;
@@ -520,5 +788,17 @@
   }
   .dbm-row-price-vix {
     font-size: 24px;
+  }
+  .dbm-quad-ghead-row,
+  .dbm-quad-grow-btn {
+    grid-template-columns: 1fr 1fr 1fr 1fr 18px;
+    gap: 8px;
+  }
+  .dbm-quad-grid {
+    gap: 6px;
+  }
+  .dbm-quad-pb-cols {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }

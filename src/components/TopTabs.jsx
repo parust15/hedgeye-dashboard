@@ -31,7 +31,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 //   endpoints and the HTML dots' `left:` styles.
 
 const TABS = [
-  { id: 'daily-brief', label: 'DAILY BRIEF' },
+  { id: 'daily-brief', label: 'DAILY SUMMARY' },
   { id: 'risk-ranges', label: 'RISK RANGES' },
   { id: 'the-call', label: 'THE CALL' },
   { id: 'etf-pro-plus', label: 'ETF PRO PLUS' },

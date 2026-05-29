@@ -10,8 +10,7 @@ export function DailyBrief() {
     <div className="panel daily-brief">
       <header className="topbar">
         <div className="topbar-left">
-          <h1>Daily Brief</h1>
-          <p className="sub">Your morning run sheet — read top to bottom.</p>
+          <h1>Daily Summary</h1>
         </div>
       </header>
 

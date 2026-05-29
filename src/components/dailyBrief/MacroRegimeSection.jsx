@@ -18,6 +18,75 @@ const DRIVER_GROUPS = [
 // Block C — correlation lookback windows, in display order.
 const WINDOWS = [15, 30, 90, 120, 180]
 
+// Static Hedgeye GIP doctrine — backtested favored/avoid across four
+// dimensions per Quad (Master the Market, p.27). Hardcoded, not fetched.
+const QUAD_PLAYBOOK = {
+  1: {
+    name: 'Goldilocks',
+    growth: 'up',
+    inflation: 'down',
+    dims: [
+      { label: 'Asset Classes', best: ['Equities', 'Credit', 'Commodities', 'FX'], worst: ['Fixed Income', 'USD'] },
+      { label: 'Equity Sectors', best: ['Tech', 'Consumer Discretionary', 'Materials', 'Industrials'], worst: ['Utilities', 'REITS', 'Consumer Staples', 'Financials'] },
+      { label: 'Equity Style Factors', best: ['High Beta', 'Momentum', 'Cyclicals', 'Secular Growth'], worst: ['Low Beta', 'Defensives', 'Value', 'Dividend Yield'] },
+      { label: 'Fixed Income Sectors', best: ['BDCs', 'Convertibles', 'HY Credit', 'EM $ Debt'], worst: ['TIPS', 'Short Duration Treasurys', 'MBS', 'Medium Duration Treasurys'] },
+    ],
+  },
+  2: {
+    name: 'Reflation',
+    growth: 'up',
+    inflation: 'up',
+    dims: [
+      { label: 'Asset Classes', best: ['Commodities', 'Equities', 'Credit', 'FX'], worst: ['Fixed Income', 'USD'] },
+      { label: 'Equity Sectors', best: ['Tech', 'Consumer Discretionary', 'Industrials', 'Materials'], worst: ['Telecom', 'Utilities', 'REITS', 'Consumer Staples'] },
+      { label: 'Equity Style Factors', best: ['Secular Growth', 'Momentum', 'Cyclical Growth', 'Small Caps'], worst: ['Low Beta', 'Value', 'Dividend Yield', 'Defensives'] },
+      { label: 'Fixed Income Sectors', best: ['Convertibles', 'BDCs', 'Preferreds', 'Leveraged Loans'], worst: ['Long Duration Treasurys', 'Medium Duration Treasurys', 'Munis', 'IG Credit'] },
+    ],
+  },
+  3: {
+    name: 'Stagflation',
+    growth: 'down',
+    inflation: 'up',
+    dims: [
+      { label: 'Asset Classes', best: ['Gold', 'Commodities'], worst: ['Credit'] },
+      { label: 'Equity Sectors', best: ['Utilities', 'Tech', 'Energy', 'Industrials'], worst: ['Financials', 'REITS', 'Materials', 'Telecom'] },
+      { label: 'Equity Style Factors', best: ['Secular Growth', 'Momentum', 'Mid Caps', 'Low Beta'], worst: ['Small Caps', 'Dividend Yield', 'Value', 'Defensives'] },
+      { label: 'Fixed Income Sectors', best: ['Munis', 'EM $ Debt', 'Long Duration Treasurys', 'TIPS'], worst: ['BDCs', 'Preferreds', 'Convertibles', 'Leveraged Loans'] },
+    ],
+  },
+  4: {
+    name: 'Deflation',
+    growth: 'down',
+    inflation: 'down',
+    dims: [
+      { label: 'Asset Classes', best: ['Fixed Income', 'Gold', 'USD'], worst: ['Commodities', 'Equities', 'Credit', 'FX'] },
+      { label: 'Equity Sectors', best: ['Consumer Staples', 'Utilities', 'REITS', 'Health Care'], worst: ['Energy', 'Tech', 'Industrials', 'Financials'] },
+      { label: 'Equity Style Factors', best: ['Low Beta', 'Dividend Yield', 'Quality', 'Defensives'], worst: ['High Beta', 'Momentum', 'Cyclicals', 'Secular Growth'] },
+      { label: 'Fixed Income Sectors', best: ['Long Duration Treasurys', 'Medium Duration Treasurys', 'IG Credit', 'Munis'], worst: ['Preferreds', 'EM Local Currency', 'BDCs', 'Leveraged Loans'] },
+    ],
+  },
+}
+
+// Cell/chip accent: bull for Q1/Q2, bear for Q3/Q4.
+function quadTone(n) {
+  if (n === 1 || n === 2) return 'bull'
+  if (n === 3 || n === 4) return 'bear'
+  return 'neu'
+}
+
+function quadInt(v) {
+  const n = parseInt(v, 10)
+  return n >= 1 && n <= 4 ? n : null
+}
+
+// 'YYYY-MM-DD' → 'M/D'.
+function fmtMD(iso) {
+  if (!iso) return ''
+  const [, m, d] = String(iso).split('-').map(Number)
+  if (!m || !d) return ''
+  return `${m}/${d}`
+}
+
 // PostgREST hands numerics back as strings — parse once at the edge.
 // Guard null BEFORE Number.isFinite to avoid the Number(null)===0 trap.
 function num(x) {
@@ -167,30 +236,6 @@ function macroImplication(ticker, trend, pct) {
       if (trend === 'BEARISH') return { label: 'bearish', type: 'neg' }
       return { label: 'neutral', type: 'neu' }
   }
-}
-
-// Morning-summary posture badge → style variant.
-function postureType(p) {
-  const s = (p || '').toUpperCase().replace(/[\s-]/g, '_')
-  if (s === 'RISK_ON') return 'riskon'
-  if (s === 'MIXED_BULLISH') return 'mixed-bull'
-  if (s === 'MIXED_BEARISH') return 'mixed-bear'
-  if (s === 'RISK_OFF') return 'riskoff'
-  return 'neu'
-}
-
-// Posture string → human label (underscores → spaces).
-function postureLabel(p) {
-  return (p || '').replace(/_/g, ' ').trim() || '—'
-}
-
-// Pipe-separated key themes → trimmed array.
-function splitThemes(detail) {
-  if (!detail) return []
-  return detail
-    .split('|')
-    .map((t) => t.trim())
-    .filter(Boolean)
 }
 
 function trendTone(trend) {
@@ -426,11 +471,109 @@ function CorrRow({ asset, open, onToggle }) {
   )
 }
 
+// The full 4-dimension Hedgeye GIP playbook for a quad — FAVORED vs
+// AVOID across Asset Classes, Equity Sectors, Style Factors, and Fixed
+// Income. Reused by US grid cells (below the grid) and Global rows.
+function QuadPlaybook({ play }) {
+  return (
+    <div className="dbm-quad-pb">
+      {play.dims.map((d) => (
+        <div className="dbm-quad-pb-dim" key={d.label}>
+          <span className="dbm-quad-pb-dimlabel">{d.label}</span>
+          <div className="dbm-quad-pb-cols">
+            <div className="dbm-quad-pb-col">
+              <span className="dbm-quad-col-head dbm-quad-col-fav">POSITIVE</span>
+              <div className="dbm-quad-pills">
+                {d.best.map((b) => (
+                  <span className="dbm-quad-pill dbm-quad-pill-fav" key={b}>
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="dbm-quad-pb-col">
+              <span className="dbm-quad-col-head dbm-quad-col-avoid">NEGATIVE</span>
+              <div className="dbm-quad-pills">
+                {d.worst.map((w) => (
+                  <span className="dbm-quad-pill dbm-quad-pill-avoid" key={w}>
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// One cell of the US 2x2 grid. Populated → big QUAD n + name + GIP +
+// footer, toggles its playbook (rendered full-width below the grid).
+// Empty (no row) → muted "—/unknown", not interactive (a deliberate
+// blank gauge — a thinking prompt).
+// Growth/Inflation arrow — ↑ green (accelerating) / ↓ red (slowing).
+function GipArrow({ dir }) {
+  return (
+    <span className={`dbm-quad-arrow dbm-quad-arrow-${dir}`} aria-hidden="true">
+      {dir === 'up' ? '↑' : '↓'}
+    </span>
+  )
+}
+
+function QuadCell({ row, open, onToggle }) {
+  const n = row ? quadInt(row.value) : null
+  const play = n ? QUAD_PLAYBOOK[n] : null
+  if (!row || !play) {
+    return (
+      <div className="dbm-quad-cell dbm-quad-cell-empty">
+        <span className="dbm-quad-ctop">
+          <span className="dbm-quad-cnum">QUAD —</span>
+          <span className="dbm-quad-cunknown">unknown</span>
+        </span>
+      </div>
+    )
+  }
+  const tone = quadTone(n)
+  return (
+    <button
+      type="button"
+      className={`dbm-quad-cell dbm-quad-cell-${tone}${open ? ' dbm-quad-cell-open' : ''}`}
+      onClick={onToggle}
+      aria-expanded={open}
+    >
+      <span className="dbm-quad-ctop">
+        <span className={`dbm-quad-cnum dbm-quad-cnum-${tone}`}>QUAD {n}</span>
+        <span className="dbm-quad-cname">{play.name}</span>
+        <span
+          className={`dbm-quad-cchev dbm-chev${open ? ' dbm-chev-open' : ''}`}
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </span>
+      <span className="dbm-quad-cgip">
+        Growth <GipArrow dir={play.growth} /> · Inflation <GipArrow dir={play.inflation} />
+      </span>
+    </button>
+  )
+}
+
 export function MacroRegimeSection() {
   const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
   const [corr, setCorr] = useState({ status: 'loading', assets: [] })
   const [insights, setInsights] = useState({ status: 'loading', map: {} })
-  const [open, setOpen] = useState(() => new Set())
+  const [quads, setQuads] = useState({
+    status: 'loading',
+    monthly: null,
+    quarterly: null,
+    monthlyShift: null,
+    quarterlyShift: null,
+    regional: [],
+  })
+  // Section-level keys ('quad-us' / 'quad-global') start expanded; the
+  // per-cell / per-driver keys default collapsed (absent from the set).
+  const [open, setOpen] = useState(() => new Set(['quad-us', 'quad-global']))
   // Live VIX spot — same source as the always-on header pill — so the
   // cockpit's VIX number matches the top-right corner.
   const { data: vixLive } = useVixBucket()
@@ -454,7 +597,12 @@ export function MacroRegimeSection() {
         .select('insight_date, block_key, headline, detail, short_verdict, market_posture')
         .order('insight_date', { ascending: false })
         .limit(200),
-    ]).then(([sigSettled, corrSettled, insSettled]) => {
+      supabase
+        .from('hedgeye_macro_assertions')
+        .select('assertion_type, value, region, stance, confidence, stated_on, source_email_type, evidence_snippet')
+        .in('assertion_type', ['monthly_quad', 'quarterly_quad', 'regional_quad'])
+        .order('stated_on', { ascending: false }),
+    ]).then(([sigSettled, corrSettled, insSettled, quadSettled]) => {
       if (cancelled) return
 
       let latestSignalDate = null
@@ -525,6 +673,54 @@ export function MacroRegimeSection() {
         // Insights are decorative — fail soft to an empty map.
         setInsights({ status: 'ready', map: {} })
       }
+
+      // --- hedgeye_macro_assertions → Quad regime ------------------
+      // Rows arrive newest-first, so the first match per slot wins.
+      // "Shift" cells = latest US row whose evidence implies a regime
+      // transition (optional; absent today → blank Upcoming cell).
+      if (quadSettled.status === 'fulfilled' && !quadSettled.value.error) {
+        const rows = quadSettled.value.data ?? []
+        const SHIFT_RE = /shift|into|emerging/i
+        const isUs = (r, type) => r.assertion_type === type && r.region === 'US'
+        const monthly = rows.find((r) => isUs(r, 'monthly_quad')) ?? null
+        const quarterly = rows.find((r) => isUs(r, 'quarterly_quad')) ?? null
+        const monthlyShift =
+          rows.find((r) => isUs(r, 'monthly_quad') && SHIFT_RE.test(r.evidence_snippet || '')) ??
+          null
+        const quarterlyShift =
+          rows.find((r) => isUs(r, 'quarterly_quad') && SHIFT_RE.test(r.evidence_snippet || '')) ??
+          null
+        const seen = new Set()
+        const regional = []
+        for (const r of rows) {
+          if (r.assertion_type !== 'regional_quad') continue
+          if (!r.region || r.region === 'US') continue
+          if (seen.has(r.region)) continue
+          seen.add(r.region)
+          regional.push(r)
+        }
+        regional.sort((a, b) => a.region.localeCompare(b.region))
+        setQuads({
+          status: 'ready',
+          monthly,
+          quarterly,
+          monthlyShift,
+          quarterlyShift,
+          regional,
+        })
+      } else {
+        if (quadSettled.status === 'rejected')
+          console.error('MacroRegime: quad fetch rejected:', quadSettled.reason)
+        else console.error('MacroRegime: quad fetch error:', quadSettled.value.error)
+        setQuads({
+          status: 'error',
+          monthly: null,
+          quarterly: null,
+          monthlyShift: null,
+          quarterlyShift: null,
+          regional: [],
+        })
+      }
     })
 
     return () => {
@@ -548,43 +744,163 @@ export function MacroRegimeSection() {
     vixLive?.vix_value != null ? vixLive.vix_value : num(vixRow?.prev_close)
   const corrInsight = insightMap.correlations
   const corrOpen = open.has('correlations')
-  const summary = insightMap.morning_summary
-  const summaryOpen = open.has('morning_summary')
-  const summaryThemes = summary ? splitThemes(summary.detail) : []
+  const usOpen = open.has('quad-us')
+  const globalOpen = open.has('quad-global')
 
   return (
     <SectionShell index={1} title="Macro Regime">
       <div className="dbm-stack">
-        {/* === Morning summary bar ================================ */}
-        {summary && (
-          <div className="dbm-summary">
-            <button
-              type="button"
-              className="dbm-summary-head"
-              onClick={() => toggle('morning_summary')}
-              aria-expanded={summaryOpen}
-            >
-              <span className={`dbm-posture dbm-posture-${postureType(summary.short_verdict)}`}>
-                {postureLabel(summary.short_verdict)}
-              </span>
-              <span className="dbm-summary-headline" title={summary.headline}>
-                {summary.headline}
-              </span>
-              <span
-                className={`dbm-chev${summaryOpen ? ' dbm-chev-open' : ''}`}
-                aria-hidden="true"
+        {/* === Quad Regime strip — collapsible US + Global ======== */}
+        {quads.status === 'ready' && (
+          <div className="dbm-quad-strip">
+            <div className="dbm-quad-section">
+              <button
+                type="button"
+                className="dbm-quad-sectitle"
+                onClick={() => toggle('quad-us')}
+                aria-expanded={usOpen}
               >
-                ▾
-              </span>
-            </button>
-            <Expand open={summaryOpen}>
-              <div className="dbm-summary-detail">
-                <p className="dbm-summary-full">{summary.headline}</p>
-                {summaryThemes.length > 0 && (
-                  <p className="dbm-summary-themes">{summaryThemes.join(' · ')}</p>
-                )}
+                <span className="dbm-quad-blocktitle">
+                  <span className="dbm-quad-blocklabel">US QUADS</span>
+                </span>
+                <span className={`dbm-chev${usOpen ? ' dbm-chev-open' : ''}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              <Expand open={usOpen}>
+                <div className="dbm-quad-grid">
+                  <span className="dbm-quad-ghead-corner" aria-hidden="true" />
+                  <span className="dbm-quad-ghead">Current</span>
+                  <span className="dbm-quad-ghead">Upcoming</span>
+
+                  <span className="dbm-quad-rowlabel">Quarterly</span>
+                  <QuadCell
+                    row={quads.quarterly}
+                    open={open.has('quad:q-current')}
+                    onToggle={() => toggle('quad:q-current')}
+                  />
+                  <QuadCell
+                    row={quads.quarterlyShift}
+                    open={open.has('quad:q-upcoming')}
+                    onToggle={() => toggle('quad:q-upcoming')}
+                  />
+
+                  <span className="dbm-quad-rowlabel">Monthly</span>
+                  <QuadCell
+                    row={quads.monthly}
+                    open={open.has('quad:m-current')}
+                    onToggle={() => toggle('quad:m-current')}
+                  />
+                  <QuadCell
+                    row={quads.monthlyShift}
+                    open={open.has('quad:m-upcoming')}
+                    onToggle={() => toggle('quad:m-upcoming')}
+                  />
+                </div>
+                {[
+                  { key: 'q-current', slot: 'Quarterly · Current', row: quads.quarterly },
+                  { key: 'q-upcoming', slot: 'Quarterly · Upcoming', row: quads.quarterlyShift },
+                  { key: 'm-current', slot: 'Monthly · Current', row: quads.monthly },
+                  { key: 'm-upcoming', slot: 'Monthly · Upcoming', row: quads.monthlyShift },
+                ].map((c) => {
+                  const cn = c.row ? quadInt(c.row.value) : null
+                  const cplay = cn ? QUAD_PLAYBOOK[cn] : null
+                  if (!cplay) return null
+                  return (
+                    <Expand key={c.key} open={open.has(`quad:${c.key}`)}>
+                      <div className="dbm-quad-pb-wrap">
+                        <div className="dbm-quad-pb-head">
+                          <span className={`dbm-quad-chip dbm-quad-chip-${quadTone(cn)}`}>
+                            QUAD {cn}
+                          </span>
+                          <span className="dbm-quad-pb-title">
+                            {c.slot} — {cplay.name}
+                          </span>
+                          {c.row && (
+                            <span className="dbm-quad-pb-proof">
+                              {c.row.source_email_type ? `${c.row.source_email_type} · ` : ''}
+                              {fmtMD(c.row.stated_on)}
+                            </span>
+                          )}
+                        </div>
+                        <QuadPlaybook play={cplay} />
+                      </div>
+                    </Expand>
+                  )
+                })}
+              </Expand>
+            </div>
+
+            {quads.regional.length > 0 && (
+              <div className="dbm-quad-section dbm-quad-global">
+                <button
+                  type="button"
+                  className="dbm-quad-sectitle"
+                  onClick={() => toggle('quad-global')}
+                  aria-expanded={globalOpen}
+                >
+                  <span className="dbm-quad-blocktitle">
+                    <span className="dbm-quad-blocklabel">GLOBAL QUADS</span>{' '}
+                    <span className="dbm-quad-globalnote">(updated as Keith cites them)</span>
+                  </span>
+                  <span className={`dbm-chev${globalOpen ? ' dbm-chev-open' : ''}`} aria-hidden="true">
+                    ▾
+                  </span>
+                </button>
+                <Expand open={globalOpen}>
+                  <div className="dbm-quad-ghead-row">
+                    <span>Country</span>
+                    <span>Quad</span>
+                    <span>Regime</span>
+                    <span>Date</span>
+                    <span aria-hidden="true" />
+                  </div>
+                  <div className="dbm-quad-glist">
+                    {quads.regional.map((r) => {
+                      const n = quadInt(r.value)
+                      const play = n ? QUAD_PLAYBOOK[n] : null
+                      const tone = quadTone(n)
+                      const stanceTone =
+                        r.stance === 'bullish' ? 'bull' : r.stance === 'bearish' ? 'bear' : 'neu'
+                      const key = `quad-global:${r.region}`
+                      const isOpen = open.has(key)
+                      return (
+                        <div className="dbm-quad-grow" key={r.region}>
+                          <button
+                            type="button"
+                            className="dbm-quad-grow-btn"
+                            onClick={play ? () => toggle(key) : undefined}
+                            aria-expanded={play ? isOpen : undefined}
+                          >
+                            <span className="dbm-quad-gregion">{r.region}</span>
+                            <span className={`dbm-quad-chip dbm-quad-chip-${tone}`}>
+                              Quad {n ?? '—'}
+                            </span>
+                            <span className={`dbm-quad-gdir dbm-quad-dir-${stanceTone}`}>
+                              {r.stance || '—'}
+                            </span>
+                            <span className="dbm-quad-gdate">{fmtMD(r.stated_on)}</span>
+                            <span
+                              className={`dbm-quad-gchev dbm-chev${isOpen ? ' dbm-chev-open' : ''}`}
+                              aria-hidden="true"
+                            >
+                              {play ? '▾' : ''}
+                            </span>
+                          </button>
+                          {play && (
+                            <Expand open={isOpen}>
+                              <div className="dbm-quad-pb-wrap">
+                                <QuadPlaybook play={play} />
+                              </div>
+                            </Expand>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </Expand>
               </div>
-            </Expand>
+            )}
           </div>
         )}
 

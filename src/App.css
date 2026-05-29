@@ -7060,9 +7060,27 @@ body,
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   margin-bottom: 14px;
+  border: none;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 10px;
+  padding: 0 0 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* Collapse chevron for each Daily Summary section header. */
+.db-section-chev {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+.db-section-chev-open {
+  transform: rotate(180deg);
 }
 
 .db-section-title {

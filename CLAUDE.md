@@ -15,6 +15,11 @@ If a fresh session starts and `session_summary.md` exists in the project root, r
 - **Commits require explicit user approval** when working on a multi-feature batch. Single-fix commits during iteration are fine to propose, but the user makes the call.
 - **Do not skip git hooks** (`--no-verify`) or bypass signing unless the user explicitly asks for it. If a pre-commit hook fails, fix the underlying issue and create a NEW commit (not `--amend`).
 
+## UI / typography conventions
+
+- **Font-size hierarchy (user preference — applies everywhere).** Headers get the biggest font, sub-headers the 2nd-biggest, everything else the smallest — but ALL of it stays on the larger/readable side (the user reads on a PC and dislikes small text). Never ship tiny (≤10px) primary text. Concretely on the Daily Summary: section titles (e.g. "US QUAD REGIME") are biggest; table column/row headers + playbook dimension labels are 2nd; pills/chips/values/dates are smallest-but-still-large (~13–15px).
+- **Non-colored table text is white** (`var(--text-strong)`); reserve `--bull`/`--bear`/`--amber-light` for intentionally color-coded values only.
+
 ## Stack reminders
 
 - React 19 + Vite 8 + recharts 3.8 + @supabase/supabase-js 2.105
