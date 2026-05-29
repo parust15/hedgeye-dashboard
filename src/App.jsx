@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { TopTabs } from './components/TopTabs'
+import { CommandCenter } from './components/CommandCenter/CommandCenter'
+import { TickerIntelligenceModal } from './components/TickerIntelligenceModal/TickerIntelligenceModal'
 import { DailyBrief } from './components/DailyBrief'
 import { RiskRangesPanel } from './components/RiskRangesPanel'
 import { TheCallPanel } from './components/TheCallPanel'
@@ -19,6 +21,11 @@ import { TickerProvider, useTickerFocus } from './lib/TickerContext'
 import { TickerSignalStateProvider } from './lib/TickerSignalStateContext'
 import { TAB_ID_SET } from './lib/tabs'
 import { supabase } from './lib/supabase'
+import {
+  fetchDailyIntelligence,
+  fetchDailyInsights,
+  fetchTickerIntelligence,
+} from './api/intelligence'
 import './App.css'
 
 const ACTIVE_TAB_KEY = 'dashboard.activeTab'
@@ -55,6 +62,31 @@ function AppBody() {
   // header pill, and forwarded to RR so the VIX SignalCard can show the
   // same bucket label next to its trend pill.
   const { data: vixBucket } = useVixBucket()
+
+  // Command Center — one-shot aggregation (daily_intelligence_v) plus
+  // today's AI verdicts (macro_insights), fetched once at the top level
+  // and rendered above every tab. Null until loaded → CommandCenter
+  // self-skips, so there's no skeleton flash.
+  const [dailyIntelligence, setDailyIntelligence] = useState(null)
+  const [dailyInsights, setDailyInsights] = useState({})
+  // Ticker clicked anywhere (Command Center, panels) → opens the
+  // TickerIntelligenceModal. Null = closed.
+  const [selectedTicker, setSelectedTicker] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const intel = await fetchDailyIntelligence()
+      if (cancelled) return
+      setDailyIntelligence(intel)
+      if (intel?.signal_date) {
+        const ins = await fetchDailyInsights(intel.signal_date)
+        if (!cancelled) setDailyInsights(ins)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Range-state distribution for the Aurora Field ambient. One-shot
   // fetch of (ticker, range_state) at the latest signal_date. Each row
@@ -156,6 +188,11 @@ function AppBody() {
         <TopTabs active={activeTab} onChange={setActiveTab} />
         <VixHeaderPill data={vixBucket} />
       </div>
+      <CommandCenter
+        intel={dailyIntelligence}
+        insights={dailyInsights}
+        onTickerClick={setSelectedTicker}
+      />
       {activeTab === 'daily-brief' && <DailyBrief />}
       {activeTab === 'risk-ranges' && (
         <RiskRangesPanel
@@ -184,6 +221,11 @@ function AppBody() {
           onJumpTab={handleJumpTab}
         />
       )}
+      <TickerIntelligenceModal
+        ticker={selectedTicker}
+        onClose={() => setSelectedTicker(null)}
+        fetchFn={fetchTickerIntelligence}
+      />
     </div>
   )
 }

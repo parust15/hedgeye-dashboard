@@ -169,6 +169,30 @@ function macroImplication(ticker, trend, pct) {
   }
 }
 
+// Morning-summary posture badge → style variant.
+function postureType(p) {
+  const s = (p || '').toUpperCase().replace(/[\s-]/g, '_')
+  if (s === 'RISK_ON') return 'riskon'
+  if (s === 'MIXED_BULLISH') return 'mixed-bull'
+  if (s === 'MIXED_BEARISH') return 'mixed-bear'
+  if (s === 'RISK_OFF') return 'riskoff'
+  return 'neu'
+}
+
+// Posture string → human label (underscores → spaces).
+function postureLabel(p) {
+  return (p || '').replace(/_/g, ' ').trim() || '—'
+}
+
+// Pipe-separated key themes → trimmed array.
+function splitThemes(detail) {
+  if (!detail) return []
+  return detail
+    .split('|')
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
 function trendTone(trend) {
   switch ((trend || '').toUpperCase()) {
     case 'BULLISH':
@@ -254,6 +278,10 @@ function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
   const rLabel = rangeLabel(pct)
   const zc = zoneColor(pct)
   const signal = macroImplication(row.ticker, row.trend, pct)
+  // Prefer the DB-authored verdict; the chip color still comes from the
+  // local rule type. Fall back to the hardcoded label when absent.
+  const verdict = insight?.short_verdict?.trim()
+  const chipLabel = verdict || signal.label
   const tone = trendTone(row.trend)
   const bucket = isVix ? vixBucket(price) : null
   // Match the header pill's 1-decimal VIX formatting exactly.
@@ -307,7 +335,7 @@ function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
         </div>
 
         <div className="dbm-row-right">
-          <span className={`dbm-chip dbm-chip-${signal.type}`}>{signal.label}</span>
+          <span className={`dbm-chip dbm-chip-${signal.type}`}>{chipLabel}</span>
           <span className={`dbm-chev${open ? ' dbm-chev-open' : ''}`} aria-hidden="true">
             ▾
           </span>
@@ -423,7 +451,7 @@ export function MacroRegimeSection() {
         .order('window_days', { ascending: true }),
       supabase
         .from('macro_insights')
-        .select('insight_date, block_key, headline, detail')
+        .select('insight_date, block_key, headline, detail, short_verdict, market_posture')
         .order('insight_date', { ascending: false })
         .limit(200),
     ]).then(([sigSettled, corrSettled, insSettled]) => {
@@ -520,10 +548,46 @@ export function MacroRegimeSection() {
     vixLive?.vix_value != null ? vixLive.vix_value : num(vixRow?.prev_close)
   const corrInsight = insightMap.correlations
   const corrOpen = open.has('correlations')
+  const summary = insightMap.morning_summary
+  const summaryOpen = open.has('morning_summary')
+  const summaryThemes = summary ? splitThemes(summary.detail) : []
 
   return (
     <SectionShell index={1} title="Macro Regime">
       <div className="dbm-stack">
+        {/* === Morning summary bar ================================ */}
+        {summary && (
+          <div className="dbm-summary">
+            <button
+              type="button"
+              className="dbm-summary-head"
+              onClick={() => toggle('morning_summary')}
+              aria-expanded={summaryOpen}
+            >
+              <span className={`dbm-posture dbm-posture-${postureType(summary.short_verdict)}`}>
+                {postureLabel(summary.short_verdict)}
+              </span>
+              <span className="dbm-summary-headline" title={summary.headline}>
+                {summary.headline}
+              </span>
+              <span
+                className={`dbm-chev${summaryOpen ? ' dbm-chev-open' : ''}`}
+                aria-hidden="true"
+              >
+                ▾
+              </span>
+            </button>
+            <Expand open={summaryOpen}>
+              <div className="dbm-summary-detail">
+                <p className="dbm-summary-full">{summary.headline}</p>
+                {summaryThemes.length > 0 && (
+                  <p className="dbm-summary-themes">{summaryThemes.join(' · ')}</p>
+                )}
+              </div>
+            </Expand>
+          </div>
+        )}
+
         {/* === Block A — VIX strip ================================= */}
         <div className="dbm-block">
           {signals.status === 'loading' && <p className="db-state">Loading VIX…</p>}
