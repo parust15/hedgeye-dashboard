@@ -143,7 +143,7 @@
 
 .dbm-rb-rr {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -162,8 +162,8 @@
   flex: 1;
   text-align: center;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 13px;
+  color: var(--text-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -614,14 +614,19 @@
   color: var(--neutral);
   background: var(--neutral-bg);
 }
+/* Regime stance — tight green/red pill hugging just the word, centered
+   under the REGIME header (matches the Quad chip treatment). */
 .dbm-quad-dir-bull {
   color: var(--bull);
+  background: var(--bull-bg);
 }
 .dbm-quad-dir-bear {
   color: var(--bear);
+  background: var(--bear-bg);
 }
 .dbm-quad-dir-neu {
   color: var(--neutral);
+  background: var(--neutral-bg);
 }
 
 /* === 4-dimension playbook (US below grid + Global inline) ======== */
@@ -753,10 +758,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Quad chip in the Global table: don't stretch across the 1fr column —
+   the green/red background sits tight on the "Quad N" text only. */
+.dbm-quad-global .dbm-quad-chip {
+  justify-self: start;
+}
 .dbm-quad-gdir {
+  justify-self: center;
+  display: inline-block;
   font-family: var(--mono);
   font-size: 15px;
-  text-align: center;
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--radius-badge);
   text-transform: capitalize;
 }
 .dbm-quad-gdate {

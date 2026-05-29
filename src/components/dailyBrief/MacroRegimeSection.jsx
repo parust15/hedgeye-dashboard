@@ -404,7 +404,12 @@ function DriverRow({ row, insight, open, onToggle, isVix, priceOverride }) {
           {insight?.headline && (
             <p className="dbm-bubble-headline">{insight.headline}</p>
           )}
-          {insight?.detail && <p className="dbm-bubble-detail">{insight.detail}</p>}
+          {/* The insight pipeline writes the same text to headline + detail,
+              so only render detail when it actually differs (no duplicate). */}
+          {insight?.detail &&
+            insight.detail.trim() !== (insight.headline || '').trim() && (
+              <p className="dbm-bubble-detail">{insight.detail}</p>
+            )}
         </div>
       </Expand>
     </div>
