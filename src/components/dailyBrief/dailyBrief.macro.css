@@ -10,9 +10,6 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
-  /* Cockpit header tint — dark, spacey blue shared by every macro header
-     (block titles, quad titles, asset-group labels). One spot to tune. */
-  --dbm-head: #5a78d6;
 }
 
 .dbm-block {
@@ -36,7 +33,7 @@
   text-transform: uppercase;
   text-decoration: underline;
   text-underline-offset: 6px;
-  color: var(--dbm-head);
+  color: var(--db-head);
   margin-bottom: 10px;
 }
 
@@ -614,7 +611,7 @@ button.dbm-chip {
   text-transform: uppercase;
   text-decoration: underline;
   text-underline-offset: 5px;
-  color: var(--dbm-head);
+  color: var(--db-head);
   margin: 14px 0 6px;
 }
 
@@ -774,7 +771,7 @@ button.dbm-chip {
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--dbm-head);
+  color: var(--db-head);
   margin: 0 0 10px;
 }
 /* Underline only the label text — not the trailing space or note. */

@@ -7047,6 +7047,10 @@ body,
   border-radius: var(--radius-card);
   padding: 18px 20px 20px;
   overflow: hidden;
+  /* Shared header tint for the whole Daily Summary tab — a deep, dark
+     midnight blue used by every section title + sub/block/group header.
+     One spot to tune the entire tab's header color. */
+  --db-head: #2d3a7a;
 }
 
 .db-section > .db-section-head,
@@ -7113,6 +7117,7 @@ body,
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
+  color: var(--db-head);
 }
 
 /* Page title ("DAILY SUMMARY") — uppercase mono, matching the tab + Quads.
@@ -7175,7 +7180,7 @@ body,
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--text-strong);
+  color: var(--db-head);
   margin-bottom: 10px;
 }
 
