@@ -1328,7 +1328,7 @@ export function MacroRegimeSection() {
               onClick={() => toggle('rr-legend')}
               aria-expanded={legendOpen}
             >
-              ? how to read these
+              Instructions
             </button>
           </div>
           {legendOpen && <RrLegend />}
