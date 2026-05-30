@@ -80,9 +80,10 @@
 
 .dbm-row-ticker {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 24px;
+  font-weight: 700;
   letter-spacing: 0.5px;
-  color: var(--text);
+  color: var(--text-strong);
 }
 
 .dbm-row-price {
@@ -147,8 +148,8 @@
 
 .dbm-rb-rr {
   font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   flex-shrink: 0;
@@ -166,7 +167,7 @@
   flex: 1;
   text-align: center;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-strong);
   white-space: nowrap;
   overflow: hidden;
@@ -180,7 +181,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
-  width: 190px;
+  width: 232px;
   flex-shrink: 0;
 }
 
@@ -283,80 +284,261 @@
   color: var(--text);
 }
 
-/* === RR verdict (hedgeye_rr_verdict) — per-ticker inspection stamp ===
-   Collapsed: a full-width "stamp" line under the row head (gate-colored
-   left accent). Expanded: the .rrv-block inside the row bubble. */
-.rrv-oneliner {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  width: 100%;
-  text-align: left;
+/* === RR verdict (hedgeye_rr_verdict) — the right-side ACTION chip is the ONLY
+   verdict surface: the decision (BUY / TRIM / LET RUN …), colored by action
+   family + intensified by conviction. Clicking it toggles a full-width detail
+   band below the row; nothing else renders for the verdict. */
+
+/* The row head is no longer a toggle — only the chip is interactive. */
+.dbm-row-head-static {
+  cursor: default;
+}
+.dbm-row-head-static:hover {
   background: none;
-  border: none;
-  border-left: 2px solid var(--neutral);
-  margin: -2px 0 4px;
-  padding: 2px 6px 4px 12px;
-  cursor: pointer;
-  color: var(--text);
-}
-.rrv-oneliner:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-.rrv-oneliner-bull {
-  border-left-color: var(--bull);
-}
-.rrv-oneliner-bear {
-  border-left-color: var(--bear);
-}
-.rrv-oneliner-neutral {
-  border-left-color: var(--neutral);
 }
 
-.rrv-stamp {
-  flex-shrink: 0;
+/* Action chip — arrow + bold verb on top, dim pattern·momentum line below,
+   centered as a tight stack. Fixed width so the column stacks as a clean
+   vertical strip. Family sets --rrv-accent; conviction sets the fill strength
+   (no dots). */
+.rrv-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 220px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-badge);
   font-family: var(--mono);
-  font-size: 11px;
+  background: none;
+}
+button.rrv-chip {
+  cursor: pointer;
+  font: inherit;
+}
+/* Fallback chip (action null) — single line, same fixed width. */
+button.dbm-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+.rrv-chip:hover {
+  filter: brightness(1.12);
+}
+
+/* Family → accent color (verb, arrow, caret, fill, border). */
+.rrv-chip-bull {
+  --rrv-accent: var(--bull);
+}
+.rrv-chip-bear {
+  --rrv-accent: var(--bear);
+}
+.rrv-chip-amber {
+  --rrv-accent: var(--amber-light);
+}
+.rrv-chip-neutral {
+  --rrv-accent: var(--text-dim);
+}
+
+/* Conviction → fill strength. high = solid fill + 1.5px border; medium = light
+   fill + 1px border; low = outline only + verb recedes. Weak calls fade. */
+.rrv-chip-high {
+  background: color-mix(in srgb, var(--rrv-accent) 20%, transparent);
+  border: 1.5px solid var(--rrv-accent);
+}
+.rrv-chip-med {
+  background: color-mix(in srgb, var(--rrv-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rrv-accent) 60%, transparent);
+}
+.rrv-chip-low {
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--rrv-accent) 50%, transparent);
+}
+.rrv-chip-low .rrv-chip-verb {
+  opacity: 0.65;
+}
+
+.rrv-chip-verb {
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
+  line-height: 1.15;
+  white-space: nowrap;
+  color: var(--rrv-accent);
+}
+.rrv-chip-sub {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  line-height: 1.15;
+  white-space: nowrap;
   color: var(--text-dim);
 }
 
-.rrv-oneliner-text {
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.4;
+/* Caret — small, dim, tucked into the top-right corner; never competes with
+   the verb. */
+.rrv-chip-caret {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--rrv-accent);
+  opacity: 0.55;
+  transition: transform 0.18s ease;
+}
+.rrv-chip-caret-open {
+  transform: rotate(180deg);
 }
 
-/* Expanded RR verdict — mechanical reads + detail inside the row bubble. */
-.rrv-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.rrv-detail {
-  margin: 0;
+/* Verdict blurb — full-row-width band below the row, bubble style, left border
+   colored by the action family (set inline). */
+.rrv-pop {
+  margin: 4px 6px 10px;
+  padding: 10px 14px;
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-input);
+  border-left: 3px solid var(--neutral);
   font-size: 12px;
   line-height: 1.6;
   color: var(--text);
 }
 
-/* Dim dimension prefix inside a badge ("GATE", "TRR", "MOM", "VOL"). */
-.rrv-k {
-  margin-right: 5px;
-  font-size: 10px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+/* === "How to read these" legend ================================== */
+/* Title row holds the block title + the subtle legend trigger. */
+.dbm-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.dbm-block-head .dbm-block-title {
+  margin-bottom: 0;
+}
+.rrl-trigger {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.3px;
   color: var(--text-dim);
+  padding: 2px 4px;
+}
+.rrl-trigger:hover,
+.rrl-trigger-open {
+  color: var(--text-strong);
 }
 
-/* 'insufficient' read — muted, never colored as a real signal. */
-.rrv-badge-insufficient {
-  background: var(--neutral-bg);
-  color: var(--text-dim);
+/* Full-width legend panel — bubble style, readable line length. */
+.rrl-panel {
+  margin: 0 0 14px;
+  padding: 18px 20px;
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-input);
+  border-left: 3px solid var(--border-strong);
+}
+.rrl-title {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.rrl-intro {
+  margin: 0 0 18px;
+  max-width: 84ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-strong);
+}
+.rrl-group {
+  margin-bottom: 18px;
+}
+.rrl-head {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+/* Italic framing note beneath a subhead. */
+.rrl-note {
+  margin: -2px 0 8px;
+  max-width: 84ch;
+  font-size: 13px;
   font-style: italic;
+  line-height: 1.55;
+  color: var(--text);
+}
+/* Verdict sub-group (bullish / bearish / neither). */
+.rrl-subgroup {
+  margin-bottom: 10px;
+}
+.rrl-subgroup:last-child {
+  margin-bottom: 0;
+}
+.rrl-grouplabel {
+  display: block;
+  margin: 10px 0 5px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text);
+}
+/* Bullet lists. */
+.rrl-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 88ch;
+}
+.rrl-li {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-strong);
+}
+.rrl-li::marker {
+  color: var(--text-dim);
+}
+.rrl-li-note {
+  font-style: italic;
+  color: var(--text);
+}
+.rrl-tok {
+  font-family: var(--mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rrl-em {
+  color: var(--text-dim);
+}
+.rrl-bottom {
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  max-width: 88ch;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--amber-light);
+  border-radius: var(--radius-badge);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-strong);
 }
 
 /* === Block B — group labels ====================================== */

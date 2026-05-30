@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useVixBucket } from '../../lib/useVixBucket'
@@ -238,57 +238,74 @@ function macroImplication(ticker, trend, pct) {
   }
 }
 
-function trendTone(trend) {
-  switch ((trend || '').toUpperCase()) {
-    case 'BULLISH':
-      return 'bull'
-    case 'BEARISH':
-      return 'bear'
-    default:
-      return 'neutral'
-  }
+// --- hedgeye_rr_verdict → action chip (the verdict surface) ----------
+// action verb → { family (drives color), arrow (direction), label }.
+// NOTE: arrow grouping ≠ color family — e.g. TRIM is amber (caution) but
+// points ↓ (cut). Up = add/long, down = cut/short, right = watch/hold.
+const ACTION_INFO = {
+  BUY: { family: 'bull', arrow: '↑', label: 'BUY' },
+  ADD: { family: 'bull', arrow: '↑', label: 'ADD' },
+  LET_RUN: { family: 'bull', arrow: '↑', label: 'LET RUN' },
+  TRIM: { family: 'amber', arrow: '↓', label: 'TRIM' },
+  REDUCE: { family: 'amber', arrow: '↓', label: 'REDUCE' },
+  COVER: { family: 'amber', arrow: '↓', label: 'COVER' },
+  WATCH_BOUNCE: { family: 'amber', arrow: '→', label: 'WATCH BOUNCE' },
+  HOLD: { family: 'neutral', arrow: '→', label: 'HOLD' },
+  WAIT: { family: 'neutral', arrow: '→', label: 'WAIT' },
+  SHORT: { family: 'bear', arrow: '↓', label: 'SHORT' },
+  AVOID: { family: 'bear', arrow: '↓', label: 'AVOID' },
+}
+function actionInfo(action) {
+  return ACTION_INFO[(action || '').toUpperCase()] || null
 }
 
-const TREND_COLOR = {
+// conviction → fill-intensity suffix: high = solid fill + bold border,
+// medium = normal, low = outline only / dimmed so weak calls recede.
+function convictionIntensity(conviction) {
+  const c = (conviction || '').toLowerCase()
+  if (c === 'high') return 'high'
+  if (c === 'low') return 'low'
+  return 'med'
+}
+
+// action family → accent color (chip text + popover left border).
+const FAMILY_COLOR = {
   bull: 'var(--bull)',
   bear: 'var(--bear)',
+  amber: 'var(--amber-light)',
   neutral: 'var(--neutral)',
 }
 
-// --- hedgeye_rr_verdict mechanical reads → badge tone/label ---------
-// gate is the trend gate (BULLISH/BEARISH/NEUTRAL).
-function rrGateTone(gate) {
-  switch ((gate || '').toUpperCase()) {
-    case 'BULLISH':
-      return 'bull'
-    case 'BEARISH':
-      return 'bear'
-    default:
-      return 'neutral'
-  }
+// range_pattern → family tint. HH/HL = bullish structure (bull), LH/LL =
+// bearish structure (bear), LH/HL/HH/LL = compression/expansion (amber).
+// 'na'/unknown → null (omit the token). Reuses the chip FAMILY_COLOR map.
+function patternTint(pattern) {
+  if (pattern === 'HH/HL') return 'bull'
+  if (pattern === 'LH/LL') return 'bear'
+  if (pattern === 'LH/HL' || pattern === 'HH/LL') return 'amber'
+  return null
 }
 
-// range_zone: at_lrr = buy zone (bull), at_trr = trim zone (amber/cau),
-// mid = no edge (neutral).
-function rrZoneInfo(zone) {
-  if (zone === 'at_lrr') return { tone: 'bull', label: 'buy zone' }
-  if (zone === 'at_trr') return { tone: 'cau', label: 'trim zone' }
-  return { tone: 'neutral', label: 'mid-range' }
+// momentum → { arrow, tone } for the chip's second line.
+function momentumInfo(momentum) {
+  const m = (momentum || '').toLowerCase()
+  if (m === 'gaining') return { arrow: '↑', tone: 'bull' }
+  if (m === 'fading') return { arrow: '↓', tone: 'bear' }
+  if (m === 'flat') return { arrow: '→', tone: 'dim' }
+  return { arrow: '?', tone: 'dim' } // insufficient / unknown
+}
+const MOM_COLOR = {
+  bull: 'var(--bull)',
+  bear: 'var(--bear)',
+  dim: 'var(--text-dim)',
 }
 
-// Secondary mechanical read (trr_slope / momentum / vol_state). These are
-// descriptive context, not buy/sell signals, so they stay neutral —
-// EXCEPT 'insufficient', which renders muted as "insufficient history".
-function RrStateBadge({ label, value }) {
-  const insufficient = value === 'insufficient'
-  return (
-    <span
-      className={`dbm-badge ${insufficient ? 'rrv-badge-insufficient' : 'dbm-badge-neutral'}`}
-    >
-      <span className="rrv-k">{label}</span>
-      {insufficient ? 'insufficient history' : value || '—'}
-    </span>
-  )
+// Compact right-column tag — the at-a-glance action from the RR zone, using
+// chip tones (pos/cau/neu). Replaces the old wordy macro short-verdict chip.
+const ZONE_TAG = {
+  at_lrr: { tone: 'pos', label: 'BUY ZONE' },
+  at_trr: { tone: 'cau', label: 'TRIM ZONE' },
+  mid: { tone: 'neu', label: 'MID-RANGE' },
 }
 
 // Correlation regime → number color.
@@ -350,6 +367,7 @@ function Expand({ open, children }) {
 // driver. Left: ticker + price. Middle: range bar + position label.
 // Right: market-signal chip + chevron. Expands to badges + insight.
 function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride }) {
+  const rowRef = useRef(null)
   // VIX shows the live spot (priceOverride, from vix_current_v) so it
   // matches the persistent header pill; everything else uses prev_close.
   const price = priceOverride != null ? priceOverride : num(row.prev_close)
@@ -358,46 +376,66 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   const pct = rangePct(lrr, trr, price)
   const rLabel = rangeLabel(pct)
   const zc = zoneColor(pct)
-  const signal = macroImplication(row.ticker, row.trend, pct)
-  // Prefer the DB-authored insight verdict for the chip; the chip color
-  // still comes from the local rule type. Fall back to the hardcoded label
-  // when absent. (Distinct from the `verdict` prop = RR inspection stamp.)
-  const insightVerdict = insight?.short_verdict?.trim()
-  const chipLabel = insightVerdict || signal.label
-  // macro_insights slices the SAME source text into headline (≤500 chars)
-  // and detail (≤2000), so the bubble used to render a truncated copy AND the
-  // full copy. When one string is a prefix of the other (same source), show
-  // only the complete one; if they're genuinely distinct, show both.
-  const insHead = insight?.headline?.trim() || ''
-  const insDetail = insight?.detail?.trim() || ''
-  const insSameSource =
-    !!insHead &&
-    !!insDetail &&
-    (insDetail.startsWith(insHead) || insHead.startsWith(insDetail))
-  const insFull = insDetail.length >= insHead.length ? insDetail : insHead
-  const tone = trendTone(row.trend)
-  // VIX is inverse: a BEARISH (falling) VIX trend is risk-on and supportive
-  // for markets, while a BULLISH (rising) trend is the warning sign. Flip the
-  // accent color for VIX so the TREND badge + bubble border never contradict
-  // the "investable" reading (the badge still shows the raw Hedgeye trend).
-  const accentTone =
-    isVix && tone === 'bull' ? 'bear' : isVix && tone === 'bear' ? 'bull' : tone
   const bucket = isVix ? vixBucket(price) : null
   // Match the header pill's 1-decimal VIX formatting exactly.
   const priceText = isVix ? (price != null ? price.toFixed(1) : '—') : fmtBand(price)
-  // hedgeye_rr_verdict — this ticker's Risk Range inspection stamp (latest
-  // signal_date). Additive: absent → nothing renders.
-  const vGateTone = rrGateTone(verdict?.gate)
-  const vZone = verdict ? rrZoneInfo(verdict.range_zone) : null
+
+  // hedgeye_rr_verdict is the ONLY verdict surface — the right-side chip. With
+  // an action it shows the DECISION (BUY / TRIM / LET RUN …), colored by family
+  // and intensified by conviction; clicking it reveals one detail blurb. If
+  // action is null it falls back to the raw zone tag, no conviction styling.
+  const aInfo = actionInfo(verdict?.action)
+  const family = aInfo?.family || 'neutral'
+  const intensity = convictionIntensity(verdict?.conviction)
+  // Second line = fractal pattern + momentum (what the RR bar CAN'T show);
+  // position/zone is read off the bar, not repeated here.
+  const pTint = patternTint(verdict?.range_pattern)
+  const mom = momentumInfo(verdict?.momentum)
+  // Fallback chip (no action): the raw zone tag, else the local macro label.
+  const zoneTag = verdict ? ZONE_TAG[verdict.range_zone] : null
+  const signal = macroImplication(row.ticker, row.trend, pct)
+  const chipTone = zoneTag ? zoneTag.tone : signal.type
+  const chipLabel = zoneTag
+    ? zoneTag.label
+    : insight?.short_verdict?.trim() || signal.label
+  const detail = verdict?.verdict_detail?.trim()
+  const hasBlurb = !!detail
+  const chipClass = aInfo
+    ? `rrv-chip rrv-chip-${family} rrv-chip-${intensity}`
+    : `dbm-chip dbm-chip-${chipTone}`
+  // Conviction is shown by fill/border strength (intensity class), not dots.
+  const chipBody = aInfo ? (
+    <>
+      <span className="rrv-chip-verb">
+        {aInfo.arrow} {aInfo.label}
+      </span>
+      <span className="rrv-chip-sub">
+        {pTint && (
+          <>
+            <span style={{ color: FAMILY_COLOR[pTint] }}>{verdict.range_pattern}</span>
+            {' · '}
+          </>
+        )}
+        <span style={{ color: MOM_COLOR[mom.tone] }}>mom {mom.arrow}</span>
+      </span>
+    </>
+  ) : (
+    chipLabel
+  )
+
+  // Close the blurb on click-away; re-click is handled by the chip itself.
+  useEffect(() => {
+    if (!open || !hasBlurb) return undefined
+    const onDown = (e) => {
+      if (rowRef.current && !rowRef.current.contains(e.target)) onToggle()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open, hasBlurb, onToggle])
 
   return (
-    <div className="dbm-row">
-      <button
-        type="button"
-        className="dbm-row-head"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
+    <div className="dbm-row" ref={rowRef}>
+      <div className="dbm-row-head dbm-row-head-static">
         <div className="dbm-row-left">
           <span className="dbm-row-ticker">{row.ticker}</span>
           <span
@@ -438,84 +476,38 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
         </div>
 
         <div className="dbm-row-right">
-          <span className={`dbm-chip dbm-chip-${signal.type}`}>{chipLabel}</span>
-          <span className={`dbm-chev${open ? ' dbm-chev-open' : ''}`} aria-hidden="true">
-            ▾
-          </span>
-        </div>
-      </button>
-
-      {/* RR verdict — collapsed "stamp" line under the row head; toggles the
-          same bubble as the head. Gate-colored left accent = read at a glance. */}
-      {verdict?.verdict_oneliner && (
-        <button
-          type="button"
-          className={`rrv-oneliner rrv-oneliner-${vGateTone}`}
-          onClick={onToggle}
-          aria-expanded={open}
-        >
-          <span className="rrv-stamp" aria-hidden="true">
-            RR
-          </span>
-          <span className="rrv-oneliner-text">{verdict.verdict_oneliner}</span>
-        </button>
-      )}
-
-      <Expand open={open}>
-        <div
-          className="dbm-bubble"
-          style={{
-            borderLeftColor: TREND_COLOR[verdict ? vGateTone : accentTone],
-          }}
-        >
-          {verdict ? (
-            /* RR verdict is this ticker's single read — gate/zone/slope/mom/
-               vol + detail (the collapsed oneliner sits above). */
-            <>
-              <div className="rrv-badges">
-                <span className={`dbm-badge dbm-badge-${vGateTone}`}>
-                  <span className="rrv-k">gate</span>
-                  {verdict.gate || '—'}
-                </span>
-                {vZone && (
-                  <span className={`dbm-badge dbm-badge-${vZone.tone}`}>
-                    <span className="rrv-k">zone</span>
-                    {vZone.label}
-                  </span>
-                )}
-                <RrStateBadge label="TRR" value={verdict.trr_slope} />
-                <RrStateBadge label="mom" value={verdict.momentum} />
-                <RrStateBadge label="vol" value={verdict.vol_state} />
-              </div>
-              {verdict.verdict_detail && (
-                <p className="rrv-detail">{verdict.verdict_detail}</p>
-              )}
-            </>
+          {/* The action chip is the single verdict surface — decision + zone/pct,
+              colored by family and conviction. Clickable when a detail exists;
+              the caret is the only expand affordance. */}
+          {hasBlurb ? (
+            <button
+              type="button"
+              className={chipClass}
+              onClick={onToggle}
+              aria-expanded={open}
+            >
+              {chipBody}
+              <span
+                className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
+                aria-hidden="true"
+              >
+                ▾
+              </span>
+            </button>
           ) : (
-            /* No RR verdict for this ticker — fall back to the macro-insight
-               read + trend/range badges so the bubble is never empty. */
-            <>
-              <div className="dbm-badges">
-                <span className={`dbm-badge dbm-badge-${accentTone}`}>
-                  {(row.trend || '—').toUpperCase()}
-                </span>
-                {rLabel && <span className="dbm-badge dbm-badge-range">{rLabel}</span>}
-                {isVix && (
-                  <span className={`dbm-badge dbm-badge-${bucket.type}`}>{bucket.label}</span>
-                )}
-              </div>
-              {insSameSource ? (
-                <p className="dbm-bubble-headline">{insFull}</p>
-              ) : (
-                <>
-                  {insHead && <p className="dbm-bubble-headline">{insHead}</p>}
-                  {insDetail && <p className="dbm-bubble-detail">{insDetail}</p>}
-                </>
-              )}
-            </>
+            <span className={chipClass}>{chipBody}</span>
           )}
         </div>
-      </Expand>
+      </div>
+
+      {/* The verdict blurb — a full-row-width band below the row in the bubble
+          style, left border colored by the action family. Click-away / re-click
+          collapses it. The only expandable verdict content on the row. */}
+      {hasBlurb && open && (
+        <div className="rrv-pop" style={{ borderLeftColor: FAMILY_COLOR[family] }}>
+          {detail}
+        </div>
+      )}
     </div>
   )
 }
@@ -668,6 +660,168 @@ function QuadCell({ row, open, onToggle }) {
   )
 }
 
+// Plain-language legend for the action chips. Verb arrows + HH/HL tokens reuse
+// the chip helpers (actionInfo / patternTint / FAMILY_COLOR) so the legend
+// stays in sync with the chips if the palette ever changes.
+const LEGEND_TREND = [
+  'Bullish or bearish, by Hedgeye’s 3-month signal. It decides direction, and nothing overrides it.',
+  'A bullish name is never a short — at worst, you trim it.',
+  'A bearish name is never a clean buy — at best, you cover, or wait out the bounce.',
+  'Everything below only shapes how you act within that direction. It cannot reverse it.',
+]
+
+const LEGEND_VERDICTS = [
+  {
+    label: 'When the trend is bullish',
+    actions: [
+      ['BUY', 'at the low end, momentum confirming. The dip worth taking.'],
+      ['ADD', 'mid-range and still working. Build on what you hold.'],
+      ['LET_RUN', 'pinned at the top, yet still climbing. Do not trim a winner mid-stride.'],
+      ['TRIM', 'at the top, but the move is tiring. Take some off.'],
+      ['REDUCE', 'the trend still reads bullish, but the structure is rotting beneath it: ceiling sinking, drive dying. The exit before the exit. And if it’s down at the lows, that is a falling knife — not a dip.'],
+      ['HOLD', 'bullish, but no edge today. Sit on your hands.'],
+    ],
+  },
+  {
+    label: 'When the trend is bearish',
+    actions: [
+      ['SHORT', 'at the top of its range and rolling over. The entry to fade.'],
+      ['AVOID', 'no clean entry. Stand clear.'],
+      ['COVER', 'washed out at the lows, ripe for a bounce. Cover your shorts.'],
+      ['WATCH_BOUNCE', 'bearish still, but the counter-move has real force. Do not short into it yet.'],
+    ],
+  },
+  {
+    label: 'When neither side is clean',
+    actions: [['WAIT', 'flat, or the signals quarrel. No setup. Honest, not idle.']],
+  },
+]
+
+const LEGEND_PATTERNS = [
+  ['HH/HL', 'higher highs, higher lows. The range marches upward. Textbook health.'],
+  ['LH/LL', 'lower highs, lower lows. The range retreats. Beneath a bullish trend, this is the rot showing first.'],
+  ['LH/HL', 'the range pinches inward. A coil, winding toward a larger move — direction yet unknown.'],
+  ['HH/LL', 'the range flies apart both ways. Rising chaos, and signals you trust less.'],
+]
+
+function RrLegend() {
+  return (
+    <div className="rrl-panel">
+      <h4 className="rrl-title">How to Read These Calls</h4>
+      <p className="rrl-intro">
+        Every ticker earns a single verdict — drawn from four readings weighed together,
+        never a rigid rule. The trend names the direction. The rest tells you where in the
+        move you stand, and how far to trust it.
+      </p>
+
+      <div className="rrl-group">
+        <span className="rrl-head">First, the trend — this is the gate.</span>
+        <ul className="rrl-list">
+          {LEGEND_TREND.map((t) => (
+            <li className="rrl-li" key={t.slice(0, 16)}>
+              {t}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rrl-group">
+        <span className="rrl-head">The verdicts</span>
+        {LEGEND_VERDICTS.map((g) => (
+          <div className="rrl-subgroup" key={g.label}>
+            <span className="rrl-grouplabel">{g.label}</span>
+            <ul className="rrl-list">
+              {g.actions.map(([a, desc]) => {
+                const info = actionInfo(a)
+                return (
+                  <li className="rrl-li" key={a}>
+                    <span className="rrl-tok" style={{ color: FAMILY_COLOR[info.family] }}>
+                      {info.arrow} {info.label}
+                    </span>
+                    <span className="rrl-em"> — </span>
+                    {desc}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="rrl-group">
+        <span className="rrl-head">The fractal pattern</span>
+        <p className="rrl-note">
+          How the range itself travels over ~5 days. The bar shows where you are; this
+          shows where the whole range is going.
+        </p>
+        <ul className="rrl-list">
+          {LEGEND_PATTERNS.map(([tok, desc]) => (
+            <li className="rrl-li" key={tok}>
+              <span className="rrl-tok" style={{ color: FAMILY_COLOR[patternTint(tok)] }}>
+                {tok}
+              </span>
+              <span className="rrl-em"> — </span>
+              {desc}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rrl-group">
+        <span className="rrl-head">Momentum</span>
+        <p className="rrl-note">Is the move speeding up or running out of breath?</p>
+        <ul className="rrl-list">
+          <li className="rrl-li">
+            <span className="rrl-tok" style={{ color: FAMILY_COLOR.bull }}>
+              ↑ gaining
+            </span>
+            <span className="rrl-em"> — </span>
+            each step lifts higher than the last. The move is accelerating; the legs are
+            real.
+          </li>
+          <li className="rrl-li">
+            <span className="rrl-tok" style={{ color: FAMILY_COLOR.bear }}>
+              ↓ fading
+            </span>
+            <span className="rrl-em"> — </span>
+            the steps are shrinking. The move presses on, but with less force each time —
+            the first sign of a stall, even while price still holds.
+          </li>
+          <li className="rrl-li rrl-li-note">
+            Read it as a runner: gaining is lengthening stride; fading is the same runner,
+            slowing, though not yet stopped.
+          </li>
+        </ul>
+      </div>
+
+      <div className="rrl-group">
+        <span className="rrl-head">Conviction</span>
+        <p className="rrl-note">Shown by the chip itself, not a number.</p>
+        <ul className="rrl-list">
+          <li className="rrl-li">
+            <strong>Bold, filled, bordered</strong> — every signal agrees. High conviction.
+          </li>
+          <li className="rrl-li">
+            <strong>Faint outline</strong> — only one factor agrees. Trust it lightly.
+          </li>
+          <li className="rrl-li">
+            Roughly four in ten names hold no clean setup on a given day. The system will
+            say so, rather than invent one.
+          </li>
+        </ul>
+      </div>
+
+      <p className="rrl-bottom">
+        The one to never miss: when a bullish name turns up{' '}
+        <strong style={{ color: FAMILY_COLOR.amber }}>REDUCE</strong> or{' '}
+        <strong style={{ color: FAMILY_COLOR.bear }}>LH/LL</strong> while the trend still
+        calls itself bullish — the structure is breaking before the label admits it. Risk
+        comes slowly. Then all at once.
+      </p>
+    </div>
+  )
+}
+
 export function MacroRegimeSection() {
   const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
   const [corr, setCorr] = useState({ status: 'loading', assets: [] })
@@ -715,10 +869,15 @@ export function MacroRegimeSection() {
         .order('stated_on', { ascending: false }),
       supabase
         .from('hedgeye_rr_verdict')
-        .select('ticker, verdict_oneliner, verdict_detail, gate, range_zone, price_in_range, trr_slope, momentum, vol_state, signal_date')
+        .select('ticker, action, conviction, verdict_oneliner, verdict_detail, gate, range_zone, price_in_range, trr_slope, momentum, vol_state, signal_date')
         .order('signal_date', { ascending: false })
         .limit(300),
-    ]).then(([sigSettled, corrSettled, insSettled, quadSettled, vSettled]) => {
+      supabase
+        .from('hedgeye_rr_verdict_input_v')
+        .select('ticker, range_pattern, momentum, signal_date')
+        .order('signal_date', { ascending: false })
+        .limit(300),
+    ]).then(([sigSettled, corrSettled, insSettled, quadSettled, vSettled, pSettled]) => {
       if (cancelled) return
 
       let latestSignalDate = null
@@ -844,6 +1003,25 @@ export function MacroRegimeSection() {
       // soft to an empty map so the rows still render without them.
       if (vSettled.status === 'fulfilled' && !vSettled.value.error) {
         const { map } = pickLatest(vSettled.value.data ?? [])
+        // Merge the input view (range_pattern + momentum) by ticker — the
+        // fractal/momentum reads the RR bar can't show. Fail soft: if the
+        // view is missing, the chip just omits the pattern token.
+        if (pSettled.status === 'fulfilled' && !pSettled.value.error) {
+          const patternMap = pickLatest(pSettled.value.data ?? []).map
+          for (const t of Object.keys(map)) {
+            const p = patternMap[t]
+            if (p)
+              map[t] = {
+                ...map[t],
+                range_pattern: p.range_pattern,
+                momentum: p.momentum ?? map[t].momentum,
+              }
+          }
+        } else if (pSettled.status === 'rejected') {
+          console.error('MacroRegime: rr_input view fetch rejected:', pSettled.reason)
+        } else {
+          console.error('MacroRegime: rr_input view fetch error:', pSettled.value.error)
+        }
         setVerdicts({ status: 'ready', map })
       } else {
         if (vSettled.status === 'rejected')
@@ -858,13 +1036,14 @@ export function MacroRegimeSection() {
     }
   }, [])
 
-  const toggle = (key) =>
+  const toggle = useCallback((key) => {
     setOpen((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
     })
+  }, [])
 
   const insightMap = insights.map
   const vixRow = signals.map.VIX
@@ -876,6 +1055,21 @@ export function MacroRegimeSection() {
   const corrOpen = open.has('correlations')
   const usOpen = open.has('quad-us')
   const globalOpen = open.has('quad-global')
+  const legendOpen = open.has('rr-legend')
+
+  // Close the "how to read these" legend on click-away (re-click on the
+  // trigger toggles it). Matches against the trigger/panel classes so clicks
+  // inside either keep it open.
+  useEffect(() => {
+    if (!legendOpen) return undefined
+    const onDown = (e) => {
+      if (!e.target.closest('.rrl-trigger') && !e.target.closest('.rrl-panel')) {
+        toggle('rr-legend')
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [legendOpen, toggle])
 
   return (
     <SectionShell index={1} title="Macro Regime">
@@ -1058,8 +1252,19 @@ export function MacroRegimeSection() {
 
         {/* === Block B — Macro Drivers ============================= */}
         <div className="dbm-block">
-          <span className="dbm-block-title">Macro Drivers</span>
+          <div className="dbm-block-head">
+            <span className="dbm-block-title">Macro Drivers</span>
+            <button
+              type="button"
+              className={`rrl-trigger${legendOpen ? ' rrl-trigger-open' : ''}`}
+              onClick={() => toggle('rr-legend')}
+              aria-expanded={legendOpen}
+            >
+              ? how to read these
+            </button>
+          </div>
           <p className="dbm-note">Hedgeye TREND (3-month) only — no TRADE or TAIL signal.</p>
+          {legendOpen && <RrLegend />}
           {signals.status === 'loading' && <p className="db-state">Loading drivers…</p>}
           {signals.status === 'error' && (
             <p className="db-state db-state-error">Driver signals unavailable.</p>
