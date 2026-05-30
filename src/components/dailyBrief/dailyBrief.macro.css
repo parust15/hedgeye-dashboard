@@ -37,13 +37,6 @@
   margin-bottom: 10px;
 }
 
-.dbm-note {
-  margin: -4px 0 10px;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-dim);
-}
-
 /* (Morning summary bar removed.) */
 
 /* === Standardized gauge row ====================================== */
@@ -487,14 +480,15 @@ button.dbm-chip {
   border: none;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 38px;
+  font-weight: 700;
   letter-spacing: 0.3px;
-  color: var(--text-dim);
+  color: #c77dff;
   padding: 2px 4px;
 }
 .rrl-trigger:hover,
 .rrl-trigger-open {
-  color: var(--text-strong);
+  color: #e0aaff;
 }
 
 /* Full-width legend panel — bubble style, readable line length. */
@@ -631,17 +625,6 @@ button.dbm-chip {
 
 .dbm-corr-title {
   margin-bottom: 6px;
-}
-
-.dbm-corr-sub {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-dim);
-  letter-spacing: 0;
-  text-transform: none;
-  text-decoration: none;
 }
 
 .dbm-corr-insight {

@@ -1331,7 +1331,6 @@ export function MacroRegimeSection() {
               ? how to read these
             </button>
           </div>
-          <p className="dbm-note">Hedgeye TREND (3-month) only — no TRADE or TAIL signal.</p>
           {legendOpen && <RrLegend />}
           {signals.status === 'loading' && <p className="db-state">Loading drivers…</p>}
           {signals.status === 'error' && (
@@ -1363,8 +1362,7 @@ export function MacroRegimeSection() {
         <div className="dbm-block">
           <div className="dbm-corr-header">
             <span className="dbm-block-title dbm-corr-title">
-              Key $USD Correlations{' '}
-              <span className="dbm-corr-sub">(UUP proxy · Pearson · trading days)</span>
+              Key $USD Correlations
             </span>
           </div>
 
