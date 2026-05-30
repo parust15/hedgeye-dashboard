@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useVixBucket } from '../../lib/useVixBucket'
@@ -276,14 +277,29 @@ const FAMILY_COLOR = {
   neutral: 'var(--neutral)',
 }
 
-// range_pattern → family tint. HH/HL = bullish structure (bull), LH/LL =
-// bearish structure (bear), LH/HL/HH/LL = compression/expansion (amber).
-// 'na'/unknown → null (omit the token). Reuses the chip FAMILY_COLOR map.
-function patternTint(pattern) {
-  if (pattern === 'HH/HL') return 'bull'
-  if (pattern === 'LH/LL') return 'bear'
-  if (pattern === 'LH/HL' || pattern === 'HH/LL') return 'amber'
-  return null
+// range_pattern → { label, tint }. Normalizes every value to one short,
+// color-coded token so EVERY chip's second line looks the same (never blank).
+// Bullish structure → bull, bearish → bear, compression/expansion/mixed →
+// amber, still-forming → neutral.
+function patternInfo(pattern) {
+  switch (pattern) {
+    case 'HH/HL':
+    case 'new_high_HL':
+      return { label: 'HH/HL', tint: 'bull' }
+    case 'LH/LL':
+    case 'new_low_LH':
+      return { label: 'LH/LL', tint: 'bear' }
+    case 'LH/HL':
+      return { label: 'LH/HL', tint: 'amber' }
+    case 'HH/LL':
+      return { label: 'HH/LL', tint: 'amber' }
+    case 'mixed':
+      return { label: 'mixed', tint: 'amber' }
+    case 'forming':
+      return { label: 'forming', tint: 'neutral' }
+    default:
+      return { label: pattern || '—', tint: 'neutral' }
+  }
 }
 
 // momentum → { arrow, tone } for the chip's second line.
@@ -291,13 +307,13 @@ function momentumInfo(momentum) {
   const m = (momentum || '').toLowerCase()
   if (m === 'gaining') return { arrow: '↑', tone: 'bull' }
   if (m === 'fading') return { arrow: '↓', tone: 'bear' }
-  if (m === 'flat') return { arrow: '→', tone: 'dim' }
-  return { arrow: '?', tone: 'dim' } // insufficient / unknown
+  if (m === 'flat') return { arrow: '→', tone: 'neutral' }
+  return { arrow: '?', tone: 'neutral' } // insufficient / unknown
 }
 const MOM_COLOR = {
   bull: 'var(--bull)',
   bear: 'var(--bear)',
-  dim: 'var(--text-dim)',
+  neutral: 'var(--text)',
 }
 
 // Compact right-column tag — the at-a-glance action from the RR zone, using
@@ -368,6 +384,17 @@ function Expand({ open, children }) {
 // Right: market-signal chip + chevron. Expands to badges + insight.
 function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride }) {
   const rowRef = useRef(null)
+  // Hover card (ticker / RR bar) — floating RR readout, positioned in a portal
+  // so it escapes the section's overflow:hidden. null = hidden.
+  const [hover, setHover] = useState(null)
+  const showHover = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setHover({
+      top: Math.round(r.bottom + 8),
+      left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 268))),
+    })
+  }
+  const hideHover = () => setHover(null)
   // VIX shows the live spot (priceOverride, from vix_current_v) so it
   // matches the persistent header pill; everything else uses prev_close.
   const price = priceOverride != null ? priceOverride : num(row.prev_close)
@@ -389,7 +416,7 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   const intensity = convictionIntensity(verdict?.conviction)
   // Second line = fractal pattern + momentum (what the RR bar CAN'T show);
   // position/zone is read off the bar, not repeated here.
-  const pTint = patternTint(verdict?.range_pattern)
+  const pInfo = verdict?.range_pattern ? patternInfo(verdict.range_pattern) : null
   const mom = momentumInfo(verdict?.momentum)
   // Fallback chip (no action): the raw zone tag, else the local macro label.
   const zoneTag = verdict ? ZONE_TAG[verdict.range_zone] : null
@@ -410,9 +437,9 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
         {aInfo.arrow} {aInfo.label}
       </span>
       <span className="rrv-chip-sub">
-        {pTint && (
+        {pInfo && (
           <>
-            <span style={{ color: FAMILY_COLOR[pTint] }}>{verdict.range_pattern}</span>
+            <span style={{ color: FAMILY_COLOR[pInfo.tint] }}>{pInfo.label}</span>
             {' · '}
           </>
         )}
@@ -436,7 +463,11 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   return (
     <div className="dbm-row" ref={rowRef}>
       <div className="dbm-row-head dbm-row-head-static">
-        <div className="dbm-row-left">
+        <div
+          className="dbm-row-left"
+          onMouseEnter={showHover}
+          onMouseLeave={hideHover}
+        >
           <span className="dbm-row-ticker">{row.ticker}</span>
           <span
             className={`dbm-row-price${isVix ? ' dbm-row-price-vix' : ''}`}
@@ -446,7 +477,7 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
           </span>
         </div>
 
-        <div className="dbm-row-mid">
+        <div className="dbm-row-mid" onMouseEnter={showHover} onMouseLeave={hideHover}>
           <div className="dbm-rb-track">
             {pct != null && (
               <div
@@ -476,38 +507,75 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
         </div>
 
         <div className="dbm-row-right">
-          {/* The action chip is the single verdict surface — decision + zone/pct,
-              colored by family and conviction. Clickable when a detail exists;
-              the caret is the only expand affordance. */}
-          {hasBlurb ? (
-            <button
-              type="button"
-              className={chipClass}
-              onClick={onToggle}
-              aria-expanded={open}
-            >
-              {chipBody}
-              <span
-                className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
-                aria-hidden="true"
+          {/* VIX is the volatility regime, not a tradeable signal — no chip. The
+              action chip is the single verdict surface for everything else:
+              decision colored by family + conviction; clickable when a detail
+              exists, the caret being the only expand affordance. */}
+          {!isVix &&
+            (hasBlurb ? (
+              <button
+                type="button"
+                className={chipClass}
+                onClick={onToggle}
+                aria-expanded={open}
               >
-                ▾
-              </span>
-            </button>
-          ) : (
-            <span className={chipClass}>{chipBody}</span>
-          )}
+                {chipBody}
+                <span
+                  className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
+                  aria-hidden="true"
+                >
+                  ▾
+                </span>
+              </button>
+            ) : (
+              <span className={chipClass}>{chipBody}</span>
+            ))}
         </div>
       </div>
 
       {/* The verdict blurb — a full-row-width band below the row in the bubble
-          style, left border colored by the action family. Click-away / re-click
-          collapses it. The only expandable verdict content on the row. */}
+          style, left border colored by the action family. Opens with the range
+          bounds (LRR · TRR) as a quick reference, then the detail paragraph. */}
       {hasBlurb && open && (
         <div className="rrv-pop" style={{ borderLeftColor: FAMILY_COLOR[family] }}>
+          {(lrr != null || trr != null) && (
+            <div className="rrv-pop-bounds">
+              {lrr != null && <span className="rrv-pop-lrr">LRR {fmtBand(lrr)}</span>}
+              {lrr != null && trr != null && <span className="rrv-pop-sep"> · </span>}
+              {trr != null && <span className="rrv-pop-trr">TRR {fmtBand(trr)}</span>}
+            </div>
+          )}
           {detail}
         </div>
       )}
+
+      {/* Hover card (ticker / bar) — RR readout, portaled to <body> so the
+          section's overflow:hidden can't clip it. */}
+      {hover &&
+        createPortal(
+          <div className="rrh-card" style={{ top: hover.top, left: hover.left }}>
+            <div className="rrh-name">{row.name || row.ticker}</div>
+            <div className="rrh-row">
+              <span className="rrh-label rrh-label-buy">LRR (buy)</span>
+              <span className="rrh-val">{fmtBand(lrr)}</span>
+            </div>
+            <div className="rrh-row">
+              <span className="rrh-label">Close</span>
+              <span className="rrh-val">{fmtBand(num(row.prev_close))}</span>
+            </div>
+            <div className="rrh-row">
+              <span className="rrh-label rrh-label-sell">TRR (sell)</span>
+              <span className="rrh-val">{fmtBand(trr)}</span>
+            </div>
+            <div className="rrh-row">
+              <span className="rrh-label">Position</span>
+              <span className="rrh-val">
+                {pct != null ? `${Math.round(pct)}% of range` : '—'}
+              </span>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
@@ -661,7 +729,7 @@ function QuadCell({ row, open, onToggle }) {
 }
 
 // Plain-language legend for the action chips. Verb arrows + HH/HL tokens reuse
-// the chip helpers (actionInfo / patternTint / FAMILY_COLOR) so the legend
+// the chip helpers (actionInfo / patternInfo / FAMILY_COLOR) so the legend
 // stays in sync with the chips if the palette ever changes.
 const LEGEND_TREND = [
   'Bullish or bearish, by Hedgeye’s 3-month signal. It decides direction, and nothing overrides it.',
@@ -757,7 +825,7 @@ function RrLegend() {
         <ul className="rrl-list">
           {LEGEND_PATTERNS.map(([tok, desc]) => (
             <li className="rrl-li" key={tok}>
-              <span className="rrl-tok" style={{ color: FAMILY_COLOR[patternTint(tok)] }}>
+              <span className="rrl-tok" style={{ color: FAMILY_COLOR[patternInfo(tok).tint] }}>
                 {tok}
               </span>
               <span className="rrl-em"> — </span>
