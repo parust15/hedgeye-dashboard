@@ -425,7 +425,12 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   const chipLabel = zoneTag
     ? zoneTag.label
     : insight?.short_verdict?.trim() || signal.label
-  const detail = verdict?.verdict_detail?.trim()
+  // Expanded body prefers the driver-aware macro_insights verdict (names the
+  // dominant driver, cites USD correlations + quad-shift context, ends in an
+  // action + level) for the latest insight_date — it's already keyed to this
+  // row via the driver:<ticker> / vix block_key. Falls back to the isolated
+  // hedgeye_rr_verdict read only when no macro_insights detail exists.
+  const detail = insight?.detail?.trim() || verdict?.verdict_detail?.trim()
   const hasBlurb = !!detail
   const chipClass = aInfo
     ? `rrv-chip rrv-chip-${family} rrv-chip-${intensity}`
