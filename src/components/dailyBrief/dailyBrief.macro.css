@@ -774,6 +774,7 @@ button.dbm-chip {
   font-weight: 700;
   line-height: 1.6;
   color: var(--text-strong);
+  white-space: pre-line; /* headline carries \n between Extreme/Tightening/Loosening */
 }
 .dbm-usdc-list {
   margin: 0;
