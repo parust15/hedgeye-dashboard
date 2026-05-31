@@ -117,11 +117,14 @@ function rangePct(lrr, trr, price) {
   return Math.min(100, Math.max(0, ((price - lrr) / (trr - lrr)) * 100))
 }
 
-function rangeLabel(pct) {
-  if (pct == null) return null
-  if (pct <= 25) return 'near LRR'
-  if (pct >= 75) return 'near TRR'
-  return 'mid-range'
+// Trend → ticker/price color (BULLISH green, BEARISH red, else default white).
+// Replaces the old "near TRR · TREND" caption — direction now reads off the
+// left column's color.
+function trendColor(trend) {
+  const t = (trend || '').toUpperCase()
+  if (t === 'BULLISH') return 'var(--bull)'
+  if (t === 'BEARISH') return 'var(--bear)'
+  return null
 }
 
 // Range-bar fill/dot color by zone (explicit per spec).
@@ -401,8 +404,10 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   const lrr = num(row.buy_trade)
   const trr = num(row.sell_trade)
   const pct = rangePct(lrr, trr, price)
-  const rLabel = rangeLabel(pct)
   const zc = zoneColor(pct)
+  // Trend reads off the ticker/price color now (green bullish, red bearish);
+  // the old "near TRR · TREND" caption is removed. VIX keeps its vol-bucket hue.
+  const tColor = isVix ? null : trendColor(row.trend)
   const bucket = isVix ? vixBucket(price) : null
   // Match the header pill's 1-decimal VIX formatting exactly.
   const priceText = isVix ? (price != null ? price.toFixed(1) : '—') : fmtBand(price)
@@ -428,10 +433,15 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   // Expanded body prefers the driver-aware macro_insights verdict (names the
   // dominant driver, cites USD correlations + quad-shift context, ends in an
   // action + level) for the latest insight_date — it's already keyed to this
-  // row via the driver:<ticker> / vix block_key. Falls back to the isolated
-  // hedgeye_rr_verdict read only when no macro_insights detail exists.
+  // row via the driver:<ticker> / vix block_key. detail_bullets (a 3-5 item
+  // array, last item the "Action:" takeaway) renders as a bullet list; detail
+  // prose is the fallback; the isolated hedgeye_rr_verdict read is last.
+  const bullets =
+    Array.isArray(insight?.detail_bullets) && insight.detail_bullets.length
+      ? insight.detail_bullets
+      : null
   const detail = insight?.detail?.trim() || verdict?.verdict_detail?.trim()
-  const hasBlurb = !!detail
+  const hasBlurb = !!bullets || !!detail
   const chipClass = aInfo
     ? `rrv-chip rrv-chip-${family} rrv-chip-${intensity}`
     : `dbm-chip dbm-chip-${chipTone}`
@@ -473,10 +483,18 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
           onMouseEnter={showHover}
           onMouseLeave={hideHover}
         >
-          <span className="dbm-row-ticker">{row.ticker}</span>
+          <span className="dbm-row-ticker" style={tColor ? { color: tColor } : undefined}>
+            {row.ticker}
+          </span>
           <span
             className={`dbm-row-price${isVix ? ' dbm-row-price-vix' : ''}`}
-            style={isVix ? { color: TYPE_COLOR[bucket.type] } : undefined}
+            style={
+              isVix
+                ? { color: TYPE_COLOR[bucket.type] }
+                : tColor
+                  ? { color: tColor }
+                  : undefined
+            }
           >
             {priceText}
           </span>
@@ -502,39 +520,34 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
             {lrr != null && (
               <span className="dbm-rb-rr dbm-rb-rr-lrr">LRR {fmtBand(lrr)}</span>
             )}
-            <span className="dbm-rb-label">
-              {rLabel ?? '—'} · {(row.trend || '—').toUpperCase()} trend
-            </span>
+            {/* The verdict chip lives in the bar caption now — a wide
+                rectangular pill centered between LRR and TRR, where the
+                position/trend text used to be. VIX shows no chip. */}
+            <div className="dbm-rb-chipslot">
+              {!isVix &&
+                (hasBlurb ? (
+                  <button
+                    type="button"
+                    className={chipClass}
+                    onClick={onToggle}
+                    aria-expanded={open}
+                  >
+                    {chipBody}
+                    <span
+                      className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </button>
+                ) : (
+                  <span className={chipClass}>{chipBody}</span>
+                ))}
+            </div>
             {trr != null && (
               <span className="dbm-rb-rr dbm-rb-rr-trr">TRR {fmtBand(trr)}</span>
             )}
           </div>
-        </div>
-
-        <div className="dbm-row-right">
-          {/* VIX is the volatility regime, not a tradeable signal — no chip. The
-              action chip is the single verdict surface for everything else:
-              decision colored by family + conviction; clickable when a detail
-              exists, the caret being the only expand affordance. */}
-          {!isVix &&
-            (hasBlurb ? (
-              <button
-                type="button"
-                className={chipClass}
-                onClick={onToggle}
-                aria-expanded={open}
-              >
-                {chipBody}
-                <span
-                  className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
-                  aria-hidden="true"
-                >
-                  ▾
-                </span>
-              </button>
-            ) : (
-              <span className={chipClass}>{chipBody}</span>
-            ))}
         </div>
       </div>
 
@@ -550,7 +563,28 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
               {trr != null && <span className="rrv-pop-trr">TRR {fmtBand(trr)}</span>}
             </div>
           )}
-          {detail}
+          {bullets ? (
+            <ul className="rrv-pop-bullets">
+              {bullets.map((b, i) => {
+                const text = String(b)
+                // The driver bullets end in the action takeaway (last item, often
+                // "Action:"-prefixed) — emphasize it in the verdict family color.
+                const isAction =
+                  i === bullets.length - 1 || /^\s*action\s*:/i.test(text)
+                return (
+                  <li
+                    key={i}
+                    className={`rrv-pop-bullet${isAction ? ' rrv-pop-action' : ''}`}
+                    style={isAction ? { color: FAMILY_COLOR[family] } : undefined}
+                  >
+                    {text}
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            detail
+          )}
         </div>
       )}
 
@@ -932,7 +966,7 @@ export function MacroRegimeSection() {
         .order('window_days', { ascending: true }),
       supabase
         .from('macro_insights')
-        .select('insight_date, block_key, headline, detail, short_verdict, market_posture')
+        .select('insight_date, block_key, headline, detail, detail_bullets, short_verdict, market_posture')
         .order('insight_date', { ascending: false })
         .limit(200),
       supabase

@@ -134,16 +134,25 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
-/* Bar caption row: LRR (buy) left · position/trend center · TRR (sell) right. */
+/* Bar caption row: LRR (buy) left · verdict chip center · TRR (sell) right. */
 .dbm-rb-meta {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
+}
+
+/* Center slot hosting the verdict chip (where the position/trend caption used
+   to be). flex:1 keeps LRR pinned left and TRR pinned right around it. */
+.dbm-rb-chipslot {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
 }
 
 .dbm-rb-rr {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -156,17 +165,6 @@
 
 .dbm-rb-rr-trr {
   color: var(--bear);
-}
-
-.dbm-rb-label {
-  flex: 1;
-  text-align: center;
-  font-family: var(--mono);
-  font-size: 14px;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Right column — signal chip + chevron. Wider now that the chip carries
@@ -299,15 +297,16 @@
 .rrv-chip {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 3px;
-  width: 220px;
-  padding: 10px 14px;
+  justify-content: center;
+  gap: 14px;
+  padding: 6px 20px;
   border: 1px solid transparent;
   border-radius: var(--radius-badge);
   font-family: var(--mono);
   background: none;
+  white-space: nowrap;
 }
 button.rrv-chip {
   cursor: pointer;
@@ -319,7 +318,6 @@ button.dbm-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 220px;
   border: none;
   cursor: pointer;
   font: inherit;
@@ -374,15 +372,11 @@ button.dbm-chip {
   color: var(--text);
 }
 
-/* Caret — small, dim, tucked into the top-right corner; never competes with
-   the verb. */
+/* Caret — sits inline at the end of the rectangular chip. */
 .rrv-chip-caret {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--rrv-accent);
-  opacity: 0.55;
+  opacity: 0.7;
   transition: transform 0.18s ease;
 }
 .rrv-chip-caret-open {
@@ -393,13 +387,37 @@ button.dbm-chip {
    colored by the action family (set inline). */
 .rrv-pop {
   margin: 4px 6px 10px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   background: var(--bg-elev-2);
   border-radius: var(--radius-input);
   border-left: 3px solid var(--neutral);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text-strong);
+}
+
+/* Driver-aware verdict as bullets (macro_insights.detail_bullets). Generous
+   spacing, a visible marker, large readable text; the final Action takeaway
+   is bolded and tinted the verdict family color (set inline). */
+.rrv-pop-bullets {
+  margin: 0;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: disc;
+}
+.rrv-pop-bullet {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-strong);
+}
+.rrv-pop-bullet::marker {
+  color: var(--text-dim);
+}
+.rrv-pop-action {
+  margin-top: 2px;
+  font-weight: 700;
 }
 /* Range-bounds quick reference at the top of the popover. */
 .rrv-pop-bounds {
