@@ -734,7 +734,7 @@ button.dbm-chip {
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
-  color: var(--text-dim);
+  color: var(--text-strong);
 }
 
 .dbm-corr-winval {
@@ -747,8 +747,125 @@ button.dbm-chip {
 
 .dbm-corr-winn {
   font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-dim);
+  font-size: 11px;
+  color: var(--text-strong);
+}
+
+/* === Block C — Key $USD Correlations card (macro_insights, server-side) ==
+   The whole block is a card matching the section's other cards (bg-elev-2,
+   border-strong, radius-input — pulled from .dbm-quad-cell). Inside: a READ
+   conclusion as a darker inset bubble, then a header + one fixed-grid row per
+   asset (asset | 15/30/90D numbers | short | med). The two trend arrows are
+   narrow right-aligned columns that stack vertically down the card. */
+.dbm-usdc {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: transparent;
+}
+/* READ line — bold accent-bar banner on the card's uniform opaque surface
+   (no separate fill, so the card back stays one solid tone). */
+.dbm-usdc-read {
+  margin: 0 0 2px;
+  padding: 2px 0 12px 14px;
+  border-left: 3px solid var(--accent);
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--text-strong);
+}
+.dbm-usdc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Shared 4-column grid for the header + each asset row, so the numbers and the
+   two right-aligned trend columns line up vertically down the card. */
+.dbm-usdc-head,
+.dbm-usdc-row {
+  display: grid;
+  /* Fixed px tracks (not ch) so the bigger header still lines up with the
+     16px data rows. Trend columns wide enough for "30 to 15"/"90 to 30" at 20px. */
+  grid-template-columns: 175px 1fr 100px 100px 18px;
+  column-gap: 20px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 16px;
+}
+.dbm-usdc-head {
+  padding: 0 12px 6px; /* L/R matches the rows so the grid columns line up */
+  font-size: 20px; /* header 25% larger than the rows */
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.dbm-usdc-row {
+  padding: 8px 12px;
+  border-radius: var(--radius-badge);
+  line-height: 1.6;
+  color: var(--text-strong);
+}
+/* Flagged (|r|≥.75) row — faint amber highlight so it stands out. Two classes
+   so it outranks the button reset below. */
+.dbm-usdc-row.dbm-usdc-row-flag {
+  background: color-mix(in srgb, var(--amber-light) 12%, transparent);
+}
+.dbm-usdc-asset {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dbm-usdc-flag {
+  color: var(--amber-light);
+}
+.dbm-usdc-nums {
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
+}
+.dbm-usdc-val {
+  font-weight: 700;
+}
+.dbm-usdc-win {
+  color: var(--text-strong);
+}
+.dbm-usdc-sep {
+  color: var(--text-strong);
+}
+.dbm-usdc-trend {
+  text-align: center;
+  white-space: nowrap;
+}
+.dbm-usdc-row .dbm-usdc-trend {
+  font-weight: 700;
+}
+/* Each asset = a button (summary) that expands to the full 5-window detail. */
+.dbm-usdc-item {
+  display: flex;
+  flex-direction: column;
+}
+button.dbm-usdc-row {
+  width: 100%;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+button.dbm-usdc-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.dbm-usdc-chev {
+  text-align: right;
+  align-self: center;
+}
+/* Expanded detail — the old full 5-window grid (15/30/90/120/180 + n_obs),
+   indented under the row. */
+.dbm-usdc-detail {
+  padding: 4px 10px 8px 34px;
 }
 
 /* === Responsive ================================================== */

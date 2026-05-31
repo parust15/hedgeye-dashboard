@@ -16,7 +16,7 @@ const DRIVER_GROUPS = [
   { group: 'Crypto', tickers: ['BITCOIN'] },
 ]
 
-// Block C — correlation lookback windows, in display order.
+// Block C — correlation lookback windows for the expandable detail grid.
 const WINDOWS = [15, 30, 90, 120, 180]
 
 // Static Hedgeye GIP doctrine — backtested favored/avoid across four
@@ -102,7 +102,7 @@ function fmtBand(n) {
   return n.toLocaleString('en-US', { maximumFractionDigits: 3 })
 }
 
-// Signed correlation to 3 decimals.
+// Signed correlation to 3 decimals — used by the expand-grid windows.
 function fmtCorr3(x) {
   const n = num(x)
   if (n == null) return '—'
@@ -327,28 +327,6 @@ const ZONE_TAG = {
   mid: { tone: 'neu', label: 'MID-RANGE' },
 }
 
-// Correlation regime → number color.
-function corrColor(regime) {
-  const r = (regime || '').toLowerCase()
-  if (r === 'inverse' || r === 'mild_inverse') return 'var(--bear)'
-  if (r === 'aligned' || r === 'mild_aligned') return 'var(--bull)'
-  return 'var(--text-dim)' // decoupled
-}
-
-// Correlation regime → chip type. Only strong inverse/aligned color the
-// chip; mild + decoupled stay neutral (per spec).
-function regimeChipType(regime) {
-  const r = (regime || '').toLowerCase()
-  if (r === 'inverse') return 'neg'
-  if (r === 'aligned') return 'pos'
-  return 'neu'
-}
-
-function regimeText(regime) {
-  if (!regime) return '—'
-  return regime.replace(/_/g, ' ')
-}
-
 // Latest signal_date wins; first row per ticker on that date.
 function pickLatest(rows) {
   const latest = rows[0]?.signal_date ?? null
@@ -360,6 +338,49 @@ function pickLatest(rows) {
     }
   }
   return { map, date: latest }
+}
+
+// --- Block C — Key $USD Correlations display helpers -----------------
+// The backend stores each asset's read as a preformatted detail_bullet string
+// (data unchanged); we parse it for a richer display:
+//   "S&P 500: 15D -0.591 | 30D -0.649 | 90D -0.408  short ▼ loosening, med ▲ tightening"
+function parseUsdCorrBullet(text) {
+  const ci = text.indexOf(':')
+  const asset = (ci >= 0 ? text.slice(0, ci) : text).trim()
+  const body = ci >= 0 ? text.slice(ci + 1) : ''
+  const winVal = (w) => {
+    const m = body.match(new RegExp(`${w}\\s+([+-]?\\d*\\.?\\d+)`))
+    return m ? m[1] : null
+  }
+  const arrowOf = (which) => {
+    const m = body.match(new RegExp(`${which}\\s+(\\S)`))
+    return m ? m[1] : null
+  }
+  return {
+    asset,
+    flag: text.includes('⚡'),
+    v15: winVal('15D'),
+    v30: winVal('30D'),
+    v90: winVal('90D'),
+    short: arrowOf('short'),
+    med: arrowOf('med'),
+  }
+}
+
+// Correlation number color — every number takes its correlation color: negative
+// = red (--bear), positive = green (--bull), by sign (no strength dimming).
+function corrNumColor(s) {
+  const v = num(s)
+  if (v == null) return 'var(--text-strong)'
+  return v < 0 ? 'var(--bear)' : 'var(--bull)'
+}
+
+// Trend arrow color — up/tightening (▲) = green (--bull), down/loosening (▼) =
+// red (--bear), flat (—) = white. Existing vars only.
+function trendArrowColor(arrow) {
+  if (arrow === '▲') return 'var(--bull)'
+  if (arrow === '▼') return 'var(--bear)'
+  return 'var(--text-strong)'
 }
 
 // Framer Motion height/opacity collapse, ~180ms.
@@ -619,66 +640,6 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   )
 }
 
-// USD-correlation row — same 3-column skeleton. Middle is the 30D
-// correlation headline; expands to the full 5-window table.
-function CorrRow({ asset, open, onToggle }) {
-  const c30 = asset.cells[30]
-  const regime30 = c30?.regime
-  return (
-    <div className="dbm-row">
-      <button
-        type="button"
-        className="dbm-row-head"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <div className="dbm-row-left">
-          <span className="dbm-corr-asset-label">{asset.label}</span>
-          <span className="dbm-corr-asset-ticker">{asset.ticker}</span>
-        </div>
-
-        <div className="dbm-row-mid dbm-corr-mid">
-          <span className="dbm-corr-num" style={{ color: corrColor(regime30) }}>
-            {fmtCorr3(c30?.correlation)}
-          </span>
-          <span className="dbm-corr-num-tag">30D</span>
-        </div>
-
-        <div className="dbm-row-right">
-          <span className={`dbm-chip dbm-chip-${regimeChipType(regime30)}`}>
-            {regimeText(regime30)}
-          </span>
-          <span className={`dbm-chev${open ? ' dbm-chev-open' : ''}`} aria-hidden="true">
-            ▾
-          </span>
-        </div>
-      </button>
-
-      <Expand open={open}>
-        <div className="dbm-bubble" style={{ borderLeftColor: corrColor(regime30) }}>
-          <div className="dbm-corr-wins">
-            {WINDOWS.map((w) => {
-              const cell = asset.cells[w]
-              return (
-                <div className="dbm-corr-winrow" key={w}>
-                  <span className="dbm-corr-winlabel">{w}D</span>
-                  <span
-                    className="dbm-corr-winval"
-                    style={{ color: corrColor(cell?.regime) }}
-                  >
-                    {fmtCorr3(cell?.correlation)}
-                  </span>
-                  <span className="dbm-corr-winn">n={cell?.n_obs ?? '—'}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </Expand>
-    </div>
-  )
-}
-
 // The full 4-dimension Hedgeye GIP playbook for a quad — FAVORED vs
 // AVOID across Asset Classes, Equity Sectors, Style Factors, and Fixed
 // Income. Reused by US grid cells (below the grid) and Global rows.
@@ -931,7 +892,9 @@ function RrLegend() {
 
 export function MacroRegimeSection() {
   const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
-  const [corr, setCorr] = useState({ status: 'loading', assets: [] })
+  // usd_correlations_v pivoted by asset_label → full 5-window detail for the
+  // expand-on-click drill-down beneath each summary row.
+  const [corr, setCorr] = useState({ status: 'loading', byLabel: {} })
   const [insights, setInsights] = useState({ status: 'loading', map: {} })
   // hedgeye_rr_verdict — latest signal_date, keyed by ticker.
   const [verdicts, setVerdicts] = useState({ status: 'loading', map: {} })
@@ -961,8 +924,7 @@ export function MacroRegimeSection() {
         .limit(300),
       supabase
         .from('usd_correlations_v')
-        .select('sort_order, asset_ticker, asset_label, window_days, correlation, n_obs, regime')
-        .order('sort_order', { ascending: true })
+        .select('asset_ticker, asset_label, window_days, correlation, n_obs')
         .order('window_days', { ascending: true }),
       supabase
         .from('macro_insights')
@@ -1002,34 +964,24 @@ export function MacroRegimeSection() {
         setSignals({ status: 'error', map: {}, date: null })
       }
 
-      // --- usd_correlations_v → asset-pivoted matrix ----------------
+      // --- usd_correlations_v → byLabel map for the expand-grid detail ---
       if (corrSettled.status === 'fulfilled' && !corrSettled.value.error) {
         const rows = corrSettled.value.data ?? []
-        const byAsset = new Map()
+        const byLabel = {}
         for (const r of rows) {
-          if (!byAsset.has(r.asset_ticker)) {
-            byAsset.set(r.asset_ticker, {
-              ticker: r.asset_ticker,
-              label: r.asset_label,
-              sort_order: r.sort_order,
-              cells: {},
-            })
-          }
-          byAsset.get(r.asset_ticker).cells[r.window_days] = {
+          if (!byLabel[r.asset_label])
+            byLabel[r.asset_label] = { ticker: r.asset_ticker, cells: {} }
+          byLabel[r.asset_label].cells[r.window_days] = {
             correlation: r.correlation,
-            regime: r.regime,
             n_obs: r.n_obs,
           }
         }
-        const assets = Array.from(byAsset.values()).sort(
-          (a, b) => a.sort_order - b.sort_order
-        )
-        setCorr({ status: assets.length ? 'ready' : 'empty', assets })
+        setCorr({ status: 'ready', byLabel })
       } else {
         if (corrSettled.status === 'rejected')
           console.error('MacroRegime: correlations fetch rejected:', corrSettled.reason)
         else console.error('MacroRegime: correlations fetch error:', corrSettled.value.error)
-        setCorr({ status: 'error', assets: [] })
+        setCorr({ status: 'error', byLabel: {} })
       }
 
       // --- macro_insights → block_key map for the signal's date -----
@@ -1158,8 +1110,11 @@ export function MacroRegimeSection() {
   // live view hasn't loaded.
   const vixDisplayPrice =
     vixLive?.vix_value != null ? vixLive.vix_value : num(vixRow?.prev_close)
-  const corrInsight = insightMap.correlations
-  const corrOpen = open.has('correlations')
+  // Block C now renders the server-side 'usd_correlations' macro_insights block
+  // (headline = one-line READ conclusion, detail_bullets = one row per asset).
+  // All correlation/trend math lives in the backend now.
+  const usdCorr = insightMap.usd_correlations
+  const usdCorrBullets = Array.isArray(usdCorr?.detail_bullets) ? usdCorr.detail_bullets : []
   const usOpen = open.has('quad-us')
   const globalOpen = open.has('quad-global')
   const legendOpen = open.has('rr-legend')
@@ -1397,59 +1352,125 @@ export function MacroRegimeSection() {
             })}
         </div>
 
-        {/* === Block C — USD Correlations ========================== */}
+        {/* === Block C — Key $USD Correlations (server-side, rule-derived) ==
+            Renders the stored macro_insights 'usd_correlations' block: a
+            one-line READ conclusion (headline) above one monospace,
+            column-aligned row per asset (detail_bullets). All correlation +
+            trend math lives in the backend now — nothing computed here. */}
         <div className="dbm-block">
           <div className="dbm-corr-header">
-            <span className="dbm-block-title dbm-corr-title">
-              Key $USD Correlations
-            </span>
+            <span className="dbm-block-title dbm-corr-title">Key $USD Correlations</span>
           </div>
 
-          {corrInsight?.headline && (
-            <div className="dbm-corr-insight">
-              <button
-                type="button"
-                className="dbm-corr-insight-toggle"
-                onClick={corrInsight.detail ? () => toggle('correlations') : undefined}
-                aria-expanded={corrInsight.detail ? corrOpen : undefined}
-              >
-                <span className="dbm-insight-spark" aria-hidden="true">
-                  ✦
-                </span>
-                <span className="dbm-corr-insight-head">{corrInsight.headline}</span>
-                {corrInsight.detail && (
-                  <span
-                    className={`dbm-chev${corrOpen ? ' dbm-chev-open' : ''}`}
-                    aria-hidden="true"
-                  >
-                    ▾
-                  </span>
-                )}
-              </button>
-              {corrInsight.detail && (
-                <Expand open={corrOpen}>
-                  <p className="dbm-bubble-detail dbm-corr-insight-detail">
-                    {corrInsight.detail}
-                  </p>
-                </Expand>
+          {insights.status === 'loading' && (
+            <p className="db-state">Loading correlations…</p>
+          )}
+          {insights.status !== 'loading' &&
+            !usdCorr?.headline &&
+            usdCorrBullets.length === 0 && (
+              <p className="db-state">No correlation data.</p>
+            )}
+          {(usdCorr?.headline || usdCorrBullets.length > 0) && (
+            <div className="dbm-usdc">
+              {usdCorr.headline && (
+                <p className="dbm-usdc-read">{usdCorr.headline.replace(/\s*\(DBC\)/g, '')}</p>
+              )}
+              {usdCorrBullets.length > 0 && (
+                <ul className="dbm-usdc-list">
+                  <li className="dbm-usdc-head">
+                    <span>Asset</span>
+                    <span>Correlation vs USD</span>
+                    <span className="dbm-usdc-trend">30 to 15</span>
+                    <span className="dbm-usdc-trend">90 to 30</span>
+                    <span aria-hidden="true" />
+                  </li>
+                  {usdCorrBullets.map((b, i) => {
+                    const p = parseUsdCorrBullet(String(b))
+                    const detail = corr.byLabel[p.asset]
+                    const key = `usdcorr:${p.asset}`
+                    const isOpen = open.has(key)
+                    const rowClass = `dbm-usdc-row${p.flag ? ' dbm-usdc-row-flag' : ''}`
+                    // Display label without the trailing "(TICKER)" — e.g.
+                    // "Commodities (DBC)" → "Commodities". Lookup still uses p.asset.
+                    const assetLabel = p.asset.replace(/\s*\([^)]*\)\s*$/, '')
+                    const rowInner = (
+                      <>
+                        <span className="dbm-usdc-asset">
+                          {assetLabel}
+                          {p.flag && (
+                            <span className="dbm-usdc-flag" aria-label="strong correlation">
+                              {' '}⚡
+                            </span>
+                          )}
+                        </span>
+                        <span className="dbm-usdc-nums">
+                          <span className="dbm-usdc-win">15D </span>
+                          <span className="dbm-usdc-val" style={{ color: corrNumColor(p.v15) }}>{p.v15 ?? '—'}</span>
+                          <span className="dbm-usdc-sep"> | </span>
+                          <span className="dbm-usdc-win">30D </span>
+                          <span className="dbm-usdc-val" style={{ color: corrNumColor(p.v30) }}>{p.v30 ?? '—'}</span>
+                          <span className="dbm-usdc-sep"> | </span>
+                          <span className="dbm-usdc-win">90D </span>
+                          <span className="dbm-usdc-val" style={{ color: corrNumColor(p.v90) }}>{p.v90 ?? '—'}</span>
+                        </span>
+                        <span className="dbm-usdc-trend" style={{ color: trendArrowColor(p.short) }}>
+                          {p.short ?? '—'}
+                        </span>
+                        <span className="dbm-usdc-trend" style={{ color: trendArrowColor(p.med) }}>
+                          {p.med ?? '—'}
+                        </span>
+                        <span
+                          className={`dbm-usdc-chev dbm-chev${isOpen ? ' dbm-chev-open' : ''}`}
+                          aria-hidden="true"
+                        >
+                          {detail ? '▾' : ''}
+                        </span>
+                      </>
+                    )
+                    return (
+                      <li className="dbm-usdc-item" key={i}>
+                        {detail ? (
+                          <button
+                            type="button"
+                            className={rowClass}
+                            onClick={() => toggle(key)}
+                            aria-expanded={isOpen}
+                          >
+                            {rowInner}
+                          </button>
+                        ) : (
+                          <div className={rowClass}>{rowInner}</div>
+                        )}
+                        {detail && (
+                          <Expand open={isOpen}>
+                            <div className="dbm-usdc-detail">
+                              <div className="dbm-corr-wins">
+                                {WINDOWS.map((w) => {
+                                  const cell = detail.cells[w]
+                                  return (
+                                    <div className="dbm-corr-winrow" key={w}>
+                                      <span className="dbm-corr-winlabel">{w}D</span>
+                                      <span
+                                        className="dbm-corr-winval"
+                                        style={{ color: corrNumColor(cell?.correlation) }}
+                                      >
+                                        {fmtCorr3(cell?.correlation)}
+                                      </span>
+                                      <span className="dbm-corr-winn">n={cell?.n_obs ?? '—'}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </Expand>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
           )}
-
-          {corr.status === 'loading' && <p className="db-state">Loading correlations…</p>}
-          {corr.status === 'error' && (
-            <p className="db-state db-state-error">USD correlations unavailable.</p>
-          )}
-          {corr.status === 'empty' && <p className="db-state">No correlation data.</p>}
-          {corr.status === 'ready' &&
-            corr.assets.map((asset) => (
-              <CorrRow
-                key={asset.ticker}
-                asset={asset}
-                open={open.has(`corr:${asset.ticker}`)}
-                onToggle={() => toggle(`corr:${asset.ticker}`)}
-              />
-            ))}
         </div>
       </div>
     </SectionShell>
