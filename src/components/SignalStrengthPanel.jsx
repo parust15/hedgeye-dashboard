@@ -15,12 +15,12 @@ const SORT_DIR_KEY = 'dashboard.ssSortDir'
 const SEARCH_KEY = 'dashboard.ssSearch'
 
 // Position (oldest add = 1) is the default tenure order; ticker, date-added,
-// and NEW-first are also offered.
+// and "Newest adds first" (today's adds on top) are also offered.
 const SS_SORT_FIELDS = [
   { value: 'position', label: 'Position (oldest first)', defaultDir: 'asc' },
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
   { value: 'date_added', label: 'Date added', defaultDir: 'desc' },
-  { value: 'new', label: 'NEW first', defaultDir: 'desc' },
+  { value: 'new', label: 'Newest adds first', defaultDir: 'desc' },
 ]
 const SS_SORT_VALUES = new Set(SS_SORT_FIELDS.map((f) => f.value))
 
@@ -174,10 +174,13 @@ export function SignalStrengthPanel() {
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
         case 'new': {
+          // "Newest adds first": added_in_latest_email DESC, then position ASC
+          // so today's adds surface at the top instead of sinking to the bottom.
           const na = a.added_in_latest_email ? 1 : 0
           const nb = b.added_in_latest_email ? 1 : 0
           cmp = sortDir === 'asc' ? na - nb : nb - na
-          return cmp !== 0 ? cmp : tieBreak(a, b)
+          if (cmp !== 0) return cmp
+          return (a.position ?? 0) - (b.position ?? 0)
         }
         default:
           return tieBreak(a, b)
