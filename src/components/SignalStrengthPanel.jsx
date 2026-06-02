@@ -4,7 +4,7 @@ import { useSignalStrength } from '../lib/useSignalStrength'
 import { StatusChip } from './StatusChip'
 import { SortControl } from './SortControl'
 import { TickerSearch } from './TickerSearch'
-import { formatPrice, parseAdded } from '../lib/format'
+import { formatPrice } from '../lib/format'
 import { useTickerFocus } from '../lib/TickerContext'
 import { TrendBubble } from './TrendBubble'
 
@@ -14,10 +14,12 @@ const SORT_FIELD_KEY = 'dashboard.ssSortField'
 const SORT_DIR_KEY = 'dashboard.ssSortDir'
 const SEARCH_KEY = 'dashboard.ssSearch'
 
-// Reconciled view has no tenure (position / date_added), so the only
-// meaningful sorts are ticker (the default) and NEW-this-email first.
+// Position (oldest add = 1) is the default tenure order; ticker, date-added,
+// and NEW-first are also offered.
 const SS_SORT_FIELDS = [
+  { value: 'position', label: 'Position (oldest first)', defaultDir: 'asc' },
   { value: 'ticker', label: 'Ticker', defaultDir: 'asc' },
+  { value: 'date_added', label: 'Date added', defaultDir: 'desc' },
   { value: 'new', label: 'NEW first', defaultDir: 'desc' },
 ]
 const SS_SORT_VALUES = new Set(SS_SORT_FIELDS.map((f) => f.value))
@@ -29,7 +31,7 @@ function loadInitialSortField() {
   } catch (err) {
     console.warn('Failed to read ssSortField from localStorage:', err)
   }
-  return 'ticker'
+  return 'position'
 }
 
 function loadInitialSortDir() {
@@ -51,8 +53,13 @@ function loadInitialSearch() {
   }
 }
 
-// parseAdded imported from src/lib/format.js — the canonical helper.
-// The previous local copy was byte-identical to EtfReRankPanel's.
+// date_added_to_list (YYYY-MM-DD) → "M/D" for the ADDED column.
+function fmtAddedMD(isoDate) {
+  if (!isoDate) return '—'
+  const [, m, d] = String(isoDate).split('-').map(Number)
+  if (!m || !d) return '—'
+  return `${m}/${d}`
+}
 
 function listAsOfLabel(listAsOf) {
   if (!listAsOf) return null
@@ -62,8 +69,7 @@ function listAsOfLabel(listAsOf) {
 }
 
 // === Single full-table row ============================================
-const SignalRow = memo(function SignalRow({ row, pos, onFocus }) {
-  const { dateLabel, days } = parseAdded(row.date_added_to_list)
+const SignalRow = memo(function SignalRow({ row, onFocus }) {
   const isNew = row.added_in_latest_email === true
   // Only NEW rows carry the green left-border; everything else is neutral
   // (per spec: "no red rows"). We intentionally don't use rerank-row-down
@@ -73,7 +79,7 @@ const SignalRow = memo(function SignalRow({ row, pos, onFocus }) {
   return (
     <li className={`rerank-row tt-ss-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
-      <span className="rerank-rank">{pos}</span>
+      <span className="rerank-rank">{row.position ?? '—'}</span>
       <button
         type="button"
         className="rerank-ticker tt-ticker-btn"
@@ -84,8 +90,8 @@ const SignalRow = memo(function SignalRow({ row, pos, onFocus }) {
       </button>
       <span className="tt-price">{priceTxt}</span>
       <span className="rerank-asset" aria-hidden="true" />
-      <span className="tt-date">{dateLabel ?? '—'}</span>
-      <span className="tt-days">{days != null ? `${days}d` : '—'}</span>
+      <span className="tt-date">{fmtAddedMD(row.date_added_to_list)}</span>
+      <span className="tt-days">{row.days_on != null ? `${row.days_on}d` : '—'}</span>
       {isNew ? (
         <span className="tt-newchip">NEW</span>
       ) : (
@@ -141,16 +147,6 @@ export function SignalStrengthPanel() {
     setSortDir(dir)
   }
 
-  // Canonical POS lookup (oldest = 1). Built once from rows so the
-  // render loop is O(1) per row instead of O(n) via rows.indexOf —
-  // matters because the table renders all 72 rows on every search
-  // keystroke, and indexOf inside the .map was previously O(n²).
-  const posByTicker = useMemo(() => {
-    const m = new Map()
-    rows.forEach((r, i) => m.set(r.ticker, i + 1))
-    return m
-  }, [rows])
-
   // Filter then sort for the main table.
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -160,9 +156,23 @@ export function SignalStrengthPanel() {
     sorted.sort((a, b) => {
       let cmp
       switch (sortField) {
+        case 'position':
+          cmp = (a.position ?? 0) - (b.position ?? 0)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
         case 'ticker':
           cmp = a.ticker.localeCompare(b.ticker)
           return sortDir === 'asc' ? cmp : -cmp
+        case 'date_added': {
+          const da = a.date_added_to_list ?? ''
+          const db = b.date_added_to_list ?? ''
+          if (!da && !db) return tieBreak(a, b)
+          if (!da) return 1
+          if (!db) return -1
+          cmp = da < db ? -1 : da > db ? 1 : 0
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
+        }
         case 'new': {
           const na = a.added_in_latest_email ? 1 : 0
           const nb = b.added_in_latest_email ? 1 : 0
@@ -238,15 +248,9 @@ export function SignalStrengthPanel() {
           </div>
 
           <ol className="rerank-list">
-            {visibleRows.map((r) => {
-              // POS column should always reflect the canonical 1..N
-              // index (oldest = 1), regardless of current sort. We
-              // compute it from the source `rows` order, not the
-              // visible order, so re-sorting doesn't renumber the
-              // tickers.
-              const pos = posByTicker.get(r.ticker) ?? 0
-              return <SignalRow key={r.ticker} row={r} pos={pos} onFocus={onFocus} />
-            })}
+            {visibleRows.map((r) => (
+              <SignalRow key={r.ticker} row={r} onFocus={onFocus} />
+            ))}
           </ol>
           {visibleRows.length === 0 && search.trim() && (
             <div className="state">

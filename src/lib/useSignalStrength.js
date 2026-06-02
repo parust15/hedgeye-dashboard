@@ -4,8 +4,9 @@ import { supabase } from './supabase'
 /**
  * Loads the reconciled Hedgeye Signal Strength ticker list from
  * `hedgeye_signal_strength_reconciled_v`. This view self-updates its
- * add/remove deltas from the latest email and does NOT carry the OCR-only
- * tenure fields (date_added_to_list, position). Rows come back ticker ASC.
+ * add/remove deltas from the latest email and carries the tenure fields
+ * (date_added_to_list, days_on, position). Rows come back position ASC
+ * (oldest add = 1).
  *
  * Returns:
  *   rows      — full array (ticker ASC)
@@ -34,9 +35,10 @@ export function useSignalStrength() {
       const res = await supabase
         .from('hedgeye_signal_strength_reconciled_v')
         .select(
-          'list_as_of, ticker, added_in_latest_email, ' +
-            'current_price, change_pct, price_quoted_at'
+          'list_as_of, ticker, added_in_latest_email, date_added_to_list, ' +
+            'days_on, position, current_price, change_pct, price_quoted_at'
         )
+        .order('position', { ascending: true })
         .order('ticker', { ascending: true })
 
       if (cancelled) return
