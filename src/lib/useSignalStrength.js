@@ -2,24 +2,23 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
 /**
- * Loads the current Hedgeye Signal Strength ticker list from
- * `hedgeye_signal_strength_current_v`. The view already returns rows
- * sorted oldest→newest by `date_added_to_list ASC, position ASC,
- * ticker ASC`, so the caller can trust the order without re-sorting
- * the main list.
+ * Loads the reconciled Hedgeye Signal Strength ticker list from
+ * `hedgeye_signal_strength_reconciled_v`. This view self-updates its
+ * add/remove deltas from the latest email and does NOT carry the OCR-only
+ * tenure fields (date_added_to_list, position). Rows come back ticker ASC.
  *
  * Returns:
- *   rows        — full array (oldest first)
- *   snapshotAt  — rows[0]?.snapshot_at — ISO timestamptz string
- *   status      — 'loading' | 'ready' | 'empty' | 'error'
- *   error       — truthy on 'error', null otherwise
+ *   rows      — full array (ticker ASC)
+ *   listAsOf  — rows[0]?.list_as_of — ISO timestamptz of the latest email
+ *   status    — 'loading' | 'ready' | 'empty' | 'error'
+ *   error     — truthy on 'error', null otherwise
  *
- * Single fetch on mount, no polling — the source data updates a few
- * times per week via the ingestion workflow.
+ * Single fetch on mount, no polling — the source data updates a few times
+ * per week via the ingestion workflow.
  */
 export function useSignalStrength() {
   const [rows, setRows] = useState([])
-  const [snapshotAt, setSnapshotAt] = useState(null)
+  const [listAsOf, setListAsOf] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState(null)
 
@@ -30,18 +29,14 @@ export function useSignalStrength() {
       setStatus('loading')
       setError(null)
 
-      // Explicit ORDER BY mirrors the view's natural order, so any
-      // future change to row-storage order doesn't shift the UI.
-      // current_price / change_pct / price_quoted_at come from Finnhub;
-      // ~22 of 72 are null (foreign/OTC names off the free tier).
+      // current_price / change_pct / price_quoted_at come from Finnhub and
+      // may be null (foreign/OTC names off the free tier).
       const res = await supabase
-        .from('hedgeye_signal_strength_current_v')
+        .from('hedgeye_signal_strength_reconciled_v')
         .select(
-          'ticker, date_added_to_list, position, added_in_latest_email, snapshot_at, ' +
+          'list_as_of, ticker, added_in_latest_email, ' +
             'current_price, change_pct, price_quoted_at'
         )
-        .order('date_added_to_list', { ascending: true })
-        .order('position', { ascending: true })
         .order('ticker', { ascending: true })
 
       if (cancelled) return
@@ -55,13 +50,13 @@ export function useSignalStrength() {
       const data = res.data ?? []
       if (data.length === 0) {
         setRows([])
-        setSnapshotAt(null)
+        setListAsOf(null)
         setStatus('empty')
         return
       }
 
       setRows(data)
-      setSnapshotAt(data[0]?.snapshot_at ?? null)
+      setListAsOf(data[0]?.list_as_of ?? null)
       setStatus('ready')
     }
 
@@ -77,5 +72,5 @@ export function useSignalStrength() {
     }
   }, [])
 
-  return { rows, snapshotAt, status, error }
+  return { rows, listAsOf, status, error }
 }
