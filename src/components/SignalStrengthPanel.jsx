@@ -174,13 +174,12 @@ export function SignalStrengthPanel() {
           return cmp !== 0 ? cmp : tieBreak(a, b)
         }
         case 'new': {
-          // "Newest adds first": added_in_latest_email DESC, then position ASC
-          // so today's adds surface at the top instead of sinking to the bottom.
-          const na = a.added_in_latest_email ? 1 : 0
-          const nb = b.added_in_latest_email ? 1 : 0
-          cmp = sortDir === 'asc' ? na - nb : nb - na
-          if (cmp !== 0) return cmp
-          return (a.position ?? 0) - (b.position ?? 0)
+          // "Newest adds first": order the WHOLE list newest → oldest by add
+          // recency. Position 1 is the oldest add, so newest-first = position
+          // DESC (today's adds lead, then on down to the longest-tenured).
+          cmp = (a.position ?? 0) - (b.position ?? 0)
+          if (sortDir === 'desc') cmp = -cmp
+          return cmp !== 0 ? cmp : tieBreak(a, b)
         }
         default:
           return tieBreak(a, b)
