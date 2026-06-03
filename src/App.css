@@ -5782,13 +5782,16 @@ body,
 .signal-strength-panel .rerank-list-head,
 .signal-strength-panel .rerank-row {
   grid-template-columns:
-    64px                  /* pos        */
-    minmax(86px, auto)    /* ticker     */
-    96px                  /* price      */
-    minmax(40px, 1fr)     /* spacer     */
-    140px                 /* date added */
-    100px                 /* days       */
-    80px;                 /* new chip   */
+    48px                  /* pos            */
+    minmax(74px, auto)    /* ticker         */
+    minmax(96px, 1fr)     /* analyst/sector */
+    80px                  /* entry          */
+    80px                  /* price          */
+    88px                  /* since signal   */
+    64px                  /* date added     */
+    74px                  /* days           */
+    84px                  /* best-idea rank */
+    60px;                 /* new chip       */
 }
 
 /* Investing Ideas: SIDE | POS | TICKER | SECTOR | RANGE(flex) | PREV | LRR | TRR
@@ -5923,6 +5926,91 @@ body,
 .signal-strength-panel .rerank-list-head .tt-newhead {
   text-align: right;
   justify-self: end;
+}
+
+/* --- Signal Strength: Hedgeye entry / since-signal / analyst / rank ---- */
+/* Entry price — currency, right-aligned mono, same weight as live Price. */
+.tt-ss-entry {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-strong);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* % Since Initial Signal — large/bold, colored bull/bear inline. */
+.tt-ss-since {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Analyst (primary) + sector (sub) stacked in the flexible column. */
+.tt-ss-analyst {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.tt-ss-analyst-name {
+  font-size: 13px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tt-ss-analyst-sector {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Best-idea rank badge ("4/8", "Bench", "KM Signal"). */
+.tt-ss-rank {
+  text-align: right;
+  justify-self: end;
+}
+.tt-ss-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-strong);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+/* Header labels for the new columns — match the existing 11px caps treatment. */
+.signal-strength-panel .rerank-list-head .tt-ss-analyst,
+.signal-strength-panel .rerank-list-head .tt-ss-entry,
+.signal-strength-panel .rerank-list-head .tt-ss-since,
+.signal-strength-panel .rerank-list-head .tt-ss-rank,
+.signal-strength-panel .rerank-list-head .tt-price {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.signal-strength-panel .rerank-list-head .tt-ss-entry,
+.signal-strength-panel .rerank-list-head .tt-price,
+.signal-strength-panel .rerank-list-head .tt-ss-since,
+.signal-strength-panel .rerank-list-head .tt-ss-rank {
+  text-align: right;
+  justify-self: end;
+}
+.signal-strength-panel .rerank-list-head .tt-ss-analyst {
+  text-align: left;
+  justify-self: start;
 }
 
 /* --- NEW chip (Signal Strength) ----------------------------------- */
@@ -6689,10 +6777,13 @@ body,
      ETF Re-Rank uses for its mobile collapse. */
   .signal-strength-panel .rerank-list-head,
   .signal-strength-panel .rerank-row {
-    grid-template-columns: 48px minmax(64px, auto) 80px 1fr 70px 70px;
+    grid-template-columns: 44px minmax(60px, auto) 80px 84px 56px;
   }
-  .signal-strength-panel .rerank-asset,
-  .signal-strength-panel .rerank-list-head .rerank-asset {
+  .signal-strength-panel .tt-ss-analyst,
+  .signal-strength-panel .tt-ss-entry,
+  .signal-strength-panel .tt-date,
+  .signal-strength-panel .tt-days,
+  .signal-strength-panel .tt-ss-rank {
     display: none;
   }
   /* II mobile (Task 6 hybrid grid): SIDE | POS | TICKER | RANGE | PREV CLOSE */

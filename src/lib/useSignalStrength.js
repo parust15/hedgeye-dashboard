@@ -36,7 +36,9 @@ export function useSignalStrength() {
         .from('hedgeye_signal_strength_reconciled_v')
         .select(
           'list_as_of, ticker, added_in_latest_email, date_added_to_list, ' +
-            'days_on, position, current_price, change_pct, price_quoted_at'
+            'days_on, position, entry_price, current_price, pct_since_signal, ' +
+            'change_since_add_amt, change_since_add_pct, sector, analyst, ' +
+            'best_idea_rank, change_pct, price_quoted_at'
         )
         .order('position', { ascending: true })
         .order('ticker', { ascending: true })

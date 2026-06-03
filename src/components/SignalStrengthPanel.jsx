@@ -76,6 +76,13 @@ const SignalRow = memo(function SignalRow({ row, onFocus }) {
   // anywhere here — direction has no meaning in this dataset.
   const tintClass = isNew ? 'rerank-row-up' : 'rerank-row-neutral'
   const priceTxt = row.current_price == null ? '—' : formatPrice(row.current_price)
+  const entryTxt = row.entry_price == null ? '—' : formatPrice(row.entry_price)
+  // Hedgeye's own "% Since Initial Signal". Guard null BEFORE Number() so a
+  // missing value renders "—", not a green +0.0% (the Number(null)===0 trap).
+  const sinceNum = row.pct_since_signal == null ? null : Number(row.pct_since_signal)
+  const sinceOk = sinceNum != null && Number.isFinite(sinceNum)
+  const sinceTxt = sinceOk ? `${sinceNum >= 0 ? '+' : ''}${sinceNum.toFixed(1)}%` : '—'
+  const sinceColor = !sinceOk ? 'var(--text-dim)' : sinceNum >= 0 ? 'var(--bull)' : 'var(--bear)'
   return (
     <li className={`rerank-row tt-ss-row ${tintClass}`}>
       <div className="card-bg" aria-hidden="true" />
@@ -88,10 +95,24 @@ const SignalRow = memo(function SignalRow({ row, onFocus }) {
         {row.ticker}
         <TrendBubble ticker={row.ticker} />
       </button>
+      <span className="tt-ss-analyst">
+        <span className="tt-ss-analyst-name">{row.analyst || '—'}</span>
+        {row.sector && <span className="tt-ss-analyst-sector">{row.sector}</span>}
+      </span>
+      <span className="tt-ss-entry">{entryTxt}</span>
       <span className="tt-price">{priceTxt}</span>
-      <span className="rerank-asset" aria-hidden="true" />
+      <span className="tt-ss-since" style={{ color: sinceColor }}>
+        {sinceTxt}
+      </span>
       <span className="tt-date">{fmtAddedMD(row.date_added_to_list)}</span>
       <span className="tt-days">{row.days_on != null ? `${row.days_on}d` : '—'}</span>
+      <span className="tt-ss-rank">
+        {row.best_idea_rank ? (
+          <span className="tt-ss-rank-badge">{row.best_idea_rank}</span>
+        ) : (
+          <span className="tt-cell-dim">—</span>
+        )}
+      </span>
       {isNew ? (
         <span className="tt-newchip">NEW</span>
       ) : (
@@ -242,10 +263,13 @@ export function SignalStrengthPanel() {
           <div className="rerank-list-head tt-ss-row" aria-hidden="true">
             <span className="rerank-rank">{LABEL.column.pos}</span>
             <span className="rerank-ticker">{LABEL.column.ticker}</span>
+            <span className="tt-ss-analyst">Analyst</span>
+            <span className="tt-ss-entry">Entry</span>
             <span className="tt-price">{LABEL.column.price}</span>
-            <span className="rerank-asset" />
+            <span className="tt-ss-since">Since</span>
             <span className="tt-date">{LABEL.column.dateAdded}</span>
             <span className="tt-days">{LABEL.column.daysOnList}</span>
+            <span className="tt-ss-rank">Rank</span>
             <span className="tt-newhead">NEW</span>
           </div>
 
