@@ -366,7 +366,7 @@ function QuadCell({ row, open, onToggle }) {
       <div className="dbm-quad-cell dbm-quad-cell-empty">
         <span className="dbm-quad-ctop">
           <span className="dbm-quad-cnum">QUAD —</span>
-          <span className="dbm-quad-cunknown">unknown</span>
+          <span className="dbm-quad-cunknown">awaiting data</span>
         </span>
       </div>
     )

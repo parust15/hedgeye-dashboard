@@ -5776,9 +5776,9 @@ body,
    =================================================================== */
 
 /* --- Per-panel grid templates -------------------------------------- */
-/* Signal Strength: POS | TICKER | PRICE | (blank flex) | DATE | DAYS | NEW
-   PRICE is Finnhub live (~50 of 72 populated, rest render "—"). The
-   blank cell preserves Re-Rank's ASSET CLASS rhythm. */
+/* Signal Strength: POS | TICKER | ANALYST/SECTOR | ENTRY | PRICE | SINCE |
+   ADDED | DAYS | RANK | NEW. ENTRY/PRICE/SINCE are Hedgeye + Finnhub; nulls
+   render "—". */
 .signal-strength-panel .rerank-list-head,
 .signal-strength-panel .rerank-row {
   grid-template-columns:
@@ -5792,6 +5792,15 @@ body,
     74px                  /* days           */
     84px                  /* best-idea rank */
     60px;                 /* new chip       */
+}
+
+/* Sticky header — stays pinned while the long ticker list scrolls. */
+.signal-strength-panel .rerank-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border-strong);
 }
 
 /* Investing Ideas: SIDE | POS | TICKER | SECTOR | RANGE(flex) | PREV | LRR | TRR

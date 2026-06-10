@@ -30,6 +30,11 @@
   border-bottom: none;
 }
 
+/* Zebra striping for fast horizontal scanning of the flat data rows. */
+.db-tape-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .db-tape-head {
   font-family: var(--mono);
   font-size: 11px;

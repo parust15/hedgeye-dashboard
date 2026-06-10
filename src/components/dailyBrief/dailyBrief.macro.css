@@ -513,8 +513,15 @@ button.dbm-usdc-row:hover {
 .dbm-quad-cell-bear:hover {
   background: var(--bg-elev);
 }
+/* Empty slot — a dashed, dimmed "awaiting data" placeholder so it reads as
+   intentional rather than broken. */
 .dbm-quad-cell-empty {
-  opacity: 0.5;
+  border-style: dashed;
+  background: transparent;
+}
+.dbm-quad-cell-empty .dbm-quad-cnum,
+.dbm-quad-cell-empty .dbm-quad-cunknown {
+  color: var(--text-dim);
 }
 
 .dbm-quad-ctop {
