@@ -107,16 +107,6 @@ function rangePct(lrr, trr, price) {
   return Math.min(100, Math.max(0, ((price - lrr) / (trr - lrr)) * 100))
 }
 
-// Trend → ticker/price color (BULLISH green, BEARISH red, else default white).
-// Replaces the old "near TRR · TREND" caption — direction now reads off the
-// left column's color.
-function trendColor(trend) {
-  const t = (trend || '').toUpperCase()
-  if (t === 'BULLISH') return 'var(--bull)'
-  if (t === 'BEARISH') return 'var(--bear)'
-  return null
-}
-
 // Range-bar fill/dot color by zone (explicit per spec).
 function zoneColor(pct) {
   if (pct == null) return '#888780'
@@ -139,182 +129,6 @@ const TYPE_COLOR = {
   neg: 'var(--bear)',
   cau: 'var(--amber-light)',
   neu: 'var(--neutral)',
-}
-
-// Right-column chip — what this ticker's reading means for the broader
-// MACRO BACKDROP (not the ticker's own direction). Label + color type
-// come entirely from this per-ticker mapping. pct guards against the
-// Number(null) coercion footgun (null <= 25 would otherwise be true).
-function macroImplication(ticker, trend, pct) {
-  // Only TRR (top of range) gates a verdict — the bar already conveys
-  // position, so the chip never restates "near LRR/TRR". pct guards
-  // against the Number(null) coercion footgun (null >= 75 → true).
-  const atTRR = pct != null && pct >= 75
-
-  switch (ticker) {
-    // VIX: inverse — low/falling vol = good backdrop
-    case 'VIX':
-      if (trend === 'BEARISH' && pct != null && pct < 50)
-        return { label: 'vol supportive', type: 'pos' }
-      if (trend === 'BEARISH') return { label: 'vol elevated', type: 'cau' }
-      if (trend === 'BULLISH') return { label: 'vol spiking', type: 'neg' }
-      return { label: 'vol neutral', type: 'neu' }
-
-    // Equities: is the trend gate helping or hurting stocks?
-    case 'SPX':
-    case 'COMPQ':
-    case 'RUT':
-      if (trend === 'BULLISH' && atTRR) return { label: 'equity at ceiling', type: 'cau' }
-      if (trend === 'BULLISH') return { label: 'equity uptrend', type: 'pos' }
-      if (trend === 'BEARISH') return { label: 'equity downtrend', type: 'neg' }
-      return { label: 'no edge', type: 'neu' }
-
-    // Rates: rising rates pressure equities + duration
-    case 'UST10Y':
-    case 'UST2Y':
-    case 'UST30Y':
-      if (trend === 'BULLISH' && atTRR) return { label: 'rate headwind', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'rate pressure', type: 'cau' }
-      if (trend === 'BEARISH') return { label: 'rate tailwind', type: 'pos' }
-      return { label: 'rates neutral', type: 'neu' }
-
-    // USD: strong dollar = headwind for risk assets
-    case 'USD':
-      if (trend === 'BULLISH' && atTRR) return { label: 'dollar headwind', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'dollar firming', type: 'cau' }
-      if (trend === 'BEARISH') return { label: 'dollar tailwind', type: 'pos' }
-      return { label: 'dollar neutral', type: 'neu' }
-
-    // FX vs USD: falling EUR/GBP = rising dollar = risk-off
-    case 'EUR/USD':
-    case 'GBP/USD':
-      if (trend === 'BEARISH') return { label: 'dollar rising', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'dollar falling', type: 'pos' }
-      return { label: 'fx neutral', type: 'neu' }
-
-    case 'USD/YEN':
-      if (trend === 'BULLISH' && atTRR) return { label: 'yen pressure', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'yen watching', type: 'cau' }
-      if (trend === 'BEARISH') return { label: 'yen stable', type: 'pos' }
-      return { label: 'yen neutral', type: 'neu' }
-
-    // Copper: Dr. Copper = growth proxy
-    case 'COPPER':
-      if (trend === 'BULLISH') return { label: 'growth signal', type: 'pos' }
-      if (trend === 'BEARISH') return { label: 'growth warning', type: 'neg' }
-      return { label: 'copper neutral', type: 'neu' }
-
-    // Oil: high = inflation risk; collapse = demand/deflation risk
-    case 'WTIC':
-    case 'BRENT':
-      if (trend === 'BULLISH' && atTRR) return { label: 'inflation risk', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'oil firming', type: 'cau' }
-      if (trend === 'BEARISH') return { label: 'deflation risk', type: 'cau' }
-      return { label: 'oil neutral', type: 'neu' }
-
-    // Gold: safe-haven bid = risk-off money moving to safety
-    case 'GOLD':
-      if (trend === 'BULLISH' && atTRR) return { label: 'safe haven bid', type: 'neg' }
-      if (trend === 'BULLISH') return { label: 'gold bid', type: 'cau' }
-      if (trend === 'BEARISH') return { label: 'no haven bid', type: 'pos' }
-      return { label: 'gold neutral', type: 'neu' }
-
-    // Bitcoin: risk-on proxy
-    case 'BITCOIN':
-      if (trend === 'BULLISH') return { label: 'risk-on signal', type: 'pos' }
-      if (trend === 'BEARISH') return { label: 'risk-off signal', type: 'neg' }
-      return { label: 'crypto neutral', type: 'neu' }
-
-    default:
-      if (trend === 'BULLISH') return { label: 'bullish', type: 'pos' }
-      if (trend === 'BEARISH') return { label: 'bearish', type: 'neg' }
-      return { label: 'neutral', type: 'neu' }
-  }
-}
-
-// --- hedgeye_rr_verdict → action chip (the verdict surface) ----------
-// action verb → { family (drives color), arrow (direction), label }.
-// NOTE: arrow grouping ≠ color family — e.g. TRIM is amber (caution) but
-// points ↓ (cut). Up = add/long, down = cut/short, right = watch/hold.
-const ACTION_INFO = {
-  BUY: { family: 'bull', arrow: '↑', label: 'BUY' },
-  ADD: { family: 'bull', arrow: '↑', label: 'ADD' },
-  LET_RUN: { family: 'bull', arrow: '↑', label: 'LET RUN' },
-  TRIM: { family: 'amber', arrow: '↓', label: 'TRIM' },
-  REDUCE: { family: 'amber', arrow: '↓', label: 'REDUCE' },
-  COVER: { family: 'amber', arrow: '↓', label: 'COVER' },
-  WATCH_BOUNCE: { family: 'amber', arrow: '→', label: 'WATCH BOUNCE' },
-  HOLD: { family: 'neutral', arrow: '→', label: 'HOLD' },
-  WAIT: { family: 'neutral', arrow: '→', label: 'WAIT' },
-  SHORT: { family: 'bear', arrow: '↓', label: 'SHORT' },
-  AVOID: { family: 'bear', arrow: '↓', label: 'AVOID' },
-}
-function actionInfo(action) {
-  return ACTION_INFO[(action || '').toUpperCase()] || null
-}
-
-// conviction → fill-intensity suffix: high = solid fill + bold border,
-// medium = normal, low = outline only / dimmed so weak calls recede.
-function convictionIntensity(conviction) {
-  const c = (conviction || '').toLowerCase()
-  if (c === 'high') return 'high'
-  if (c === 'low') return 'low'
-  return 'med'
-}
-
-// action family → accent color (chip text + popover left border).
-const FAMILY_COLOR = {
-  bull: 'var(--bull)',
-  bear: 'var(--bear)',
-  amber: 'var(--amber-light)',
-  neutral: 'var(--neutral)',
-}
-
-// range_pattern → { label, tint }. Normalizes every value to one short,
-// color-coded token so EVERY chip's second line looks the same (never blank).
-// Bullish structure → bull, bearish → bear, compression/expansion/mixed →
-// amber, still-forming → neutral.
-function patternInfo(pattern) {
-  switch (pattern) {
-    case 'HH/HL':
-    case 'new_high_HL':
-      return { label: 'HH/HL', tint: 'bull' }
-    case 'LH/LL':
-    case 'new_low_LH':
-      return { label: 'LH/LL', tint: 'bear' }
-    case 'LH/HL':
-      return { label: 'LH/HL', tint: 'amber' }
-    case 'HH/LL':
-      return { label: 'HH/LL', tint: 'amber' }
-    case 'mixed':
-      return { label: 'mixed', tint: 'amber' }
-    case 'forming':
-      return { label: 'forming', tint: 'neutral' }
-    default:
-      return { label: pattern || '—', tint: 'neutral' }
-  }
-}
-
-// momentum → { arrow, tone } for the chip's second line.
-function momentumInfo(momentum) {
-  const m = (momentum || '').toLowerCase()
-  if (m === 'gaining') return { arrow: '↑', tone: 'bull' }
-  if (m === 'fading') return { arrow: '↓', tone: 'bear' }
-  if (m === 'flat') return { arrow: '→', tone: 'neutral' }
-  return { arrow: '?', tone: 'neutral' } // insufficient / unknown
-}
-const MOM_COLOR = {
-  bull: 'var(--bull)',
-  bear: 'var(--bear)',
-  neutral: 'var(--text)',
-}
-
-// Compact right-column tag — the at-a-glance action from the RR zone, using
-// chip tones (pos/cau/neu). Replaces the old wordy macro short-verdict chip.
-const ZONE_TAG = {
-  at_lrr: { tone: 'pos', label: 'BUY ZONE' },
-  at_trr: { tone: 'cau', label: 'TRIM ZONE' },
-  mid: { tone: 'neu', label: 'MID-RANGE' },
 }
 
 // Latest signal_date wins; first row per ticker on that date.
@@ -393,10 +207,10 @@ function Expand({ open, children }) {
   )
 }
 
-// The standardized gauge row — identical structure for VIX and every
-// driver. Left: ticker + price. Middle: range bar + position label.
-// Right: market-signal chip + chevron. Expands to badges + insight.
-function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride }) {
+// VIX strip — the lone gauge row left now that the per-driver cards are
+// retired. Ticker + vol-bucket-colored spot, range bar (LRR/TRR), and an RR
+// readout hover card portaled to <body>.
+function VixRow({ row, priceOverride }) {
   const rowRef = useRef(null)
   // Hover card (ticker / RR bar) — floating RR readout, positioned in a portal
   // so it escapes the section's overflow:hidden. null = hidden.
@@ -416,75 +230,8 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
   const trr = num(row.sell_trade)
   const pct = rangePct(lrr, trr, price)
   const zc = zoneColor(pct)
-  // Trend reads off the ticker/price color now (green bullish, red bearish);
-  // the old "near TRR · TREND" caption is removed. VIX keeps its vol-bucket hue.
-  const tColor = isVix ? null : trendColor(row.trend)
-  const bucket = isVix ? vixBucket(price) : null
-  // Match the header pill's 1-decimal VIX formatting exactly.
-  const priceText = isVix ? (price != null ? price.toFixed(1) : '—') : fmtBand(price)
-
-  // hedgeye_rr_verdict is the ONLY verdict surface — the right-side chip. With
-  // an action it shows the DECISION (BUY / TRIM / LET RUN …), colored by family
-  // and intensified by conviction; clicking it reveals one detail blurb. If
-  // action is null it falls back to the raw zone tag, no conviction styling.
-  const aInfo = actionInfo(verdict?.action)
-  const family = aInfo?.family || 'neutral'
-  const intensity = convictionIntensity(verdict?.conviction)
-  // Second line = fractal pattern + momentum (what the RR bar CAN'T show);
-  // position/zone is read off the bar, not repeated here.
-  const pInfo = verdict?.range_pattern ? patternInfo(verdict.range_pattern) : null
-  const mom = momentumInfo(verdict?.momentum)
-  // Fallback chip (no action): the raw zone tag, else the local macro label.
-  const zoneTag = verdict ? ZONE_TAG[verdict.range_zone] : null
-  const signal = macroImplication(row.ticker, row.trend, pct)
-  const chipTone = zoneTag ? zoneTag.tone : signal.type
-  const chipLabel = zoneTag
-    ? zoneTag.label
-    : insight?.short_verdict?.trim() || signal.label
-  // Expanded body prefers the driver-aware macro_insights verdict (names the
-  // dominant driver, cites USD correlations + quad-shift context, ends in an
-  // action + level) for the latest insight_date — it's already keyed to this
-  // row via the driver:<ticker> / vix block_key. detail_bullets (a 3-5 item
-  // array, last item the "Action:" takeaway) renders as a bullet list; detail
-  // prose is the fallback; the isolated hedgeye_rr_verdict read is last.
-  const bullets =
-    Array.isArray(insight?.detail_bullets) && insight.detail_bullets.length
-      ? insight.detail_bullets
-      : null
-  const detail = insight?.detail?.trim() || verdict?.verdict_detail?.trim()
-  const hasBlurb = !!bullets || !!detail
-  const chipClass = aInfo
-    ? `rrv-chip rrv-chip-${family} rrv-chip-${intensity}`
-    : `dbm-chip dbm-chip-${chipTone}`
-  // Conviction is shown by fill/border strength (intensity class), not dots.
-  const chipBody = aInfo ? (
-    <>
-      <span className="rrv-chip-verb">
-        {aInfo.arrow} {aInfo.label}
-      </span>
-      <span className="rrv-chip-sub">
-        {pInfo && (
-          <>
-            <span style={{ color: FAMILY_COLOR[pInfo.tint] }}>{pInfo.label}</span>
-            {' · '}
-          </>
-        )}
-        <span style={{ color: MOM_COLOR[mom.tone] }}>mom {mom.arrow}</span>
-      </span>
-    </>
-  ) : (
-    chipLabel
-  )
-
-  // Close the blurb on click-away; re-click is handled by the chip itself.
-  useEffect(() => {
-    if (!open || !hasBlurb) return undefined
-    const onDown = (e) => {
-      if (rowRef.current && !rowRef.current.contains(e.target)) onToggle()
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open, hasBlurb, onToggle])
+  const bucket = vixBucket(price)
+  const priceText = price != null ? price.toFixed(1) : '—'
 
   return (
     <div className="dbm-row" ref={rowRef}>
@@ -494,18 +241,10 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
           onMouseEnter={showHover}
           onMouseLeave={hideHover}
         >
-          <span className="dbm-row-ticker" style={tColor ? { color: tColor } : undefined}>
-            {row.ticker}
-          </span>
+          <span className="dbm-row-ticker">{row.ticker}</span>
           <span
-            className={`dbm-row-price${isVix ? ' dbm-row-price-vix' : ''}`}
-            style={
-              isVix
-                ? { color: TYPE_COLOR[bucket.type] }
-                : tColor
-                  ? { color: tColor }
-                  : undefined
-            }
+            className="dbm-row-price dbm-row-price-vix"
+            style={{ color: TYPE_COLOR[bucket.type] }}
           >
             {priceText}
           </span>
@@ -531,73 +270,12 @@ function DriverRow({ row, insight, verdict, open, onToggle, isVix, priceOverride
             {lrr != null && (
               <span className="dbm-rb-rr dbm-rb-rr-lrr">LRR {fmtBand(lrr)}</span>
             )}
-            {/* The verdict chip lives in the bar caption now — a wide
-                rectangular pill centered between LRR and TRR, where the
-                position/trend text used to be. VIX shows no chip. */}
-            <div className="dbm-rb-chipslot">
-              {!isVix &&
-                (hasBlurb ? (
-                  <button
-                    type="button"
-                    className={chipClass}
-                    onClick={onToggle}
-                    aria-expanded={open}
-                  >
-                    {chipBody}
-                    <span
-                      className={`rrv-chip-caret${open ? ' rrv-chip-caret-open' : ''}`}
-                      aria-hidden="true"
-                    >
-                      ▾
-                    </span>
-                  </button>
-                ) : (
-                  <span className={chipClass}>{chipBody}</span>
-                ))}
-            </div>
             {trr != null && (
               <span className="dbm-rb-rr dbm-rb-rr-trr">TRR {fmtBand(trr)}</span>
             )}
           </div>
         </div>
       </div>
-
-      {/* The verdict blurb — a full-row-width band below the row in the bubble
-          style, left border colored by the action family. Opens with the range
-          bounds (LRR · TRR) as a quick reference, then the detail paragraph. */}
-      {hasBlurb && open && (
-        <div className="rrv-pop" style={{ borderLeftColor: FAMILY_COLOR[family] }}>
-          {(lrr != null || trr != null) && (
-            <div className="rrv-pop-bounds">
-              {lrr != null && <span className="rrv-pop-lrr">LRR {fmtBand(lrr)}</span>}
-              {lrr != null && trr != null && <span className="rrv-pop-sep"> · </span>}
-              {trr != null && <span className="rrv-pop-trr">TRR {fmtBand(trr)}</span>}
-            </div>
-          )}
-          {bullets ? (
-            <ul className="rrv-pop-bullets">
-              {bullets.map((b, i) => {
-                const text = String(b)
-                // The driver bullets end in the action takeaway (last item, often
-                // "Action:"-prefixed) — emphasize it in the verdict family color.
-                const isAction =
-                  i === bullets.length - 1 || /^\s*action\s*:/i.test(text)
-                return (
-                  <li
-                    key={i}
-                    className={`rrv-pop-bullet${isAction ? ' rrv-pop-action' : ''}`}
-                    style={isAction ? { color: FAMILY_COLOR[family] } : undefined}
-                  >
-                    {text}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            detail
-          )}
-        </div>
-      )}
 
       {/* Hover card (ticker / bar) — RR readout, portaled to <body> so the
           section's overflow:hidden can't clip it. */}
@@ -1068,15 +746,7 @@ export function MacroRegimeSection() {
           {(signals.status === 'ready' || signals.status === 'empty') && !vixRow && (
             <p className="db-state">No VIX signal.</p>
           )}
-          {vixRow && (
-            <DriverRow
-              row={vixRow}
-              open={open.has('vix')}
-              onToggle={() => toggle('vix')}
-              isVix
-              priceOverride={vixDisplayPrice}
-            />
-          )}
+          {vixRow && <VixRow row={vixRow} priceOverride={vixDisplayPrice} />}
         </div>
 
         {/* === Block C — Key $USD Correlations (server-side, rule-derived) ==
