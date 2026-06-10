@@ -10,7 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 export function SectionShell({ index, title, meta, children, className = '' }) {
   const [open, setOpen] = useState(true)
   return (
-    <section className={`db-section${className ? ` ${className}` : ''}`}>
+    <section className={`db-section db-scrim${className ? ` ${className}` : ''}`}>
       <div className="card-bg" aria-hidden="true" />
       <button
         type="button"

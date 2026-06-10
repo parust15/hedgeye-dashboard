@@ -7151,6 +7151,23 @@ body,
      midnight blue used by every section title + sub/block/group header.
      One spot to tune the entire tab's header color. */
   --db-head: #2d3a7a;
+  /* Neutral default so .card-bg's rgba(var(--card-tint), …) recipe is
+     valid here — without it the whole background declaration is invalid
+     and the section renders fill-less over the nebula. */
+  --card-tint: 156, 163, 175;
+}
+
+/* Reusable dark scrim — a flat dark layer that evens out text contrast
+   over the nebula. Add to any positioned, overflow-clipped container
+   whose content sits at z-index 1+ (pairs with .card-bg, which paints
+   above it in tree order). */
+.db-scrim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(11, 13, 18, 0.55);
 }
 
 .db-section > .db-section-head,
