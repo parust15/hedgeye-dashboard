@@ -6,16 +6,6 @@ import { useVixBucket } from '../../lib/useVixBucket'
 import { SectionShell } from './SectionShell'
 import './dailyBrief.macro.css'
 
-// Block B — macro driver lamps, grouped by asset class. Tickers absent
-// from today's signal set are simply skipped.
-const DRIVER_GROUPS = [
-  { group: 'Equities', tickers: ['SPX', 'COMPQ', 'RUT'] },
-  { group: 'Rates', tickers: ['UST10Y', 'UST2Y', 'UST30Y'] },
-  { group: 'FX / Dollar', tickers: ['USD', 'EUR/USD', 'USD/YEN'] },
-  { group: 'Commodities', tickers: ['WTIC', 'GOLD', 'COPPER'] },
-  { group: 'Crypto', tickers: ['BITCOIN'] },
-]
-
 // Block C — correlation lookback windows for the expandable detail grid.
 const WINDOWS = [15, 30, 90, 120, 180]
 
@@ -728,176 +718,12 @@ function QuadCell({ row, open, onToggle }) {
   )
 }
 
-// Plain-language legend for the action chips. Verb arrows + HH/HL tokens reuse
-// the chip helpers (actionInfo / patternInfo / FAMILY_COLOR) so the legend
-// stays in sync with the chips if the palette ever changes.
-const LEGEND_TREND = [
-  'Bullish or bearish, by Hedgeye’s 3-month signal. It decides direction, and nothing overrides it.',
-  'A bullish name is never a short — at worst, you trim it.',
-  'A bearish name is never a clean buy — at best, you cover, or wait out the bounce.',
-  'Everything below only shapes how you act within that direction. It cannot reverse it.',
-]
-
-const LEGEND_VERDICTS = [
-  {
-    label: 'When the trend is bullish',
-    actions: [
-      ['BUY', 'at the low end, momentum confirming. The dip worth taking.'],
-      ['ADD', 'mid-range and still working. Build on what you hold.'],
-      ['LET_RUN', 'pinned at the top, yet still climbing. Do not trim a winner mid-stride.'],
-      ['TRIM', 'at the top, but the move is tiring. Take some off.'],
-      ['REDUCE', 'the trend still reads bullish, but the structure is rotting beneath it: ceiling sinking, drive dying. The exit before the exit. And if it’s down at the lows, that is a falling knife — not a dip.'],
-      ['HOLD', 'bullish, but no edge today. Sit on your hands.'],
-    ],
-  },
-  {
-    label: 'When the trend is bearish',
-    actions: [
-      ['SHORT', 'at the top of its range and rolling over. The entry to fade.'],
-      ['AVOID', 'no clean entry. Stand clear.'],
-      ['COVER', 'washed out at the lows, ripe for a bounce. Cover your shorts.'],
-      ['WATCH_BOUNCE', 'bearish still, but the counter-move has real force. Do not short into it yet.'],
-    ],
-  },
-  {
-    label: 'When neither side is clean',
-    actions: [['WAIT', 'flat, or the signals quarrel. No setup. Honest, not idle.']],
-  },
-]
-
-const LEGEND_PATTERNS = [
-  ['HH/HL', 'higher highs, higher lows. The range marches upward. Textbook health.'],
-  ['LH/LL', 'lower highs, lower lows. The range retreats. Beneath a bullish trend, this is the rot showing first.'],
-  ['LH/HL', 'the range pinches inward. A coil, winding toward a larger move — direction yet unknown.'],
-  ['HH/LL', 'the range flies apart both ways. Rising chaos, and signals you trust less.'],
-]
-
-function RrLegend() {
-  return (
-    <div className="rrl-panel">
-      <h4 className="rrl-title">How to Read These Calls</h4>
-      <p className="rrl-intro">
-        Every ticker earns a single verdict — drawn from four readings weighed together,
-        never a rigid rule. The trend names the direction. The rest tells you where in the
-        move you stand, and how far to trust it.
-      </p>
-
-      <div className="rrl-group">
-        <span className="rrl-head">First, the trend — this is the gate.</span>
-        <ul className="rrl-list">
-          {LEGEND_TREND.map((t) => (
-            <li className="rrl-li" key={t.slice(0, 16)}>
-              {t}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="rrl-group">
-        <span className="rrl-head">The verdicts</span>
-        {LEGEND_VERDICTS.map((g) => (
-          <div className="rrl-subgroup" key={g.label}>
-            <span className="rrl-grouplabel">{g.label}</span>
-            <ul className="rrl-list">
-              {g.actions.map(([a, desc]) => {
-                const info = actionInfo(a)
-                return (
-                  <li className="rrl-li" key={a}>
-                    <span className="rrl-tok" style={{ color: FAMILY_COLOR[info.family] }}>
-                      {info.arrow} {info.label}
-                    </span>
-                    <span className="rrl-em"> — </span>
-                    {desc}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      <div className="rrl-group">
-        <span className="rrl-head">The fractal pattern</span>
-        <p className="rrl-note">
-          How the range itself travels over ~5 days. The bar shows where you are; this
-          shows where the whole range is going.
-        </p>
-        <ul className="rrl-list">
-          {LEGEND_PATTERNS.map(([tok, desc]) => (
-            <li className="rrl-li" key={tok}>
-              <span className="rrl-tok" style={{ color: FAMILY_COLOR[patternInfo(tok).tint] }}>
-                {tok}
-              </span>
-              <span className="rrl-em"> — </span>
-              {desc}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="rrl-group">
-        <span className="rrl-head">Momentum</span>
-        <p className="rrl-note">Is the move speeding up or running out of breath?</p>
-        <ul className="rrl-list">
-          <li className="rrl-li">
-            <span className="rrl-tok" style={{ color: FAMILY_COLOR.bull }}>
-              ↑ gaining
-            </span>
-            <span className="rrl-em"> — </span>
-            each step lifts higher than the last. The move is accelerating; the legs are
-            real.
-          </li>
-          <li className="rrl-li">
-            <span className="rrl-tok" style={{ color: FAMILY_COLOR.bear }}>
-              ↓ fading
-            </span>
-            <span className="rrl-em"> — </span>
-            the steps are shrinking. The move presses on, but with less force each time —
-            the first sign of a stall, even while price still holds.
-          </li>
-          <li className="rrl-li rrl-li-note">
-            Read it as a runner: gaining is lengthening stride; fading is the same runner,
-            slowing, though not yet stopped.
-          </li>
-        </ul>
-      </div>
-
-      <div className="rrl-group">
-        <span className="rrl-head">Conviction</span>
-        <p className="rrl-note">Shown by the chip itself, not a number.</p>
-        <ul className="rrl-list">
-          <li className="rrl-li">
-            <strong>Bold, filled, bordered</strong> — every signal agrees. High conviction.
-          </li>
-          <li className="rrl-li">
-            <strong>Faint outline</strong> — only one factor agrees. Trust it lightly.
-          </li>
-          <li className="rrl-li">
-            Roughly four in ten names hold no clean setup on a given day. The system will
-            say so, rather than invent one.
-          </li>
-        </ul>
-      </div>
-
-      <p className="rrl-bottom">
-        The one to never miss: when a bullish name turns up{' '}
-        <strong style={{ color: FAMILY_COLOR.amber }}>REDUCE</strong> or{' '}
-        <strong style={{ color: FAMILY_COLOR.bear }}>LH/LL</strong> while the trend still
-        calls itself bullish — the structure is breaking before the label admits it. Risk
-        comes slowly. Then all at once.
-      </p>
-    </div>
-  )
-}
-
 export function MacroRegimeSection() {
   const [signals, setSignals] = useState({ status: 'loading', map: {}, date: null })
   // usd_correlations_v pivoted by asset_label → full 5-window detail for the
   // expand-on-click drill-down beneath each summary row.
   const [corr, setCorr] = useState({ status: 'loading', byLabel: {} })
   const [insights, setInsights] = useState({ status: 'loading', map: {} })
-  // hedgeye_rr_verdict — latest signal_date, keyed by ticker.
-  const [verdicts, setVerdicts] = useState({ status: 'loading', map: {} })
   const [quads, setQuads] = useState({
     status: 'loading',
     monthly: null,
@@ -936,17 +762,7 @@ export function MacroRegimeSection() {
         .select('assertion_type, value, region, stance, confidence, stated_on, source_email_type, evidence_snippet')
         .in('assertion_type', ['monthly_quad', 'quarterly_quad', 'regional_quad'])
         .order('stated_on', { ascending: false }),
-      supabase
-        .from('hedgeye_rr_verdict')
-        .select('ticker, action, conviction, verdict_oneliner, verdict_detail, gate, range_zone, price_in_range, trr_slope, momentum, vol_state, signal_date')
-        .order('signal_date', { ascending: false })
-        .limit(300),
-      supabase
-        .from('hedgeye_rr_verdict_input_v')
-        .select('ticker, range_pattern, momentum, signal_date')
-        .order('signal_date', { ascending: false })
-        .limit(300),
-    ]).then(([sigSettled, corrSettled, insSettled, quadSettled, vSettled, pSettled]) => {
+    ]).then(([sigSettled, corrSettled, insSettled, quadSettled]) => {
       if (cancelled) return
 
       let latestSignalDate = null
@@ -1056,38 +872,6 @@ export function MacroRegimeSection() {
         })
       }
 
-      // --- hedgeye_rr_verdict → latest-date ticker map --------------
-      // Rows arrive newest-first; pickLatest keeps only the max
-      // signal_date and keys by ticker. Verdicts are additive — fail
-      // soft to an empty map so the rows still render without them.
-      if (vSettled.status === 'fulfilled' && !vSettled.value.error) {
-        const { map } = pickLatest(vSettled.value.data ?? [])
-        // Merge the input view (range_pattern + momentum) by ticker — the
-        // fractal/momentum reads the RR bar can't show. Fail soft: if the
-        // view is missing, the chip just omits the pattern token.
-        if (pSettled.status === 'fulfilled' && !pSettled.value.error) {
-          const patternMap = pickLatest(pSettled.value.data ?? []).map
-          for (const t of Object.keys(map)) {
-            const p = patternMap[t]
-            if (p)
-              map[t] = {
-                ...map[t],
-                range_pattern: p.range_pattern,
-                momentum: p.momentum ?? map[t].momentum,
-              }
-          }
-        } else if (pSettled.status === 'rejected') {
-          console.error('MacroRegime: rr_input view fetch rejected:', pSettled.reason)
-        } else {
-          console.error('MacroRegime: rr_input view fetch error:', pSettled.value.error)
-        }
-        setVerdicts({ status: 'ready', map })
-      } else {
-        if (vSettled.status === 'rejected')
-          console.error('MacroRegime: rr_verdict fetch rejected:', vSettled.reason)
-        else console.error('MacroRegime: rr_verdict fetch error:', vSettled.value.error)
-        setVerdicts({ status: 'ready', map: {} })
-      }
     })
 
     return () => {
@@ -1117,21 +901,6 @@ export function MacroRegimeSection() {
   const usdCorrBullets = Array.isArray(usdCorr?.detail_bullets) ? usdCorr.detail_bullets : []
   const usOpen = open.has('quad-us')
   const globalOpen = open.has('quad-global')
-  const legendOpen = open.has('rr-legend')
-
-  // Close the "how to read these" legend on click-away (re-click on the
-  // trigger toggles it). Matches against the trigger/panel classes so clicks
-  // inside either keep it open.
-  useEffect(() => {
-    if (!legendOpen) return undefined
-    const onDown = (e) => {
-      if (!e.target.closest('.rrl-trigger') && !e.target.closest('.rrl-panel')) {
-        toggle('rr-legend')
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [legendOpen, toggle])
 
   return (
     <SectionShell index={1} title="Macro Regime">
@@ -1302,54 +1071,12 @@ export function MacroRegimeSection() {
           {vixRow && (
             <DriverRow
               row={vixRow}
-              insight={insightMap.vix}
-              verdict={verdicts.map.VIX}
               open={open.has('vix')}
               onToggle={() => toggle('vix')}
               isVix
               priceOverride={vixDisplayPrice}
             />
           )}
-        </div>
-
-        {/* === Block B — Macro Drivers ============================= */}
-        <div className="dbm-block">
-          <div className="dbm-block-head">
-            <span className="dbm-block-title">Macro Drivers</span>
-            <button
-              type="button"
-              className={`rrl-trigger${legendOpen ? ' rrl-trigger-open' : ''}`}
-              onClick={() => toggle('rr-legend')}
-              aria-expanded={legendOpen}
-            >
-              Instructions
-            </button>
-          </div>
-          {legendOpen && <RrLegend />}
-          {signals.status === 'loading' && <p className="db-state">Loading drivers…</p>}
-          {signals.status === 'error' && (
-            <p className="db-state db-state-error">Driver signals unavailable.</p>
-          )}
-          {(signals.status === 'ready' || signals.status === 'empty') &&
-            DRIVER_GROUPS.map((grp) => {
-              const present = grp.tickers.filter((t) => signals.map[t])
-              if (present.length === 0) return null
-              return (
-                <div className="dbm-group" key={grp.group}>
-                  <span className="dbm-group-head">{grp.group}</span>
-                  {present.map((t) => (
-                    <DriverRow
-                      key={t}
-                      row={signals.map[t]}
-                      insight={insightMap[`driver:${t}`]}
-                      verdict={verdicts.map[t]}
-                      open={open.has(`driver:${t}`)}
-                      onToggle={() => toggle(`driver:${t}`)}
-                    />
-                  ))}
-                </div>
-              )
-            })}
         </div>
 
         {/* === Block C — Key $USD Correlations (server-side, rule-derived) ==
