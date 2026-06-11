@@ -739,6 +739,7 @@ export function MacroRegimeSection() {
 
         {/* === Block A — VIX strip ================================= */}
         <div className="dbm-block">
+          <span className="dbm-block-title">Volatility Regime</span>
           {signals.status === 'loading' && <p className="db-state">Loading VIX…</p>}
           {signals.status === 'error' && (
             <p className="db-state db-state-error">VIX unavailable.</p>

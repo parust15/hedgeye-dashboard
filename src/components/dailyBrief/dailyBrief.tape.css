@@ -37,11 +37,11 @@
 
 .db-tape-head {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text);
   border-bottom: 1px solid var(--border-strong);
 }
 
@@ -63,7 +63,7 @@
 }
 
 .db-tape-head .db-tape-cell-num {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* Number coloring. */
@@ -81,8 +81,8 @@
 .db-tape-footer {
   margin: 10px 0 0;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 12px;
+  color: var(--text);
   line-height: 1.6;
 }
 
@@ -100,8 +100,8 @@
 
 .db-sector-ticker {
   font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-dim);
+  font-size: 12px;
+  color: var(--text);
 }
 
 /* SPY benchmark row — set off by a heavier top divider. */
@@ -117,7 +117,7 @@
 .db-stance-chip {
   display: inline-block;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.4px;
   padding: 2px 7px;
@@ -151,7 +151,7 @@
 .db-impact-title {
   display: block;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.4px;
   margin-bottom: 6px;
@@ -177,8 +177,8 @@
 }
 
 .db-impact-sector {
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 12px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -187,11 +187,11 @@
 .db-tape-head.db-impact-row .db-impact-sym,
 .db-tape-head.db-impact-row .db-impact-sector {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .db-impact-empty {
@@ -201,9 +201,9 @@
 /* --- USD correlation matrix -------------------------------------- */
 .db-corr-explainer {
   margin: 0 0 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-style: italic;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .db-usdcorr-row {
