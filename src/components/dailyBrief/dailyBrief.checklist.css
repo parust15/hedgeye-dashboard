@@ -1,0 +1,610 @@
+/* === Pre-Market Checklist ============================================
+   Seven numbered checks, walked top to bottom before the open.
+   Reuses the .db-section / .db-scrim / .card-bg chrome from App.css;
+   everything inside is pmc-*. Big, bright, decision-speed typography:
+   verdicts and action verbs are the loudest elements on the page. */
+
+.pmc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pmc-asof {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pmc-asof-stale {
+  margin-left: 6px;
+}
+
+/* --- Morning Read banner ------------------------------------------ */
+.pmc-banner .pmc-check-title {
+  color: var(--text-strong);
+}
+.pmc-votes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.pmc-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pmc-vote-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-strong);
+}
+.pmc-friction {
+  margin: 0;
+  font-size: 15px;
+  color: var(--amber-light);
+}
+.pmc-friction b {
+  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.6px;
+}
+.pmc-banner-narrative {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-strong);
+  border-left: 3px solid var(--accent);
+  padding-left: 14px;
+}
+
+/* --- Check section chrome ---------------------------------------- */
+.pmc-check-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.pmc-check-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev-2);
+  color: var(--text-strong);
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pmc-check-title {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--db-head);
+  min-width: 0;
+}
+
+.pmc-check-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Verdict chip — the one-glance answer ------------------------- */
+.pmc-verdict {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-badge);
+  white-space: nowrap;
+}
+.pmc-verdict-bull { color: var(--bull); background: var(--bull-bg); border: 1px solid rgba(34, 197, 94, 0.4); }
+.pmc-verdict-bear { color: var(--bear); background: var(--bear-bg); border: 1px solid rgba(239, 68, 68, 0.4); }
+.pmc-verdict-amber { color: var(--amber-light); background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.4); }
+.pmc-verdict-neu { color: var(--text-strong); background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border-strong); }
+
+/* --- Shared chips / tones ------------------------------------------ */
+.pmc-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-badge);
+  white-space: nowrap;
+}
+.pmc-chip-bull { color: var(--bull); background: var(--bull-bg); }
+.pmc-chip-bear { color: var(--bear); background: var(--bear-bg); }
+.pmc-chip-amber { color: var(--amber-light); background: rgba(245, 158, 11, 0.14); }
+.pmc-chip-neu { color: var(--neutral); background: var(--neutral-bg); }
+
+.pmc-up { color: var(--bull); font-style: normal; }
+.pmc-down { color: var(--bear); font-style: normal; }
+.pmc-tone-bull { color: var(--bull); }
+.pmc-tone-bear { color: var(--bear); }
+.pmc-tone-amber { color: var(--amber-light); }
+.pmc-tone-neu { color: var(--text-strong); }
+
+.pmc-footnote {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pmc-subhead {
+  display: block;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  margin-bottom: 8px;
+}
+
+/* --- 1. Regime ------------------------------------------------------ */
+.pmc-regime {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pmc-regime-main {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pmc-regime-quad {
+  font-family: var(--mono);
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+}
+.pmc-regime-name {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.pmc-regime-gip {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.pmc-regime-gip b { font-weight: 800; }
+.pmc-regime-date {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+.pmc-regime-play {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.pmc-play-label {
+  display: inline-block;
+  min-width: 64px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+.pmc-regime-market {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pmc-regime-market .pmc-subhead {
+  margin-bottom: 2px;
+}
+.pmc-regime-market-line {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.pmc-regime-market-line b {
+  font-family: var(--mono);
+  font-weight: 800;
+}
+.pmc-regime-next {
+  display: flex;
+  gap: 18px;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+.pmc-regime-next b { font-family: var(--mono); }
+.pmc-regime-regional {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --- 2. VIX ---------------------------------------------------------- */
+.pmc-vix {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.pmc-vix-num {
+  font-family: var(--mono);
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.pmc-vix-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pmc-vix-line {
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.pmc-vix-line b { font-weight: 700; }
+.pmc-vix-rule {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* --- 3. Signal board -------------------------------------------------- */
+.pmc-posture {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.pmc-posture-cell {
+  font-size: 17px;
+  color: var(--text-strong);
+}
+.pmc-posture-cell b {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+.pmc-posture-sub {
+  font-size: 14px;
+  color: var(--text);
+}
+.pmc-flips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pmc-flip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pmc-flip:last-child { border-bottom: none; }
+.pmc-flip-ticker {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-strong);
+  min-width: 92px;
+}
+.pmc-flip-arrow {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.pmc-flip-date {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+.pmc-break {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+.pmc-bucket-cross {
+  margin-left: 10px;
+}
+
+/* Range-structure counts + width movers (check 3). */
+.pmc-rs-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+.pmc-rs-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+.pmc-rs-cell b {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 800;
+}
+.pmc-rs-movers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 8px;
+}
+.pmc-rs-mover {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.pmc-rs-mover b {
+  font-size: 16px;
+  font-weight: 800;
+}
+.pmc-earn-time {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-strong);
+  text-transform: uppercase;
+}
+
+/* --- 4. Range extremes ------------------------------------------------ */
+.pmc-extremes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.pmc-extreme-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pmc-extreme-head {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-strong);
+  margin-bottom: 4px;
+}
+.pmc-extreme-item {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pmc-extreme-item:last-child { border-bottom: none; }
+.pmc-extreme-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* AI verdict reason line under each extreme row. */
+.pmc-extreme-why {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+/* Conviction tag on verdict rows. */
+.pmc-conv {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+}
+.pmc-conv-high { color: var(--amber-light); background: rgba(245, 158, 11, 0.14); }
+.pmc-conv-medium { color: var(--text-strong); background: rgba(255, 255, 255, 0.08); }
+.pmc-conv-low { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.pmc-action {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  min-width: 76px;
+}
+.pmc-extreme-ticker {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+.pmc-extreme-num {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.pmc-extreme-pct {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* --- 5. Signal gate ---------------------------------------------------- */
+.pmc-gate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pmc-gate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pmc-gate-row:last-child { border-bottom: none; }
+.pmc-gate-vs {
+  font-size: 14px;
+  color: var(--text);
+}
+.pmc-gate-rule {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* --- 6. Sectors --------------------------------------------------------- */
+.pmc-sectors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.pmc-sector {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev-2);
+}
+.pmc-sector-bull { border-left: 3px solid var(--bull); }
+.pmc-sector-bear { border-left: 3px solid var(--bear); }
+.pmc-sector-neu { border-left: 3px solid var(--neutral); }
+.pmc-sector-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pmc-sector-1d {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pmc-sector-ticker {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.pmc-sector-ytd {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 7. Focus ------------------------------------------------------------ */
+.pmc-top3 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pmc-theme {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.pmc-theme-rank {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent);
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.pmc-theme-name {
+  display: block;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  margin-bottom: 2px;
+}
+.pmc-theme-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-strong);
+}
+.pmc-spx-rows,
+.pmc-ondeck-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.pmc-spx-cell {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.pmc-spx-cell b { font-weight: 800; }
+
+/* --- Responsive ------------------------------------------------------------ */
+@media (max-width: 760px) {
+  .pmc-extremes {
+    grid-template-columns: 1fr;
+  }
+  .pmc-check-title {
+    font-size: 22px;
+  }
+  .pmc-verdict {
+    font-size: 14px;
+  }
+  .pmc-vix-num {
+    font-size: 44px;
+  }
+  .pmc-regime-quad {
+    font-size: 34px;
+  }
+  .pmc-regime-name {
+    font-size: 24px;
+  }
+}

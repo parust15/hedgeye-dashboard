@@ -1,24 +1,8 @@
-import { MacroRegimeSection } from './dailyBrief/MacroRegimeSection'
-import { TapeSection } from './dailyBrief/TapeSection'
-import { BattersBoxSection } from './dailyBrief/BattersBoxSection'
+import { PreMarketChecklist } from './dailyBrief/PreMarketChecklist'
 
-// The master morning page — a fixed, ordered stack of decision-layer
-// sections. Each section owns its own data fetch. Adding a future tier
-// is: build one section component, drop one line in the stack below.
+// The Daily Summary tab (id stays `daily-brief` — localStorage-coupled).
+// Renders the Pre-Market Checklist: seven ordered checks the trader
+// walks before the open, structured by the Hedgeye 5-level confluence.
 export function DailyBrief() {
-  return (
-    <div className="panel daily-brief">
-      <header className="topbar">
-        <div className="topbar-left">
-          <h1>Daily Summary</h1>
-        </div>
-      </header>
-
-      <div className="db-stack">
-        <MacroRegimeSection />
-        <TapeSection />
-        <BattersBoxSection />
-      </div>
-    </div>
-  )
+  return <PreMarketChecklist />
 }
