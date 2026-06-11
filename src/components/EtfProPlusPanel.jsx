@@ -350,6 +350,10 @@ export function EtfProPlusPanel() {
   // dataset — same defensive sweep RR does for category chips.
   useEffect(() => {
     setActiveAssetClasses((prev) => {
+      // null = "no filter" sentinel — nothing to reconcile (same guard as
+      // RiskRangesPanel's sweep; without it `for...of null` throws and the
+      // whole app unmounts on tab open).
+      if (prev === null) return prev
       const valid = new Set(assetClasses)
       let changed = false
       const next = new Set()
